@@ -52,6 +52,6 @@ def test_anthropic_api():
         print(f"❌ Anthropic 调用失败: {e}")
 
 if __name__ == "__main__":
-    # 执行测试 (如果你的某个 Key 没有余额或没配，对应的函数会走 except 打印失败，不影响另一个)
+    # 执行测试
     test_openai_api()
     test_anthropic_api()

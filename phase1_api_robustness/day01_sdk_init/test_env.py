@@ -9,11 +9,11 @@ load_dotenv()
 openai_key = os.getenv("OPENAI_API_KEY")
 anthropic_key = os.getenv("ANTHROPIC_API_KEY")
 
-# 3. 安全打印测试 (绝不要打印出完整的 Key)
+# 3. 安全打印测试 
 print("=== 环境变量测试开始 ===")
 
 if openai_key:
-    # 只打印前 8 个字符，后面用星号代替，证明读到了即可
+    # 只打印前 8 个字符
     print(f"✅ OpenAI Key 读取成功: {openai_key[:8]}**********")
 else:
     print("❌ 错误: 未找到 OPENAI_API_KEY")
