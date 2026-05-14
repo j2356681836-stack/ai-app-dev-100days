@@ -24,6 +24,7 @@
         - before/after的区别
         - 自定义ValueError
     - Day 5 : Model Validators
+        -（pydantic.dev/docs/validation/api/pydantic/functional_validators）
         - Model Validators下可以访问所有字段
         - 不在Enum枚举列表中的会被大模型拦截
 - [ ] 阶段二：动态上下文与混合检索层 (Day 21-50)
