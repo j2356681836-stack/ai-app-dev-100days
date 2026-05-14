@@ -27,6 +27,16 @@
         -（pydantic.dev/docs/validation/api/pydantic/functional_validators）
         - Model Validators下可以访问所有字段
         - 不在Enum枚举列表中的会被大模型拦截
+    - Day 6 :
+        - raise:拉响警报，中断代码，报告错误； return：继续执行，最后报错，难以排查
+        - API 本身没有记忆。控制循环时，重试需要在原来的信息上追加（append）消息到上下文中
+        - 传给大模型的content必须是字符串，不能是python对象
+        - 遇到项目：1.先写框架；2.状态流转图；3.破坏和默写 。理清逻辑后再去落实语法
+        - 强类型约束高于自然语言提示词。结构化输出（Structured Outputs）底层机制中Pydantic Schema 的权重远远高于 System Prompt（系统提示词）。在处理大模型幻觉时：
+            - 1.增加泄洪口；
+            - 2.进行拦截；
+            - 3.把约束条件写进 Pydantic 的 Field中，强制转换成 JSON Schema 规则。
+        - 大模型只做客观提取，业务逻辑留在代码库里
 - [ ] 阶段二：动态上下文与混合检索层 (Day 21-50)
 - [ ] 阶段三：原生 Agent 编排与工具调用 (Day 51-70)
 - [ ] 阶段四：流式全栈体验与云原生高可用 (Day 71-100)

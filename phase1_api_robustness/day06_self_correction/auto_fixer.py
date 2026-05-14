@@ -73,6 +73,9 @@ def extact_with_retry(user_text:str, max_retries:int = 3):
                 text_format = BeautyOrder
             )
 
+            # 大模型原始输出Json文本
+            raw_string = response.output_text
+
             # 如果结果没有报错，则带着正确结果跳出循环
             return response.output_parsed
 
@@ -82,6 +85,11 @@ def extact_with_retry(user_text:str, max_retries:int = 3):
             print(f'第{attempt+1}次失败，报错原因：{errors_reason}。')
 
             # 将报错原因追加到上下文，进行再一次
+            messages.append({
+                'role': 'assistant', 
+                'content': raw_string
+            })
+
             messages.append({
                 'role': 'user',
                 'content': f'刚才的输出出现错误，报错信息为{errors_reason}，请检查并重新输出正确的结果。'
@@ -106,6 +114,8 @@ print('---核心品牌信息---')
 core_data = exteactinfo.get_core_brand()
 print(f"核心品牌单品：{core_data['core_items']}")
 print(f"核心品牌收入：{core_data['core_revenue']}")
+
+
 
 
 
