@@ -46,6 +46,9 @@
         - 在 Windows 环境下跑异步程序，退出时会遇到 Event loop is closed 报错，通过引入asyncio.WindowsSelectorEventLoopPolicy()把底层的异步发动机从默认的V8降级成V6解决
         - 通过asyncio.gather()将多组任务打包成并发任务
         - 通过if __name__ == "__main__"设置隔离，防止在import时直接触发执行调用大模型消耗token，加了隔离仅引入工具不会触发执行
+    - Day 9 ：Semaphore与Tenacity，异步并发的限制
+        - Semaphore(1)一个任务结束再到下一个，相当于同步
+        - 异步最大并发数（Semaphore 的大小）阈值边界取决于客户端和服务端中最弱的一环
 - [ ] 阶段二：动态上下文与混合检索层 (Day 21-50)
 - [ ] 阶段三：原生 Agent 编排与工具调用 (Day 51-70)
 - [ ] 阶段四：流式全栈体验与云原生高可用 (Day 71-100)
