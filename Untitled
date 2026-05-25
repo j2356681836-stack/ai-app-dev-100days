@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  beauty_db:
+    # 直接使用官方维护的包含了 pgvector 的镜像
+    image: ankane/pgvector:latest
+    container_name: beauty_agent_pg
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin_password
+      POSTGRES_DB: beauty_kb
+    ports:
+      - "5432:5432"
+    volumes:
+      # 将数据库数据挂载到本地，防止容器重启后数据丢失
+      - pg_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pg_data:
