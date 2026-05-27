@@ -1,3 +1,44 @@
-.env
+# Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+
+# Virtual Environment
+venv/
+.env/
+
+# Environment Variables
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# JSONL outputs
+*.jsonl
+
+# Langfuse / traces
+traces/
+logs/
+
+# Datasets
+data/raw/
+data/generated/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# pytest
+.pytest_cache/
+
+# Coverage
+.coverage
+htmlcov/
