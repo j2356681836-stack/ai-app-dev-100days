@@ -37,3 +37,11 @@
 | -d beauty_kb    | 指定连接 beauty_kb 数据库 |
 
 
+
+
+
+`docker ps` 进入 PostgreSQL
+
+\i sql/daily_sales.sql
+
+
