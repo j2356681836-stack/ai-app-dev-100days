@@ -271,3 +271,51 @@ Retrieval-Augmented Text-to-SQL System
 - 构建第一版 Business Semantic Metadata
 - 建立 business_metrics.yaml
 - 开始 Schema Retrieval 原型开发
+
+---
+### Day 25 Semantic Layer Metadata Foundation
+
+完成内容：
+
+- 建立 business_metrics.yaml
+- 建立 table_dictionary.yaml
+- 定义指标元数据结构：
+  - name
+  - chinese_name
+  - grain
+  - source_field
+  - definition
+  - formula
+  - tables
+  - filters
+
+完成组件：
+
+- metric_loader.py
+  - load_metrics()
+  - get_metric_by_name()
+  - search_metrics()
+
+- table_loader.py
+  - load_tables()
+  - get_table_by_name()
+  - search_tables()
+
+- semantic_search.py
+  - Semantic Search V0
+
+实现能力：
+
+- Metric Retrieval
+- Schema Retrieval
+
+核心认知：
+
+- 同一业务指标可能存在多个业务口径
+- 指标定义需要结构化存储
+- Text-to-SQL 应建立在 Retrieval 之上，而非直接生成 SQL
+
+下一步：
+
+- Context Builder
+- Retrieval-Augmented Text-to-SQL

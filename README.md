@@ -294,6 +294,23 @@ PostgreSQL + pgvector
 - 精华类商品退款率约为其它品类的 2 倍以上
 - 已发现会员复购规则在当前数据模型下存在验证困难，后续将引入会员等级历史建模
 
+### Semantic Layer (In Progress)
+
+已完成：
+
+- Business Metrics Metadata
+- Table Dictionary Metadata
+- Metric Retrieval
+- Schema Retrieval
+- Semantic Search V0
+
+当前能力：
+
+用户问题
+→ Semantic Search
+→ Metric Context
+→ Schema Context
+
 - [ ] 阶段三：原生 Agent 编排与工具调用 (Day 51-70)
 
 - [ ] 阶段四：流式全栈体验与云原生高可用 (Day 71-100)

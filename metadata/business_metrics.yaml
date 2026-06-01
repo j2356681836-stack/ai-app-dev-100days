@@ -1,0 +1,43 @@
+metrics:
+
+  - name: order_paid_amount
+    chinese_name: 订单实付金额
+    grain: order
+    source_field: fact_orders.paid_amount
+    definition: >
+      已支付订单产生的实付销售金额
+    formula: >
+      SUM(paid_amount)
+    tables:
+      - fact_orders
+    filters:
+      - order_status = paid
+
+  - name: item_sales_amount
+    chinese_name: 商品明细实付销售额
+    grain: order_item
+    source_field: fact_order_items.item_paid_amount
+    definition: >
+      已支付订单产生的实付销售金额
+    formula: >
+      SUM(item_paid_amount)
+    tables:
+      - fact_orders
+      - fact_order_items
+    filters:
+      - order_status = paid
+
+  - name: refund_rate
+    chinese_name: 退款率
+    grain: order_item
+    definition: >
+      退款金额占销售金额比例
+    formula: >
+      SUM(refund_amount) / SUM(item_paid_amount)
+    tables:
+      - fact_orders
+      - fact_order_items
+      - fact_refunds
+    filters:
+      - order_status = paid
+

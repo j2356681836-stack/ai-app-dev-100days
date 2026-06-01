@@ -1,0 +1,85 @@
+tables:
+
+  - name: fact_orders
+    chinese_name: 订单事实表
+    description: >
+      记录订单层级信息，
+      包括订单状态、订单金额、下单时间、付款时间等。
+    primary_key:
+      - order_id
+    fields:
+      order_id:
+        description: 订单主键ID
+      order_status:
+        description: 订单状态
+      paid_amount:
+        description: 订单实付金额
+      order_date:
+        description: 下单时间
+      customer_id:
+        description: 用户ID
+      channel_id: 
+        description: 渠道ID
+      gross_amount: 
+        description: 订单原始金额
+      discount_amount: 
+        description: 订单优惠金额
+      paid_amount: 
+        description: 订单实付金额
+      
+
+  - name: fact_order_items
+    chinese_name: 订单商品事实表
+    description: >
+      记录订单中的商品明细，
+      是销售额分析的核心事实表。
+    primary_key:
+      - order_item_id
+    foreign_keys:
+      - order_id
+      - product_id
+    fields:
+      order_item_id:
+        description: 订单明细主键ID
+      order_id:
+        description: 订单ID
+      product_id:
+        description: 商品ID
+      quantity:
+        description: 商品数量
+      unit_price:
+        description: 商品单价
+      item_gross_amount: 
+        description: 商品原始金额
+      item_discount_amount: 
+        description: 商品优惠金额
+      item_paid_amount: 
+        description: 商品实付金额
+
+  - name: fact_refunds
+    chinese_name: 退款订单事实表
+    description: >
+      记录退款订单中的商品明细，
+      包括订单退款状态、退款品类、退款金额，是退款分析的核心事实表。
+    primary_key:
+      - refund_id
+    foreign_keys:
+      - order_id
+      - order_item_id
+    fields:
+      refund_id:
+        description: 退款订单主键ID
+      order_id:
+        description: 原订单ID
+      order_item_id:
+        description: 原订单明细ID
+      refund_date:
+        description: 退款日期
+      refund_amount:
+        description: 退款金额
+      refund_status: 
+        description: 退款状态
+      refund_reason: 
+        description: 退款原因
+
+  

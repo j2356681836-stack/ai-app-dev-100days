@@ -16,7 +16,7 @@
 
 3. 进入 PostgreSQL
 
-`docker exec -it pgvector-db psql -U postgres`  进入数据库命令行，用于执行 SQL
+`docker exec -it pgvector-db psql -U postgres`  进入默认数据库命令行，用于执行 SQL
 
 | 部分          | 含义               |
 | ----------- | ---------------- |
@@ -28,7 +28,7 @@
 
 ---
 
-`docker exec -it beauty_agent_pg psql -U admin -d beauty_kb` 进入数据库，回复**beauty_kb=#**后可以写SQL语句进行查询
+`docker exec -it beauty_agent_pg psql -U admin -d beauty_kb` 进入指定数据库，回复**beauty_kb=#**后可以写SQL语句进行查询
 
 | 部分              | 含义                 |
 | --------------- | ------------------ |
