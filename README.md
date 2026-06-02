@@ -296,20 +296,53 @@ PostgreSQL + pgvector
 
 ### Semantic Layer (In Progress)
 
-已完成：
+## 当前进度
 
-- Business Metrics Metadata
-- Table Dictionary Metadata
-- Metric Retrieval
-- Schema Retrieval
-- Semantic Search V0
+### 已完成
 
-当前能力：
+#### 数据层
+
+- PostgreSQL 环境搭建
+- 星型模型建模
+- 模拟业务数据生成
+
+#### SQL分析层
+
+- 销售分析
+- 退款分析
+- 用户分析
+
+#### 语义层（Semantic Layer）
+
+完成：
+- 业务指标元数据管理
+- 数据表元数据管理
+- 表关系元数据管理
+
+支持：
+- 指标检索
+- 表检索
+- 关系检索
+
+实现：
 
 用户问题
 → Semantic Search
-→ Metric Context
-→ Schema Context
+→ Context Builder
+→ Prompt Builder
+
+---
+
+### 下一阶段
+
+Day27：
+实现 SQL Generator V0
+
+目标：
+自然语言问题
+→ LLM
+→ PostgreSQL SQL
+
 
 - [ ] 阶段三：原生 Agent 编排与工具调用 (Day 51-70)
 

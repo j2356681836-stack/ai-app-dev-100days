@@ -38,6 +38,7 @@ metrics:
       - fact_orders
       - fact_order_items
       - fact_refunds
+      - dim_product
     filters:
       - order_status = paid
 

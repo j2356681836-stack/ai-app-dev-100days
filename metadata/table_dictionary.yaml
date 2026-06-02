@@ -81,5 +81,33 @@ tables:
         description: 退款状态
       refund_reason: 
         description: 退款原因
+      
+  - name: dim_product
+    chinese_name: 商品维度表
+    description: >
+      记录商品基础信息，
+      包括商品名称、品牌、品类、子品类、价格、上架日期等。
+    primary_key:
+      - product_id
+    fields:
+      product_id:
+        description: 商品ID
+      product_name:
+        description: 商品名称
+      brand:
+        description: 商品品牌
+      category:
+        description: 商品品类
+      sub_category:
+        description: 商品子品类
+      price:
+        description: 商品标价
+      sku_code: 
+        description: 商品库存单位编码
+      launch_date: 
+        description: 商品上市时间
+      is_active: 
+        description: 商品是否在售
+
 
   

@@ -38,6 +38,15 @@ def search_tables(query: str) -> list[dict[str, Any]]:
     tables = load_tables()
     results = []
 
+    keywords = [
+        "退款率",
+        "退款",
+        "退货",
+        "销售额",
+        "销售",
+        "实付",
+        "订单",
+    ]
 
     for table in tables:
         # 字段
@@ -53,8 +62,11 @@ def search_tables(query: str) -> list[dict[str, Any]]:
             table.get("description", ""),
             field_text,
         ])
-        if query.lower() in searchable_text.lower():
-            results.append(table)
+
+        for keyword in keywords:
+            if keyword in query and keyword in searchable_text:
+                results.append(table)
+                break
     return results
 
 if __name__ == "__main__":

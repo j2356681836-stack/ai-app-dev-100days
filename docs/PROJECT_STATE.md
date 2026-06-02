@@ -319,3 +319,95 @@ Retrieval-Augmented Text-to-SQL System
 
 - Context Builder
 - Retrieval-Augmented Text-to-SQL
+
+---
+## Day26（语义层与 Prompt Builder）
+
+### 已完成
+
+#### 元数据建设
+
+新增：
+
+- metadata/business_metrics.yaml
+- metadata/table_dictionary.yaml
+- metadata/table_relationships.yaml
+
+完成业务指标、数据表、表关系的结构化定义。
+
+---
+
+#### Loader 模块
+
+完成：
+- metric_loader.py
+- table_loader.py
+- relationship_loader.py
+
+支持：
+- 指标加载
+- 指标检索
+- 表加载
+- 表检索
+- 表关系加载
+
+---
+
+#### Semantic Search
+
+完成：semantic_search.py
+
+实现：
+
+用户问题
+→ 指标检索
+→ 数据表检索
+
+---
+
+#### Context Builder
+
+完成：
+
+context_builder.py
+
+实现自动构建业务上下文：
+
+- 指标定义
+- 指标公式
+- 表说明
+- 字段说明
+- 表关联关系
+
+---
+
+#### Prompt Builder
+
+完成：
+
+prompt_builder.py
+
+生成标准 Text-to-SQL Prompt：
+
+用户问题
++
+业务上下文
++
+SQL生成规则
+
+---
+
+### 当前能力
+
+已实现：
+
+自然语言问题
+→ 业务语义检索
+→ 上下文构建
+→ Prompt生成
+
+下一步：
+
+Prompt
+→ LLM
+→ SQL生成

@@ -39,6 +39,16 @@ def search_metrics(query: str) -> list[dict[str, Any]]:
     metrics = load_metrics()
     results = []
 
+    keywords = [
+        "退款率",
+        "退款",
+        "退货",
+        "销售额",
+        "销售",
+        "实付",
+        "订单",
+    ]
+
     for metric in metrics:
         searchable_text = " ".join([
             metric.get("name", ""),
@@ -46,8 +56,12 @@ def search_metrics(query: str) -> list[dict[str, Any]]:
             metric.get("definition", ""),
             metric.get("formula", ""),
         ])
-        if query.lower() in searchable_text.lower():
-            results.append(metric)
+
+        for keyword in keywords:
+            if keyword in query and keyword in searchable_text:
+                results.append(metric)
+                break
+
     return results
 
 if __name__ == "__main__":

@@ -1,0 +1,26 @@
+relationships:
+
+  - left_table: fact_order_items
+    left_field: order_id
+    right_table: fact_orders
+    right_field: order_id
+
+  - left_table: fact_order_items
+    left_field: product_id
+    right_table: dim_product
+    right_field: product_id
+
+  - left_table: fact_refunds
+    left_field: order_item_id
+    right_table: fact_order_items
+    right_field: order_item_id
+
+  - left_table: fact_orders
+    left_field: customer_id
+    right_table: dim_customer
+    right_field: customer_id
+
+  - left_table: fact_orders
+    left_field: channel_id
+    right_table: dim_channel
+    right_field: channel_id
