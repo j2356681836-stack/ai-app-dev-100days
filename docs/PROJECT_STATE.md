@@ -204,11 +204,6 @@ SQL
 ---
 ## 当前待办（Next Milestone）
 
-### Day28
-- SQL Validation
-- SQL Execution
-- PostgreSQL Runner
-
 ### Day29
 - Result Formatter
 - SQL → Table
@@ -237,12 +232,8 @@ SQL
 完成：
 - business_metrics.yaml
 - table_dictionary.yaml
-
-完成：
 - metric_loader.py
 - table_loader.py
-
-完成：
 - semantic_search.py
 
 ---
@@ -251,14 +242,8 @@ SQL
 
 完成：
 - table_relationships.yaml
-
-完成：
 - relationship_loader.py
-
-完成：
 - context_builder.py
-
-完成：
 - prompt_builder.py
 
 ---
@@ -277,4 +262,24 @@ SQL
 - 哪个品类销售额最高？
 均成功生成SQL
 
-下一步：SQL Execution
+---
+
+### Day28
+
+完成：
+- SQL Validation
+- SQL Execution
+- PostgreSQL Runner
+
+实现：自然语言问题 → 业务语义检索 → Prompt 构建 → SQL 生成 → SQL 校验 → PostgreSQL 执行 → 结构化结果返回
+
+问题：
+哪个品类退款率最高？
+返回：
+category = 精华
+refund_rate_pct = 10.0
+
+下一步：
+Evaluation Framework
+Failure Cases
+Prompt Optimization

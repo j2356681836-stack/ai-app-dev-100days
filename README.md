@@ -287,6 +287,10 @@ Business Semantic Layer + Text-to-SQL
 
 状态：🟡 进行中
 已完成：
+- PostgreSQL环境搭建
+- 星型模型设计
+- 测试数据生成（Seed）
+- 业务指标分析
 - Business Metrics
 - Table Dictionary
 - Relationship Dictionary
@@ -295,14 +299,48 @@ Business Semantic Layer + Text-to-SQL
 - Prompt Builder
 - DeepSeek SQL Generation
 - SQL Cleaner
+- SQL Validator
+- Database Engine
+- SQL Runner
+- Result Formatter
+- Query Service
 
-当前能力：
+当前能力：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → 结构化
 
-自然语言
-↓
-SQL
+## Text2SQL 示例
 
+问题：哪个品类的退款率最高？
 
+生成SQL：
+
+```sql
+SELECT
+    dp.category,
+    ROUND(
+        COALESCE(SUM(fr.refund_amount), 0)
+        / NULLIF(SUM(foi.item_paid_amount), 0)
+        * 100,
+        2
+    ) AS refund_rate_pct
+FROM fact_order_items foi
+INNER JOIN dim_product dp
+    ON foi.product_id = dp.product_id
+INNER JOIN fact_orders fo
+    ON foi.order_id = fo.order_id
+LEFT JOIN fact_refunds fr
+    ON foi.order_item_id = fr.order_item_id
+WHERE fo.order_status = 'paid'
+GROUP BY dp.category
+ORDER BY refund_rate_pct DESC
+LIMIT 1;
+
+返回结果：
+[
+  {
+    "category": "精华",
+    "refund_rate_pct": 10.0
+  }
+]
 ---
 
 ## Phase 3
@@ -399,10 +437,7 @@ Answer
 # 当前版本
 
 Version:v0.3
-
 完成度：Day27 / 100
-
-当前实现：自然语言 → SQL
-
+当前实现：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → 结构化结果返回
 下一里程碑：自然语言 → SQL → PostgreSQL → Result
 
