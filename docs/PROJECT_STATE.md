@@ -1,25 +1,21 @@
 # AI-Architect-100Days
 
-# 长期目标
+## 项目目标
 
+构建企业级 AI BI Agent：
 
-100 天内完成：
+用户自然语言
+→ Business Semantic Layer
+→ Text-to-SQL
+→ SQL Execution
+→ Business Analysis
+→ Agent Workflow
 
-- 企业级 LLM Reliability
+目标岗位：
 
-- Business Semantic Layer
-
-- Text-to-SQL
-
-- LangGraph Agent
-
-- Eval-Driven Development
-
-- FastAPI Deployment
-
-最终目标：
-
-成为可就业的 GenAI Engineer / AI Agent Engineer
+- GenAI Engineer
+- AI Agent Engineer
+- AI Data Engineer
 
 ---
 ## 学习计划
@@ -71,343 +67,214 @@
 - **Day 91-95：作品集与架构图包装。** 完善 GitHub 仓库的 README。画出你系统的状态机流转图和 Ragas 准确率提升曲线。
 - **Day 96-100：工程化面试靶向训练。** 梳理项目中真实踩过的坑（如：并发 429 怎么处理的？大模型死循环了怎么阻断？脏数据怎么用 Pydantic 洗掉的？），用 STAR 法则写进简历。
 
----
-## 已完成（Phase 1）
 
-### API Reliability
-
-- AsyncOpenAI
-- asyncio.gather
-- Semaphore concurrency control
-- tenacity retry
-- structured outputs
-### Data Validation
-
-- Pydantic V2
-- field_validator
-- nested schema validation
-- self-healing JSON repair
-### Observability
-
-- Langfuse tracing
-- parent-child spans
-- token monitoring
-- tagging
 ---
 ## 当前阶段
 
-第二阶段：Business Semantic Layer + Text-to-SQL
+Phase 2：Business Semantic Layer & Text-to-SQL
+
+进度：Day21 ~ Day50
+
+当前日期：Day27 / 100
 
 ---
-## 当前系统状态
+## 已完成能力
 
-当前已完成：
-### 基础设施
+### Phase1：LLM Reliability
 
-- Docker 化 PostgreSQL + pgvector
-    
-- SQLAlchemy 2.0 数据连接
-    
-- Synthetic Business Dataset
-    
-- Beauty BI Schema
-    
-### AI Reliability
+#### API Reliability
 
+- AsyncOpenAI
+- asyncio.gather
+- Semaphore
+- Retry
 - Structured Outputs
-    
-- Pydantic V2 强校验
-    
-- Retry + Self-healing
-    
-- Langfuse Observability
-    
----
-### 当前核心方向
 
-正在构建：
+#### Data Validation
 
-Retrieval-Augmented Text-to-SQL System
-
-重点包括：
-
-- Schema Retrieval
-    
-- Business Metric Retrieval
-    
-- SQL Safety Validation
-    
-- Hallucination Prevention
-
----
-## 当前架构演进
-
-项目当前正在从**phase/day 学习结构**逐渐演进为**企业级模块化工程结构**
-
-目标结构：
-	app/  
-	├── db/  
-	├── semantic_layer/  
-	├── text_to_sql/  
-	├── agents/  
-	├── api/  
-	└── evaluation/
-
-其中：
-- phase 目录保留学习实验记录
-    
-- app 目录作为正式系统核心
-
----
-## 当前技术栈
-
-### Backend
-
-- Python 3.12
-- FastAPI（准备接入）
-
-### AI Stack
-
-- OpenAI SDK
-- Langfuse
 - Pydantic V2
+- field_validator
+- Nested Schema
+- JSON Self-Healing
 
-### Database（Phase 2）
+#### Observability
 
-- PostgreSQL + pgvector
+- Langfuse Tracing
+- Parent/Child Span
+- Token Monitoring
+
+---
+
+### Phase2：Business Semantic Layer
+
+#### 数据层
+
+- PostgreSQL
+- pgvector
 - SQLAlchemy 2.0
-- Synthetic Business Dataset
 - Beauty BI Schema
 
----
+#### 业务元数据
 
-## 当前数据库:
+- business_metrics.yaml
+- table_dictionary.yaml
+- table_relationships.yaml
 
-- 100 products
-- 2000 customers
-- 20000 orders
-- 29051 order items
-- 2008 refunds
-- 5000 reviews
-- 180 days marketing spend
+#### Retrieval
 
-业务规律植入:
-
-- 夏季防晒销售额增长
-- 小红书渠道投放费用上涨
-- 精华退款率更高
-- 会员用户复购行为增强
-
----
-## 当前目标
-
-构建企业级 AI BI Agent：
-
-- 用户输入自然语言 ->
-- 检索业务 schema ->
-- 动态生成 SQL ->
-- 执行 SQL ->
-- 返回业务分析结果
-
----
-## 当前重点问题
-
-- 如何构建 business semantic layer
-- 如何提升 retrieval precision
-- 如何做 SQL safety
-- 如何避免 hallucination
-
----
-## 当前阶段交付物
-
-目标：
-
-企业级 Text-to-SQL 系统
-
----
-发现：
-会员复购增强规律未被当前数据集有效体现。
-
-原因：
-当前仅保存会员等级快照，
-缺少会员等级变更历史；
-同时订单生成逻辑未显著拉开各等级购买频次差异。
-
-后续：
-重构 seed.py，
-增加会员等级升级逻辑和等级历史表。
-
----
-### Day 24 业务指标验证与业务语义理解
-
-完成内容：
-
-- 品类销售额分析 SQL
-- 品类退款率分析 SQL
-- 理解 Fact / Dimension 数据模型
-- 理解 INNER JOIN 与 LEFT JOIN 在业务统计中的区别
-
-业务规律验证：
-
-- 成功验证：
-  - 精华类商品退款率显著高于其它品类（约10%，其它品类约4.5%）
-
-- 未成功验证：
-  - 当前数据集未能有效体现“会员用户复购行为增强”
-
-发现问题：
-
-- 当前会员等级仅保存最新快照
-- 缺少会员等级历史表
-- 会员等级与订单行为关联度不足
-
-核心认知：
-
-- SQL正确 ≠ 业务口径正确
-- 业务口径正确 ≠ 指标有分析价值
-
-下一步：
-
-- 构建第一版 Business Semantic Metadata
-- 建立 business_metrics.yaml
-- 开始 Schema Retrieval 原型开发
-
----
-### Day 25 Semantic Layer Metadata Foundation
-
-完成内容：
-
-- 建立 business_metrics.yaml
-- 建立 table_dictionary.yaml
-- 定义指标元数据结构：
-  - name
-  - chinese_name
-  - grain
-  - source_field
-  - definition
-  - formula
-  - tables
-  - filters
-
-完成组件：
-
-- metric_loader.py
-  - load_metrics()
-  - get_metric_by_name()
-  - search_metrics()
-
-- table_loader.py
-  - load_tables()
-  - get_table_by_name()
-  - search_tables()
-
-- semantic_search.py
-  - Semantic Search V0
-
-实现能力：
-
-- Metric Retrieval
-- Schema Retrieval
-
-核心认知：
-
-- 同一业务指标可能存在多个业务口径
-- 指标定义需要结构化存储
-- Text-to-SQL 应建立在 Retrieval 之上，而非直接生成 SQL
-
-下一步：
-
-- Context Builder
-- Retrieval-Augmented Text-to-SQL
-
----
-## Day26（语义层与 Prompt Builder）
-
-### 已完成
-
-#### 元数据建设
-
-新增：
-
-- metadata/business_metrics.yaml
-- metadata/table_dictionary.yaml
-- metadata/table_relationships.yaml
-
-完成业务指标、数据表、表关系的结构化定义。
-
----
-
-#### Loader 模块
-
-完成：
 - metric_loader.py
 - table_loader.py
 - relationship_loader.py
 
-支持：
-- 指标加载
-- 指标检索
-- 表加载
-- 表检索
-- 表关系加载
+#### Semantic Layer
+
+- semantic_search.py
+- context_builder.py
+
+#### Text-to-SQL
+
+- prompt_builder.py
+- sql_generator.py（DeepSeek）
+- sql_cleaner.py
+
+当前能力：
+
+自然语言
+→ Semantic Search
+→ Context Builder
+→ Prompt Builder
+→ DeepSeek
+→ SQL
+
+---
+## 当前项目结构
+
+app/
+├── api/
+├── agents/
+├── db/
+├── semantic_layer/
+├── text_to_sql/
+├── evaluation/
+docs/
+metadata/
 
 ---
 
-#### Semantic Search
+## 当前数据库
 
-完成：semantic_search.py
+### 数据规模
 
-实现：
+- 100 Products
+- 2000 Customers
+- 20000 Orders
+- 29051 Order Items
+- 2008 Refunds
+- 5000 Reviews
 
-用户问题
-→ 指标检索
-→ 数据表检索
+### 已植入业务规律
+
+- 夏季防晒销量增长
+- 小红书渠道成本增长
+- 精华退款率更高
+
+### 待增强业务规律
+
+- 会员等级成长体系
+- 会员等级历史表
+- 复购行为增强
 
 ---
+## 当前系统架构
 
-#### Context Builder
+Question
+↓
+Semantic Search
+↓
+Context Builder
+↓
+Prompt Builder
+↓
+DeepSeek
+↓
+SQL Cleaner
+↓
+SQL
+
+---
+## 当前待办（Next Milestone）
+
+### Day28
+- SQL Validation
+- SQL Execution
+- PostgreSQL Runner
+
+### Day29
+- Result Formatter
+- SQL → Table
+
+### Day30
+- Natural Language → SQL → Result 闭环
+
+---
+## 开发日志
+
+### Day24
 
 完成：
+- 品类销售额分析
+- 品类退款率分析
+- Business SQL验证
 
-context_builder.py
-
-实现自动构建业务上下文：
-
-- 指标定义
-- 指标公式
-- 表说明
-- 字段说明
-- 表关联关系
+发现：
+- 会员等级快照设计不足
+- 缺少等级历史表
 
 ---
 
-#### Prompt Builder
+### Day25
 
 完成：
+- business_metrics.yaml
+- table_dictionary.yaml
 
-prompt_builder.py
+完成：
+- metric_loader.py
+- table_loader.py
 
-生成标准 Text-to-SQL Prompt：
-
-用户问题
-+
-业务上下文
-+
-SQL生成规则
+完成：
+- semantic_search.py
 
 ---
 
-### 当前能力
+### Day26
 
-已实现：
+完成：
+- table_relationships.yaml
 
-自然语言问题
-→ 业务语义检索
-→ 上下文构建
-→ Prompt生成
+完成：
+- relationship_loader.py
 
-下一步：
+完成：
+- context_builder.py
 
-Prompt
-→ LLM
-→ SQL生成
+完成：
+- prompt_builder.py
+
+---
+
+### Day27
+
+完成：
+- DeepSeek API接入
+- sql_generator.py
+- sql_cleaner.py
+
+实现：自然语言→ SQL
+
+验证问题：
+- 哪个品类退款率最高？
+- 哪个品类销售额最高？
+均成功生成SQL
+
+下一步：SQL Execution

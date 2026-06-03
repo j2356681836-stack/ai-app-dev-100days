@@ -68,6 +68,16 @@ def build_context(query: str) -> str:
 """
     )
 
+    context_parts.append("=== filters_text ===")
+    filters = metric.get("filters", [])
+    filters_text = "\n".join([f"- {item}" for item in filters])
+    context_parts.append(
+        f"""
+过滤条件:
+{filters_text}
+"""
+    )
+
     return "\n".join(context_parts)
 
 

@@ -29,6 +29,12 @@ def build_prompt(user_question: str) -> str:
 2. 使用提供的表。
 3. 不要编造字段。
 4. 只返回 SQL。
+5. 必须使用指标中的 filters 作为 WHERE 条件。
+6. 如果指标涉及 filters 中的字段，必须 JOIN 包含该字段的表。
+7. 聚合除法必须使用 NULLIF 防止除以 0。
+8. LEFT JOIN 用于可选事实表，例如退款表；不要因为没有退款记录而丢失销售明细。
+9. SQL中的表别名和字段别名统一使用英文。
+10. 不要使用中文字段别名。
 """
 
     return prompt
