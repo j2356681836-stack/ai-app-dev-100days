@@ -75,7 +75,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
 
-当前日期：Day27 / 100
+当前日期：Day29 / 100
 
 ---
 ## 已完成能力
@@ -140,11 +140,24 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 当前能力：
 
 自然语言
-→ Semantic Search
-→ Context Builder
-→ Prompt Builder
-→ DeepSeek
-→ SQL
+↓
+Semantic Search
+↓
+Context Builder
+↓
+Prompt Builder
+↓
+DeepSeek
+↓
+SQL Cleaner
+↓
+SQL Validator
+↓
+PostgreSQL
+↓
+Table
+↓
+Evaluation
 
 ---
 ## 当前项目结构
@@ -204,12 +217,28 @@ SQL
 ---
 ## 当前待办（Next Milestone）
 
-### Day29
-- Result Formatter
-- SQL → Table
-
 ### Day30
-- Natural Language → SQL → Result 闭环
+
+- Evaluation V2
+- 扩展 Golden Questions（10~20条）
+- Failure Cases 数据集
+- Prompt Optimization V2
+
+### Day31
+
+- Metadata Embedding
+- BGE Small 接入准备
+- Vector Search 基础
+
+### Day32
+
+- pgvector 接入
+- Metadata Vector Store
+
+### Day33
+
+- Semantic Search V2
+- Keyword + Vector Hybrid Search
 
 ---
 ## 开发日志
@@ -283,3 +312,47 @@ refund_rate_pct = 10.0
 Evaluation Framework
 Failure Cases
 Prompt Optimization
+
+---
+
+### Day29
+
+完成：
+
+- Result Formatter
+- SQL → Table
+- Golden Questions
+- Evaluator
+- Evaluation Report
+- Failure Case Analysis
+- Prompt Optimization V1
+
+实现：
+
+Question
+↓
+SQL
+↓
+PostgreSQL
+↓
+Table
+↓
+Evaluation
+
+发现问题：
+
+- 模糊问题导致分析维度错误
+- category 被错误替换为 product_name
+
+解决：
+
+- 新增 Evaluation V1
+- 增加 expected_columns 校验
+- Prompt 增加默认 category 规则
+
+结果：
+
+Pass Rate
+66.67%
+↓
+100%

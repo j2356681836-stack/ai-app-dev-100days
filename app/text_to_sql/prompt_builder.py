@@ -37,6 +37,7 @@ def build_prompt(user_question: str) -> str:
 10. 不要使用中文字段别名。
 11. 比率类指标必须乘以 100，并使用 ROUND(..., 2)，字段别名使用 *_pct。
 12. 当用户问题包含“最高”、“最低”、“最大”、“最小”、“最多”、“最少”、“第一”等排序取极值含义时，必须使用 ORDER BY，并添加 LIMIT 1。
+13. 当用户问题没有明确指定分析维度，但指标与商品相关时，默认使用 dim_product.category 作为分析维度，不要默认使用 dim_product.product_name。
 """
 
     return prompt

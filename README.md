@@ -307,6 +307,34 @@ Business Semantic Layer + Text-to-SQL
 
 当前能力：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → 结构化
 
+## Evaluation Framework
+
+支持：
+
+- Golden Questions
+- SQL Evaluation
+- Failure Case Analysis
+- Prompt Optimization
+
+评估流程：
+
+Question
+↓
+SQL Generation
+↓
+SQL Validation
+↓
+Evaluation
+↓
+Failure Analysis
+↓
+Prompt Optimization
+
+当前评估结果：
+
+- Golden Questions：3
+- Pass Rate：100%
+
 ## Text2SQL 示例
 
 问题：哪个品类的退款率最高？
@@ -436,8 +464,7 @@ Answer
 
 # 当前版本
 
-Version:v0.3
-完成度：Day27 / 100
-当前实现：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → 结构化结果返回
-下一里程碑：自然语言 → SQL → PostgreSQL → Result
+Version: v0.4
+完成度：Day29 / 100
+当前实现：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → Table → Evaluation
 

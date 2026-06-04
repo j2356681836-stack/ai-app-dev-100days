@@ -13,10 +13,22 @@ def format_result(rows: list[dict]) -> list[dict]:
 
     for row in rows:
         formatted_row = {}
-
         for key, value in row.items():
             formatted_row[key] = format_value(value)
-
         formatted_rows.append(formatted_row)
-
     return formatted_rows
+
+
+def to_table(rows: list[dict]) -> dict:
+    if not rows:
+        return {
+            "columns": [],
+            "rows": [],
+            "row_count": 0,
+        }
+
+    return {
+        "columns": list(rows[0].keys()),
+        "rows": rows,
+        "row_count": len(rows),
+    }
