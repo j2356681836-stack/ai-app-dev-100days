@@ -75,7 +75,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
 
-当前日期：Day29 / 100
+当前日期：Day30 / 100
 
 ---
 ## 已完成能力
@@ -217,28 +217,47 @@ SQL
 ---
 ## 当前待办（Next Milestone）
 
-### Day30
-
-- Evaluation V2
-- 扩展 Golden Questions（10~20条）
-- Failure Cases 数据集
-- Prompt Optimization V2
-
 ### Day31
 
-- Metadata Embedding
-- BGE Small 接入准备
-- Vector Search 基础
+Alias Search vs Embedding Search
+
+目标：
+理解：
+- Embedding
+- Vector Search
+- 为什么 Alias 无法覆盖所有业务表达
 
 ### Day32
 
-- pgvector 接入
-- Metadata Vector Store
+Embedding Metadata 准备
+
+目标：
+- Metadata 向量化
+- BGE Small 接入设计
 
 ### Day33
 
-- Semantic Search V2
-- Keyword + Vector Hybrid Search
+Semantic Search V2
+
+目标：
+- Alias Match + Embedding Match
+- Hybrid Search
+
+### Day34
+
+Metadata Embedding Pipeline
+
+### Day35
+
+Vector Retrieval Prototype
+
+### Day36~40
+
+渠道分析能力建设：
+- dim_channel
+- fact_marketing_spend
+- ROI
+- 渠道 Evaluation
 
 ---
 ## 开发日志
@@ -354,5 +373,36 @@ Evaluation
 
 Pass Rate
 66.67%
+↓
+100%
+
+---
+
+### Day30
+
+完成：
+
+- Golden Questions 扩展
+- Evaluation V2
+- Semantic Search V1
+- Alias Search
+- Failure Cases 分类
+
+发现问题：
+
+- 业务黑话无法识别
+- Alias 可解决部分问题
+- Alias 无法无限扩展
+
+解决：
+
+- business_metrics.yaml 增加 aliases
+- metric_loader 支持 Alias Match
+
+结果：
+
+Pass Rate：
+
+71.43%
 ↓
 100%

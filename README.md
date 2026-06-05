@@ -369,6 +369,35 @@ LIMIT 1;
     "refund_rate_pct": 10.0
   }
 ]
+
+## Evaluation Framework V2
+
+支持：
+
+- Golden Questions
+- Failure Case Analysis
+- Prompt Optimization
+- Semantic Alias Search
+
+当前评估结果：
+
+- Golden Questions：8
+- Pass Rate：100%
+
+支持业务表达：
+
+- 销售额最高
+- 卖得最好
+- 退款率最高
+- 退货最严重
+
+当前暂不支持：
+
+- ROI
+- 利润分析
+- 渠道分析
+- 模糊业务口语
+
 ---
 
 ## Phase 3
@@ -464,7 +493,7 @@ Answer
 
 # 当前版本
 
-Version: v0.4
-完成度：Day29 / 100
+Version: v0.5
+完成度：Day30 / 100
 当前实现：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → Table → Evaluation
 

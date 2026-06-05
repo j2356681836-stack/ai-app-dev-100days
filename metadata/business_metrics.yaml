@@ -15,6 +15,13 @@ metrics:
 
   - name: item_sales_amount
     chinese_name: 商品明细实付销售额
+    aliases:
+      - 销售额
+      - 销售金额
+      - 卖得最好
+      - 卖得最火
+      - 最能卖
+      - 卖得好
     grain: order_item
     source_field: fact_order_items.item_paid_amount
     definition: >
@@ -29,6 +36,12 @@ metrics:
 
   - name: refund_rate
     chinese_name: 退款率
+    aliases:
+      - 退款率
+      - 退货率
+      - 退货最严重
+      - 退款最严重
+      - 退得最厉害
     grain: order_item
     definition: >
       退款金额占销售金额比例

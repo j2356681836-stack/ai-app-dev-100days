@@ -1,0 +1,128 @@
+{
+  "timestamp": "20260605_150325",
+  "summary": {
+    "total": 7,
+    "passed": 0,
+    "failed": 7,
+    "pass_rate": 0.0
+  },
+  "results": [
+    {
+      "id": "case_001",
+      "question": "哪个品类的退款率最高？",
+      "passed": false,
+      "missing_tables": [
+        "fact_order_items",
+        "fact_orders",
+        "fact_refunds",
+        "dim_product"
+      ],
+      "missing_columns": [
+        "category",
+        "refund_rate_pct"
+      ],
+      "sql": null,
+      "row_count": 0,
+      "error": "name 'filters' is not defined"
+    },
+    {
+      "id": "case_002",
+      "question": "哪个品类销售额最高？",
+      "passed": false,
+      "missing_tables": [
+        "fact_order_items",
+        "fact_orders",
+        "dim_product"
+      ],
+      "missing_columns": [
+        "category"
+      ],
+      "sql": null,
+      "row_count": 0,
+      "error": "name 'filters' is not defined"
+    },
+    {
+      "id": "case_003",
+      "question": "退款率最高的是啥？",
+      "passed": false,
+      "missing_tables": [
+        "fact_order_items",
+        "fact_orders",
+        "fact_refunds",
+        "dim_product"
+      ],
+      "missing_columns": [
+        "category"
+      ],
+      "sql": null,
+      "row_count": 0,
+      "error": "name 'filters' is not defined"
+    },
+    {
+      "id": "case_005",
+      "question": "卖得最好的是哪个品类？",
+      "passed": false,
+      "missing_tables": [
+        "fact_order_items",
+        "fact_orders",
+        "dim_product"
+      ],
+      "missing_columns": [
+        "category"
+      ],
+      "sql": null,
+      "row_count": 0,
+      "error": "未找到与问题相关的业务指标：卖得最好的是哪个品类？"
+    },
+    {
+      "id": "case_006",
+      "question": "退款率前三的品类",
+      "passed": false,
+      "missing_tables": [
+        "fact_order_items",
+        "fact_orders",
+        "dim_product",
+        "fact_refunds"
+      ],
+      "missing_columns": [
+        "category"
+      ],
+      "sql": null,
+      "row_count": 0,
+      "error": "name 'filters' is not defined"
+    },
+    {
+      "id": "case_008",
+      "question": "哪个品类退货最严重？",
+      "passed": false,
+      "missing_tables": [
+        "fact_order_items",
+        "fact_orders",
+        "dim_product",
+        "fact_refunds"
+      ],
+      "missing_columns": [
+        "category"
+      ],
+      "sql": null,
+      "row_count": 0,
+      "error": "未找到与问题相关的业务指标：哪个品类退货最严重？"
+    },
+    {
+      "id": "case_010",
+      "question": "销售额Top5品类",
+      "passed": false,
+      "missing_tables": [
+        "fact_order_items",
+        "fact_orders",
+        "dim_product"
+      ],
+      "missing_columns": [
+        "category"
+      ],
+      "sql": null,
+      "row_count": 0,
+      "error": "name 'filters' is not defined"
+    }
+  ]
+}

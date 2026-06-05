@@ -32,33 +32,26 @@ def get_metric_by_name(metric_name: str) -> dict | None:
 
 def search_metrics(query: str) -> list[dict[str, Any]]:
     """
-    根据关键词搜索指标。
-    当前是 V0：基于 name、chinese_name、definition 的简单包含匹配。
+    根据用户问题搜索业务指标。
+    V1：支持 name、chinese_name、definition、formula、aliases 匹配。
     """
 
     metrics = load_metrics()
     results = []
 
-    keywords = [
-        "退款率",
-        "退款",
-        "退货",
-        "销售额",
-        "销售",
-        "实付",
-        "订单",
-    ]
-
     for metric in metrics:
-        searchable_text = " ".join([
+        searchable_items = [
             metric.get("name", ""),
             metric.get("chinese_name", ""),
             metric.get("definition", ""),
             metric.get("formula", ""),
-        ])
+        ]
 
-        for keyword in keywords:
-            if keyword in query and keyword in searchable_text:
+        aliases = metric.get("aliases", [])
+        searchable_items.extend(aliases)
+
+        for item in searchable_items:
+            if item and item in query:
                 results.append(metric)
                 break
 

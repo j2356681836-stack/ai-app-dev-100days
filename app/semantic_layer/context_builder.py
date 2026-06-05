@@ -6,6 +6,10 @@ from app.semantic_layer.relationship_loader import get_relationships_for_tables
 def build_context(query: str) -> str:
 
     result = semantic_search(query)     # Metrics,Tables
+    metrics = result["metrics"]
+
+    if not metrics:
+        raise ValueError(f"未找到与问题相关的业务指标：{query}")    
 
     context_parts = []
 
@@ -69,8 +73,16 @@ def build_context(query: str) -> str:
     )
 
     context_parts.append("=== filters_text ===")
-    filters = metric.get("filters", [])
-    filters_text = "\n".join([f"- {item}" for item in filters])
+    all_filters = []
+
+    for metric in result["metrics"]:
+        all_filters.extend(
+            metric.get("filters", [])
+        )
+
+    filters_text = "\n".join(
+        [f"- {item}" for item in all_filters]
+    )
     context_parts.append(
         f"""
 过滤条件:
