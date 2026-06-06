@@ -400,6 +400,44 @@ LIMIT 1;
 
 ---
 
+## Day31：Semantic Search V2 设计
+
+完成：
+
+- Alias Search 局限分析
+- Embedding Search 原理学习
+- Clarification 机制设计
+- Hybrid Search 架构设计
+- Metric Embedding Pipeline 设计
+- Metric Text Builder 实现
+
+新增文档：
+
+- docs/architecture/semantic_search_v2.md
+- docs/architecture/metric_embedding_design.md
+
+新增模块：
+
+- app/semantic_layer/metric_text_builder.py
+
+当前状态：
+
+Metric YAML
+↓
+Metric Text
+
+已完成
+
+下一步：
+
+Metric Text
+↓
+Embedding Vector
+↓
+Similarity Search
+
+---
+
 ## Phase 3
 
 Agent Workflow
@@ -493,7 +531,7 @@ Answer
 
 # 当前版本
 
-Version: v0.5
-完成度：Day30 / 100
+Version: v0.6
+完成度：Day31 / 100
 当前实现：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → Table → Evaluation
 

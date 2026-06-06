@@ -75,7 +75,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
 
-当前日期：Day30 / 100
+当前日期：Day31 / 100
 
 ---
 ## 已完成能力
@@ -217,47 +217,56 @@ SQL
 ---
 ## 当前待办（Next Milestone）
 
-### Day31
-
-Alias Search vs Embedding Search
-
-目标：
-理解：
-- Embedding
-- Vector Search
-- 为什么 Alias 无法覆盖所有业务表达
-
 ### Day32
 
-Embedding Metadata 准备
+目标：接入 BGE-small-zh-v1.5
 
-目标：
-- Metadata 向量化
-- BGE Small 接入设计
+完成：
+Metric Text
+↓
+Embedding Vector
+
+验证：向量相似度
+
+---
 
 ### Day33
 
-Semantic Search V2
+目标：Embedding Search Prototype
+实现：Metric Vector Retrieval
 
-目标：
-- Alias Match + Embedding Match
-- Hybrid Search
+---
 
 ### Day34
 
-Metadata Embedding Pipeline
+目标：
+Hybrid Search V1
+Alias + Embedding
+
+---
 
 ### Day35
 
-Vector Retrieval Prototype
+目标：
+Confidence Score
+Top1 Threshold + Top1 Gap
+
+---
 
 ### Day36~40
 
-渠道分析能力建设：
+渠道分析能力建设
+
+新增：
 - dim_channel
 - fact_marketing_spend
+
+新增指标：
 - ROI
-- 渠道 Evaluation
+- CAC
+- 渠道销售额
+
+新增 Evaluation
 
 ---
 ## 开发日志
@@ -406,3 +415,38 @@ Pass Rate：
 71.43%
 ↓
 100%
+
+---
+
+### Day31
+
+完成：
+- Semantic Search V2 架构设计
+- Hybrid Search 方案设计
+- Clarification 机制设计
+- Metric Embedding Pipeline 设计
+- Metric Text Builder 开发
+
+产出：
+- semantic_search_v2.md
+- metric_embedding_design.md
+- metric_text_builder.py
+
+关键收获：Alias Search：
+
+优点：
+- 准确
+- 可控
+
+缺点：
+- 难扩展
+
+Embedding Search：
+
+优点：
+- 语义理解能力强
+
+缺点：
+- 无法解决业务歧义
+
+因此未来采用： Alias + Embedding + Clarification 的 Hybrid Search方案
