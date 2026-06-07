@@ -438,6 +438,41 @@ Similarity Search
 
 ---
 
+## Day32：Embedding Search 与 Vector Cache
+
+完成：
+
+- 接入 BGE-small-zh-v1.5
+- 实现 Embedding Service
+- 实现 Semantic Search V2
+- 实现 Cosine Similarity 检索
+- 实现 Confidence 判断
+- 实现结构化返回
+- 实现 Metric Vector Cache
+
+新增模块：
+
+- app/semantic_layer/embedding_service.py
+- app/semantic_layer/semantic_search_v2.py
+- app/semantic_layer/vector_store.py
+
+当前能力：
+
+Question
+↓
+Embedding
+↓
+Vector Search
+↓
+Confidence Check
+
+下一步：
+
+Hybrid Search
+(Alias + Embedding + Clarification)
+
+---
+
 ## Phase 3
 
 Agent Workflow
@@ -531,7 +566,7 @@ Answer
 
 # 当前版本
 
-Version: v0.6
-完成度：Day31 / 100
+Version: v0.7
+完成度：Day32 / 100
 当前实现：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → Table → Evaluation
 

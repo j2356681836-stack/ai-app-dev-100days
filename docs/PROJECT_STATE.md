@@ -75,7 +75,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
 
-当前日期：Day31 / 100
+当前日期：Day32 / 100
 
 ---
 ## 已完成能力
@@ -217,45 +217,38 @@ SQL
 ---
 ## 当前待办（Next Milestone）
 
-### Day32
-
-目标：接入 BGE-small-zh-v1.5
-
-完成：
-Metric Text
-↓
-Embedding Vector
-
-验证：向量相似度
-
----
-
 ### Day33
 
-目标：Embedding Search Prototype
-实现：Metric Vector Retrieval
+目标：Hybrid Search V1
+
+实现：
+Alias Search
+↓
+Embedding Search
+↓
+Clarification
+
+统一编排。
 
 ---
 
 ### Day34
 
-目标：
-Hybrid Search V1
-Alias + Embedding
+目标：Metric Text 优化,提升Embedding区分度。
 
 ---
 
 ### Day35
 
-目标：
-Confidence Score
-Top1 Threshold + Top1 Gap
+目标：Evaluation扩展
+新增：15~20条Golden Questions
+完成：Threshold Calibration
 
 ---
 
 ### Day36~40
 
-渠道分析能力建设
+目标：渠道分析能力建设
 
 新增：
 - dim_channel
@@ -265,8 +258,7 @@ Top1 Threshold + Top1 Gap
 - ROI
 - CAC
 - 渠道销售额
-
-新增 Evaluation
+- 渠道退款率
 
 ---
 ## 开发日志
@@ -437,7 +429,6 @@ Pass Rate：
 优点：
 - 准确
 - 可控
-
 缺点：
 - 难扩展
 
@@ -445,8 +436,31 @@ Embedding Search：
 
 优点：
 - 语义理解能力强
-
 缺点：
 - 无法解决业务歧义
 
 因此未来采用： Alias + Embedding + Clarification 的 Hybrid Search方案
+
+---
+
+### Day32
+
+完成：
+- BGE Embedding 接入
+- Semantic Search V2 实现
+- Cosine Similarity 检索实现
+- Confidence Score 判断
+- Metric Vector Cache 实现
+
+产出：
+- embedding_service.py
+- semantic_search_v2.py
+- vector_store.py
+
+关键收获：
+- Embedding：负责语义表达。
+- Vector Search：负责检索。
+- Confidence：负责判断是否可信。
+- Clarification：负责处理业务歧义。
+
+当前系统能力：Alias Search + Embedding Search 已具备独立运行能力。
