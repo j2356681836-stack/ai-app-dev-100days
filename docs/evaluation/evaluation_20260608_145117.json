@@ -1,0 +1,91 @@
+{
+  "timestamp": "20260608_145117",
+  "summary": {
+    "total": 8,
+    "passed": 8,
+    "failed": 0,
+    "pass_rate": 100.0
+  },
+  "results": [
+    {
+      "id": "case_001",
+      "question": "哪个品类的退款率最高？",
+      "passed": true,
+      "missing_tables": [],
+      "missing_columns": [],
+      "sql": "SELECT \n    dp.category,\n    ROUND(\n        COALESCE(SUM(fr.refund_amount), 0) * 100.0 / NULLIF(SUM(foi.item_paid_amount), 0), \n        2\n    ) AS refund_rate_pct\nFROM fact_order_items foi\nINNER JOIN fact_orders fo ON foi.order_id = fo.order_id\nINNER JOIN dim_product dp ON foi.product_id = dp.product_id\nLEFT JOIN fact_refunds fr ON foi.order_item_id = fr.order_item_id\nWHERE fo.order_status = 'paid'\nGROUP BY dp.category\nORDER BY refund_rate_pct DESC\nLIMIT 1;",
+      "row_count": 1,
+      "error": null
+    },
+    {
+      "id": "case_002",
+      "question": "哪个品类销售额最高？",
+      "passed": true,
+      "missing_tables": [],
+      "missing_columns": [],
+      "sql": "SELECT \n    dp.category AS category,\n    SUM(foi.item_paid_amount) AS item_sales_amount\nFROM fact_order_items foi\nJOIN fact_orders fo ON foi.order_id = fo.order_id\nLEFT JOIN dim_product dp ON foi.product_id = dp.product_id\nWHERE fo.order_status = 'paid'\nGROUP BY dp.category\nORDER BY item_sales_amount DESC\nLIMIT 1;",
+      "row_count": 1,
+      "error": null
+    },
+    {
+      "id": "case_003",
+      "question": "退款率最高的是啥？",
+      "passed": true,
+      "missing_tables": [],
+      "missing_columns": [],
+      "sql": "SELECT \n    dp.category,\n    ROUND(\n        (SUM(fr.refund_amount) / NULLIF(SUM(foi.item_paid_amount), 0)) * 100, \n        2\n    ) AS refund_rate_pct\nFROM fact_order_items foi\nINNER JOIN fact_orders fo ON foi.order_id = fo.order_id\nINNER JOIN dim_product dp ON foi.product_id = dp.product_id\nLEFT JOIN fact_refunds fr ON foi.order_item_id = fr.order_item_id\nWHERE fo.order_status = 'paid'\nGROUP BY dp.category\nORDER BY refund_rate_pct DESC\nLIMIT 1;",
+      "row_count": 1,
+      "error": null
+    },
+    {
+      "id": "case_005",
+      "question": "卖得最好的是哪个品类？",
+      "passed": true,
+      "missing_tables": [],
+      "missing_columns": [],
+      "sql": "SELECT \n    dp.category AS category,\n    SUM(foi.item_paid_amount) AS item_sales_amount\nFROM fact_order_items foi\nJOIN fact_orders fo ON foi.order_id = fo.order_id\nLEFT JOIN dim_product dp ON foi.product_id = dp.product_id\nWHERE fo.order_status = 'paid'\nGROUP BY dp.category\nORDER BY item_sales_amount DESC\nLIMIT 1;",
+      "row_count": 1,
+      "error": null
+    },
+    {
+      "id": "case_006",
+      "question": "退款率前三的品类",
+      "passed": true,
+      "missing_tables": [],
+      "missing_columns": [],
+      "sql": "SELECT \n    dp.category,\n    ROUND(\n        (SUM(COALESCE(fr.refund_amount, 0)) * 100.0) \n        / NULLIF(SUM(foi.item_paid_amount), 0), \n        2\n    ) AS refund_rate_pct\nFROM fact_order_items foi\nJOIN fact_orders fo ON foi.order_id = fo.order_id\nJOIN dim_product dp ON foi.product_id = dp.product_id\nLEFT JOIN fact_refunds fr ON foi.order_item_id = fr.order_item_id\nWHERE fo.order_status = 'paid'\nGROUP BY dp.category\nORDER BY refund_rate_pct DESC\nLIMIT 3;",
+      "row_count": 3,
+      "error": null
+    },
+    {
+      "id": "case_008",
+      "question": "哪个品类退货最严重？",
+      "passed": true,
+      "missing_tables": [],
+      "missing_columns": [],
+      "sql": "SELECT \n    dp.category,\n    ROUND(\n        (SUM(fr.refund_amount) / NULLIF(SUM(foi.item_paid_amount), 0)) * 100, \n        2\n    ) AS refund_rate_pct\nFROM fact_order_items foi\nJOIN fact_orders fo ON foi.order_id = fo.order_id\nJOIN dim_product dp ON foi.product_id = dp.product_id\nLEFT JOIN fact_refunds fr ON foi.order_item_id = fr.order_item_id\nWHERE fo.order_status = 'paid'\nGROUP BY dp.category\nORDER BY refund_rate_pct DESC\nLIMIT 1;",
+      "row_count": 1,
+      "error": null
+    },
+    {
+      "id": "case_010",
+      "question": "销售额Top5品类",
+      "passed": true,
+      "missing_tables": [],
+      "missing_columns": [],
+      "sql": "SELECT \n    p.category AS category,\n    SUM(foi.item_paid_amount) AS item_sales_amount\nFROM fact_order_items foi\nJOIN fact_orders fo ON foi.order_id = fo.order_id\nLEFT JOIN dim_product p ON foi.product_id = p.product_id\nWHERE fo.order_status = 'paid'\nGROUP BY p.category\nORDER BY item_sales_amount DESC\nLIMIT 5;",
+      "row_count": 5,
+      "error": null
+    },
+    {
+      "id": "case_013",
+      "question": "哪个品类退得最厉害",
+      "passed": true,
+      "missing_tables": [],
+      "missing_columns": [],
+      "sql": "SELECT \n    dp.category,\n    ROUND(\n        COALESCE(SUM(fr.refund_amount), 0) * 100.0 / NULLIF(SUM(foi.item_paid_amount), 0),\n        2\n    ) AS refund_rate_pct\nFROM fact_order_items foi\nINNER JOIN fact_orders fo ON foi.order_id = fo.order_id\nINNER JOIN dim_product dp ON foi.product_id = dp.product_id\nLEFT JOIN fact_refunds fr ON foi.order_item_id = fr.order_item_id\nWHERE fo.order_status = 'paid'\nGROUP BY dp.category\nORDER BY refund_rate_pct DESC\nLIMIT 1;",
+      "row_count": 1,
+      "error": null
+    }
+  ]
+}

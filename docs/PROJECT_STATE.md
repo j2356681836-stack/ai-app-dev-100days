@@ -128,14 +128,22 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 #### Semantic Layer
 
+- clarification.py
 - semantic_search.py
+- semantic_search_v2.py
 - context_builder.py
+- hybrid_search.py
+- metric_text_builder.py
+- vector_store.py
 
 #### Text-to-SQL
 
 - prompt_builder.py
+- query_service.py
+- result_formatter.py
 - sql_generator.py（DeepSeek）
 - sql_cleaner.py
+- sql_validator.py
 
 当前能力：
 
@@ -169,6 +177,7 @@ app/
 ├── semantic_layer/
 ├── text_to_sql/
 ├── evaluation/
+data/
 docs/
 metadata/
 
@@ -202,35 +211,21 @@ metadata/
 
 Question
 ↓
-Semantic Search
+Hybrid Search
+├─ Alias Match
+├─ Embedding Match
+└─ Clarification
 ↓
 Context Builder
 ↓
 Prompt Builder
 ↓
-DeepSeek
+SQL Generator
 ↓
-SQL Cleaner
-↓
-SQL
+SQL Runner
 
 ---
 ## 当前待办（Next Milestone）
-
-### Day33
-
-目标：Hybrid Search V1
-
-实现：
-Alias Search
-↓
-Embedding Search
-↓
-Clarification
-
-统一编排。
-
----
 
 ### Day34
 
@@ -464,3 +459,16 @@ Embedding Search：
 - Clarification：负责处理业务歧义。
 
 当前系统能力：Alias Search + Embedding Search 已具备独立运行能力。
+
+---
+
+### Day33
+
+完成：
+- 新增 Hybrid Search（Alias Search + Embedding Search）
+- 新增 Clarification Layer
+- 支持语义歧义问题识别
+- Context Builder接入Hybrid Search
+- Query Service支持needs_clarification状态
+- 完成Semantic Layer到Text2SQL主链路打通
+- Evaluation回归测试8/8通过

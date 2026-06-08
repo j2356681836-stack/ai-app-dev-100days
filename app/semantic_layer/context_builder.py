@@ -1,12 +1,23 @@
-from app.semantic_layer.semantic_search import semantic_search
+from app.semantic_layer.hybrid_search import search_metric
+from app.semantic_layer.metric_loader import get_metric_by_name
 from app.semantic_layer.table_loader import get_table_by_name
 from app.semantic_layer.relationship_loader import get_relationships_for_tables
 
 
 def build_context(query: str) -> str:
 
-    result = semantic_search(query)     # Metrics,Tables
-    metrics = result["metrics"]
+    result = search_metric(query)
+
+    if result["status"] == "needs_clarification":
+        raise ValueError(result)
+
+    metrics = []
+
+    for item in result["metrics"]:
+        metric = get_metric_by_name(item["name"])
+
+        if metric:
+            metrics.append(metric)
 
     if not metrics:
         raise ValueError(f"未找到与问题相关的业务指标：{query}")    
@@ -14,7 +25,7 @@ def build_context(query: str) -> str:
     context_parts = []
 
     context_parts.append("=== Metrics ===")
-    for metric in result["metrics"]:
+    for metric in metrics:
         context_parts.append(
             f"""
 指标: {metric["chinese_name"]} ({metric["name"]})
@@ -28,7 +39,7 @@ def build_context(query: str) -> str:
     related_tables = set()
     
     context_parts.append("=== Tables ===")
-    for metric in result["metrics"]:
+    for metric in metrics:
         for table_name in metric.get("tables", []):
             related_tables.add(table_name)
 
@@ -75,7 +86,7 @@ def build_context(query: str) -> str:
     context_parts.append("=== filters_text ===")
     all_filters = []
 
-    for metric in result["metrics"]:
+    for metric in metrics:
         all_filters.extend(
             metric.get("filters", [])
         )
@@ -94,4 +105,5 @@ def build_context(query: str) -> str:
 
 
 if __name__ == "__main__":
-    print(build_context("退款"))
+    print(build_context("退款率最高"))
+    print(build_context("最赚钱"))

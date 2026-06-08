@@ -473,6 +473,38 @@ Hybrid Search
 
 ---
 
+Day33：Hybrid Search 接入主链路
+
+完成内容：
+- 新增 Hybrid Search（Alias Search + Embedding Search）
+- 新增 Clarification Layer
+- 支持语义歧义问题识别
+- Context Builder接入Hybrid Search
+- Query Service支持needs_clarification状态
+- 完成Semantic Layer到Text2SQL主链路打通
+- Evaluation回归测试8/8通过
+
+示例：
+用户问题：最赚钱
+系统返回：问题存在歧义，请选择您想查询的指标：
+- 商品明细实付销售额
+- 退款率
+- 订单实付金额
+
+当前系统状态：
+Question
+↓
+Hybrid Search
+↓
+Context Builder
+↓
+Prompt Builder
+↓
+SQL Generator
+↓
+SQL Runner
+---
+
 ## Phase 3
 
 Agent Workflow
@@ -566,7 +598,7 @@ Answer
 
 # 当前版本
 
-Version: v0.7
-完成度：Day32 / 100
+Version: v0.8
+完成度：Day33 / 100
 当前实现：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → Table → Evaluation
 

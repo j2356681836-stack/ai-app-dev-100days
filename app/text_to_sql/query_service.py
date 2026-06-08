@@ -13,8 +13,21 @@ def ask(question: str):
     自然语言问题 -> SQL -> 数据库结果
     """
 
-    raw_sql = generate_sql(question)
-    sql = clean_sql(raw_sql)
+    try:
+        raw_sql = generate_sql(question)
+        sql = clean_sql(raw_sql)
+    except ValueError as e:
+        payload = e.args[0]
+        if isinstance(payload, dict):
+            return {
+                "success": False,
+                **payload,
+            }
+        return {
+            "success": False,
+            "status": "error",
+            "message": str(e),
+        }
 
     if not validate_sql(sql):
         raise ValueError("SQL 校验失败，拒绝执行。")
@@ -24,6 +37,7 @@ def ask(question: str):
 
     return {
         "success": True,
+        "status": "completed",
         "question": question,
         "sql": sql,
         "table": table,
@@ -31,16 +45,41 @@ def ask(question: str):
 
 
 if __name__ == "__main__":
-    result = ask("退款率最高的是啥？")
+    questions = [
+        "退款率最高",
+        "最赚钱",
+    ]
 
-    print("Question:")
-    print(result["question"])
+    for question in questions:
+        result = ask(question)
 
-    print("\nSQL:")
-    print(result["sql"])
+        print("Question:")
+        print(result["question"])
 
-    print("\nTable:")
-    print(result["table"])
-    
-    elapsed = round(time.time() - start, 2)
-    print(f"\nElapsed: {elapsed}s")
+        if not result["success"]:
+            print("\nStatus:")
+            print(result["status"])
+
+            print("\nMessage:")
+            print(result["message"])
+
+            if "suggestions" in result:
+
+                print("\nSuggestions:")
+
+                for item in result["suggestions"]:
+
+                    print(
+                        "-",
+                        item["metric_label"]
+                    )
+
+        else:
+            print("\nSQL:")
+            print(result["sql"])
+
+            print("\nTable:")
+            print(result["table"])
+
+        elapsed = round(time.time() - start, 2)
+        print(f"\nElapsed: {elapsed}s")
