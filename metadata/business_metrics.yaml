@@ -12,6 +12,14 @@ metrics:
       - fact_orders
     filters:
       - order_status = paid
+    examples:
+      - 订单金额最高
+      - 客单价最高
+      - 哪些订单支付金额最大
+    negative_examples:
+      - 退款最多
+      - 退货最严重
+      - 商品卖得最好
 
   - name: item_sales_amount
     chinese_name: 商品明细实付销售额
@@ -33,6 +41,15 @@ metrics:
       - fact_order_items
     filters:
       - order_status = paid
+    examples:
+      - 哪个品类卖得最好
+      - 哪个商品销售额最高
+      - 销售冠军是谁
+      - 哪个品类贡献收入最多
+    negative_examples:
+      - 退款最多
+      - 退货最严重
+      - 订单最多
 
   - name: refund_rate
     chinese_name: 退款率
@@ -54,4 +71,13 @@ metrics:
       - dim_product
     filters:
       - order_status = paid
+    examples:
+      - 哪个品类退款率最高
+      - 退货最严重的是哪个品类
+      - 哪个商品退款最多
+      - 售后问题最严重的是谁
+    negative_examples:
+      - 卖得最好
+      - 销售冠军
+      - 订单最多
 

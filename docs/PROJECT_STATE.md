@@ -75,7 +75,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
 
-当前日期：Day32 / 100
+当前日期：Day34 / 100
 
 ---
 ## 已完成能力
@@ -227,17 +227,15 @@ SQL Runner
 ---
 ## 当前待办（Next Milestone）
 
-### Day34
-
-目标：Metric Text 优化,提升Embedding区分度。
-
----
-
 ### Day35
+Metric System Expansion
 
-目标：Evaluation扩展
-新增：15~20条Golden Questions
-完成：Threshold Calibration
+新增指标：
+- order_count
+- sales_quantity
+目标：
+解决订单最多、销量最高等业务问题
+扩展Business Semantic Layer覆盖范围
 
 ---
 
@@ -472,3 +470,42 @@ Embedding Search：
 - Query Service支持needs_clarification状态
 - 完成Semantic Layer到Text2SQL主链路打通
 - Evaluation回归测试8/8通过
+
+---
+
+### Day34
+
+完成：
+- Semantic Search Calibration
+- Metric Text 增强
+- Confidence 阈值校准
+- Search Trace 可解释性增强
+- Calibration Report 文档沉淀
+- Evaluation 回归测试 8/8 通过
+
+关键调整：
+- TOP1_THRESHOLD = 0.50
+- GAP_THRESHOLD = 0.08
+- hybrid_search.py 只负责 Alias / Embedding / Clarification
+
+新增文档：
+- docs/architecture/semantic_search_calibration.md
+
+当前能力：
+Question
+↓
+Alias Search
+↓
+Embedding Search
+↓
+Confidence Check
+↓
+Clarification / Matched
+↓
+Search Trace
+
+下一步：
+Day35 Evaluation Expansion
+- 扩展 Golden Questions 到 15~20 条
+- 统计 Alias / Embedding / Clarification 命中情况
+- 为后续渠道分析能力建立评测基线

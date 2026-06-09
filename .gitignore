@@ -42,3 +42,10 @@ data/generated/
 # Coverage
 .coverage
 htmlcov/
+
+# Evaluation Results
+docs/evaluation/*.json
+
+# Embedding cache
+*.npy
+*.pkl

@@ -3,25 +3,29 @@ from app.semantic_layer.metric_text_builder import (build_all_metric_texts,)
 from app.semantic_layer.embedding_service import (embed_text,)
 from app.semantic_layer.vector_store import load_metric_vectors
 
-TOP1_THRESHOLD = 0.40
-GAP_THRESHOLD = 0.06
+TOP1_THRESHOLD = 0.50
+GAP_THRESHOLD = 0.08
 
+reason = None
 
-def is_confident(results: list[dict]) -> bool:
+def check_confidence(results: list[dict]) -> bool:
     if not results:
-        return False
+        return False, "no_result"
 
     if len(results) == 1:
-        return results[0]["score"] >= TOP1_THRESHOLD
+        if results[0]["score"] >= TOP1_THRESHOLD:
+            return True, None
+        return False, "low_score"
 
     top1 = results[0]
     top2 = results[1]
 
-    return (
-        top1["score"] >= TOP1_THRESHOLD
-        and top1["score"] - top2["score"] >= GAP_THRESHOLD
-    )
-
+    if top1["score"] < TOP1_THRESHOLD:
+        return False, "low_score"
+    elif top1["score"] - top2["score"] < GAP_THRESHOLD:
+        return False, "low_gap"
+    
+    return True, None
 
 def search_metric_by_embedding(question: str,):
     query_vector = embed_text(question) #转译向量
@@ -47,10 +51,11 @@ def search_metric_by_embedding(question: str,):
         reverse=True,
     )
 
-    confident = is_confident(results)
+    confident, reason = check_confidence(results)
 
     return {
         "status": "matched" if confident else "needs_clarification",
+        "reason": reason,
         "method": "embedding",
         "question": question,
         "top_metric": results[0] if results else None,

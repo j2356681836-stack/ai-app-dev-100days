@@ -505,6 +505,24 @@ SQL Generator
 SQL Runner
 ---
 
+### Day34 Semantic Search Calibration
+
+完成内容：
+
+- Semantic Search Calibration
+- Metric Text 优化
+- Confidence Threshold 调整
+- Search Trace 可解释性增强
+- Calibration Report 文档
+
+关键收获：
+
+- Confidence 判断应统一维护
+- Embedding 命中不代表结果可信
+- Search Trace 有助于定位检索问题
+
+---
+
 ## Phase 3
 
 Agent Workflow
@@ -598,7 +616,7 @@ Answer
 
 # 当前版本
 
-Version: v0.8
-完成度：Day33 / 100
+Version: v0.9
+完成度：Day34 / 100
 当前实现：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → Table → Evaluation
 

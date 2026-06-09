@@ -15,6 +15,12 @@ def build_metric_text(metric: dict) -> str:
     filters = metric.get("filters", [])
     filters_text = "\n".join([f"- {item}" for item in filters])
 
+    examples = metric.get("examples", [])
+    examples_text = "\n".join([f"- {item}" for item in examples])
+
+    negative_examples = metric.get("negative_examples", [])
+    negative_examples_text = "\n".join([f"- {item}" for item in negative_examples])
+
     return f"""
 指标名称：
 {metric.get("chinese_name", "")}
@@ -26,6 +32,10 @@ def build_metric_text(metric: dict) -> str:
 {metric.get("formula", "")}
 常见说法：
 {aliases_text}
+适用问题：
+{examples_text}
+不适用问题：
+{negative_examples_text}
 相关数据表：
 {tables_text}
 过滤条件：
