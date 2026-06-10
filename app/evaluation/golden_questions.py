@@ -109,4 +109,60 @@ GOLDEN_QUESTIONS = [
         ],
         "should_execute": True,
     },
+    {
+        "id": "case_014",
+        "question": "哪个品类订单最多",
+        "expected_tables": [
+            "fact_order_items",
+            "fact_orders",
+            "dim_product",
+        ],
+        "expected_columns": [
+            "category",
+            "order_count"
+        ],
+        "should_execute": True,
+    },
+    {
+        "id": "case_015",
+        "question": "哪个品类销量最高",
+        "expected_tables": [
+            "fact_order_items",
+            "fact_orders",
+            "dim_product",
+        ],
+        "expected_columns": [
+            "category",
+            "sales_quantity"
+        ],
+        "should_execute": True,
+    },
+    {
+        "id": "case_016",
+        "question": "哪个品类成交最多",
+        "expected_tables": [
+            "fact_order_items",
+            "fact_orders",
+            "dim_product",
+        ],
+        "expected_columns": [
+            "category",
+            "order_count",
+        ],
+        "should_execute": True,
+    },
+    {
+        "id": "case_017",
+        "question": "哪个品类卖出最多件",
+        "expected_tables": [
+            "fact_order_items",
+            "fact_orders",
+            "dim_product",
+        ],
+        "expected_columns": [
+            "category",
+            "sales_quantity",
+        ],
+        "should_execute": True,
+    },
 ]

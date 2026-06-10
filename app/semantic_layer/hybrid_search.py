@@ -19,7 +19,7 @@ def search_metric(query: str) -> dict:
     if alias_results:
         return {
             "status": "matched",
-            "method": "alias",
+            "method": "rule",
             "question": query,
             "metrics": [
                 {
@@ -31,7 +31,7 @@ def search_metric(query: str) -> dict:
             ],
             "trace": [
                 {
-                    "search_type": "alias",
+                    "search_type": metric.get("_match_type"),
                     "matched_alias": metric["aliases"],
                     "candidate_count": 1
                 }
@@ -97,16 +97,13 @@ def search_metric(query: str) -> dict:
 if __name__ == "__main__":
 
     questions = [
-        "卖得最好",
-        "最赚钱",
-        "销售冠军",
-        "退货最严重",
-        "退款最多",
-        "订单最多",
-        "成交最多",
-        "销量最高",
-        "表现最差",
-        "销售最差"
+        "哪个品类销售额最高",
+        "哪个订单支付金额最高",
+        "哪个品类销量最高",
+        "哪个品类订单最多",
+        "销售额Top5品类",
+        "销售额Top10品类",
+        "哪个品类销售额最高",
     ]
 
     for question in questions:

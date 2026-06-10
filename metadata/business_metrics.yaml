@@ -2,6 +2,11 @@ metrics:
 
   - name: order_paid_amount
     chinese_name: 订单实付金额
+    aliases:
+      - 订单金额
+      - 订单实付金额
+      - 实付金额
+      - 支付金额
     grain: order
     source_field: fact_orders.paid_amount
     definition: >
@@ -13,19 +18,25 @@ metrics:
     filters:
       - order_status = paid
     examples:
-      - 订单金额最高
       - 客单价最高
-      - 哪些订单支付金额最大
+      - 哪些订单实付金额最大
+      - 哪个订单支付金额最高
+      - 订单金额最高的是哪笔
     negative_examples:
       - 退款最多
       - 退货最严重
-      - 商品卖得最好
+      - 哪个品类销量最高
+      - 哪个品类卖出最多件
+      - 哪个品类订单最多
+      - 哪个品类销售额最高
+      - 哪个商品销售额最高
+      - 哪个品类卖得最好
 
   - name: item_sales_amount
     chinese_name: 商品明细实付销售额
     aliases:
-      - 销售额
-      - 销售金额
+      - 商品销售额
+      - 品类销售额
       - 卖得最好
       - 卖得最火
       - 最能卖
@@ -46,10 +57,21 @@ metrics:
       - 哪个商品销售额最高
       - 销售冠军是谁
       - 哪个品类贡献收入最多
+      - 哪个品类销售额最高
+      - 哪个品类销售金额最高
     negative_examples:
       - 退款最多
       - 退货最严重
       - 订单最多
+      - 客单价最高
+      - 哪些订单实付金额最大
+      - 哪个品类销量最高
+      - 哪个品类订单最多
+    keyword_groups:
+      - ["销售额", "品类"]
+      - ["销售金额", "品类"]
+      - ["销售额", "商品"]
+      - ["销售金额", "商品"]
 
   - name: refund_rate
     chinese_name: 退款率
@@ -80,4 +102,57 @@ metrics:
       - 卖得最好
       - 销售冠军
       - 订单最多
+
+  - name: order_count
+    chinese_name: 订单数
+    definition: 已支付订单的数量，用于衡量成交订单规模。
+    formula: COUNT(DISTINCT fact_orders.order_id)
+    aliases:
+      - 订单数
+      - 订单量
+      - 订单最多
+      - 订单量最高
+      - 成交最多
+      - 成交订单数
+    examples:
+      - 哪个品类订单最多
+      - 哪个品类订单量最高
+      - 哪个品类成交最多
+    negative_examples:
+      - 销售额最高
+      - 销量最高
+      - 退款率最高
+    tables:
+      - fact_orders
+      - fact_order_items
+      - dim_product
+    filters:
+      - fact_orders.order_status = 'paid'
+
+  - name: sales_quantity
+    chinese_name: 销量
+    definition: 已支付订单中商品销售件数，用于衡量商品实际卖出的数量。
+    formula: SUM(fact_order_items.quantity)
+    aliases:
+      - 销量
+      - 销量最高
+      - 卖出最多
+      - 卖出最多件
+      - 销售件数
+      - 商品销量
+    examples:
+      - 哪个品类销量最高
+      - 哪个商品卖出最多件
+      - 哪个品类销售件数最多
+    negative_examples:
+      - 退款率最高
+      - 哪个品类销售额最高
+      - 哪个品类销售金额最高
+      - 哪个品类订单最多
+    tables:
+      - fact_order_items
+      - fact_orders
+      - dim_product
+    filters:
+      - fact_orders.order_status = 'paid'
 

@@ -33,13 +33,17 @@ def get_metric_by_name(metric_name: str) -> dict | None:
 def search_metrics(query: str) -> list[dict[str, Any]]:
     """
     根据用户问题搜索业务指标。
-    V1：支持 name、chinese_name、definition、formula、aliases 匹配。
+    支持：
+    - name / chinese_name / definition / formula / aliases 连续命中
+    - keyword_groups 非连续关键词组合命中
     """
 
     metrics = load_metrics()
     results = []
 
     for metric in metrics:
+        matched = False
+
         searchable_items = [
             metric.get("name", ""),
             metric.get("chinese_name", ""),
@@ -52,8 +56,23 @@ def search_metrics(query: str) -> list[dict[str, Any]]:
 
         for item in searchable_items:
             if item and item in query:
-                results.append(metric)
+                matched = True
+                match_type = "alias"
                 break
+
+        if not matched:
+            keyword_groups = metric.get("keyword_groups", [])
+
+            for group in keyword_groups:
+                if all(keyword in query for keyword in group):
+                    matched = True
+                    match_type = "keyword_group"
+                    break
+
+        if matched:
+            metric = metric.copy()
+            metric["_match_type"] = match_type
+            results.append(metric)
 
     return results
 

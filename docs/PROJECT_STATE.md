@@ -75,7 +75,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
 
-当前日期：Day34 / 100
+当前日期：Day35 / 100
 
 ---
 ## 已完成能力
@@ -227,31 +227,157 @@ SQL Runner
 ---
 ## 当前待办（Next Milestone）
 
-### Day35
-Metric System Expansion
-
-新增指标：
-- order_count
-- sales_quantity
-目标：
-解决订单最多、销量最高等业务问题
-扩展Business Semantic Layer覆盖范围
-
----
-
-### Day36~40
+### Day36-Day40 规划
 
 目标：渠道分析能力建设
 
-新增：
+新增数据表：
 - dim_channel
 - fact_marketing_spend
 
+新增业务指标：
+- channel_sales_amount（渠道销售额）
+- channel_refund_rate（渠道退款率）
+- roi（投资回报率）
+- cac（获客成本）
+
+---
+
+#### Day36
+
+渠道维度建模
+
+学习内容：
+- dim_channel 表结构分析
+- fact_marketing_spend 表结构设计
+- 渠道分析场景理解
+交付：
+- 渠道数据字典
+- 渠道指标定义文档
+
+---
+
+#### Day37
+
+渠道销售分析
+
 新增指标：
-- ROI
-- CAC
+- channel_sales_amount
+- channel_refund_rate
+支持问题：
+- 哪个渠道销售额最高
+- 哪个渠道卖得最好
+- 哪个渠道退款率最高
+交付：
+- business_metrics.yaml 扩展
+- Golden Cases 扩展
+
+---
+
+#### Day38
+
+ROI 指标建设
+
+新增指标：ROI
+计算逻辑：ROI = 销售额 / 营销成本
+支持问题：
+- 哪个渠道 ROI 最高
+- 哪个渠道投放最划算
+交付：
+- ROI SQL 模板
+- ROI 指标定义
+
+---
+
+#### Day39
+
+CAC 指标建设
+
+新增指标：CAC
+计算逻辑：CAC = 营销成本 / 获客客户数
+支持问题：
+- 哪个渠道获客成本最低
+- 哪个渠道拉新效率最高
+交付：
+- CAC SQL 模板
+- CAC 指标定义
+
+---
+
+#### Day40
+
+渠道分析能力验收
+
+新增 Golden Cases：
 - 渠道销售额
 - 渠道退款率
+- ROI
+- CAC
+
+目标：
+- Evaluator 100%通过
+- 渠道分析闭环完成
+
+---
+
+### Day41-Day45 规划
+
+目标：Intent Parser V1
+
+从“指标识别”升级为“业务意图识别”。
+
+识别内容：
+- Metric
+- Dimension
+- Ranking
+
+示例：
+销售额Top5品类
+解析为：
+{
+  "metric": "item_sales_amount",
+  "dimension": "category",
+  "ranking": {
+    "type": "top",
+    "value": 5
+  }
+}
+
+交付：
+- Intent Schema
+- Intent Parser V1
+- TopN 解析能力
+- Ranking 解析能力
+
+---
+
+### Day46-Day50 规划
+
+目标：Phase2 收尾与验收
+完善：
+- Hybrid Search
+- Intent Parser
+- Golden Dataset
+- Evaluator
+形成完整闭环：
+自然语言
+↓
+业务语义识别
+↓
+指标识别
+↓
+维度识别
+↓
+SQL生成
+↓
+SQL执行
+↓
+结果返回
+
+目标：
+- Golden Cases ≥ 30
+- Evaluator 稳定运行
+- Phase2 验收完成
 
 ---
 ## 开发日志
@@ -358,13 +484,11 @@ Evaluation
 - category 被错误替换为 product_name
 
 解决：
-
 - 新增 Evaluation V1
 - 增加 expected_columns 校验
 - Prompt 增加默认 category 规则
 
 结果：
-
 Pass Rate
 66.67%
 ↓
@@ -375,7 +499,6 @@ Pass Rate
 ### Day30
 
 完成：
-
 - Golden Questions 扩展
 - Evaluation V2
 - Semantic Search V1
@@ -383,20 +506,16 @@ Pass Rate
 - Failure Cases 分类
 
 发现问题：
-
 - 业务黑话无法识别
 - Alias 可解决部分问题
 - Alias 无法无限扩展
 
 解决：
-
 - business_metrics.yaml 增加 aliases
 - metric_loader 支持 Alias Match
 
 结果：
-
 Pass Rate：
-
 71.43%
 ↓
 100%
@@ -504,8 +623,17 @@ Clarification / Matched
 ↓
 Search Trace
 
-下一步：
-Day35 Evaluation Expansion
-- 扩展 Golden Questions 到 15~20 条
-- 统计 Alias / Embedding / Clarification 命中情况
-- 为后续渠道分析能力建立评测基线
+---
+
+### Day35
+
+完成：
+- 新增订单数（order_count）指标
+- 新增销量（sales_quantity）指标
+- 引入 keyword_group 规则匹配
+- 支持 TopN 类业务问题
+- 扩展 Golden Cases 至 12 条
+- Evaluator 保持 100% 通过率
+
+新增 keyword_group 规则匹配
+

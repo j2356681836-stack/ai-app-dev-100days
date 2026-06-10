@@ -523,6 +523,19 @@ SQL Runner
 
 ---
 
+### Day35
+
+完成内容：
+
+- 新增订单数（order_count）指标
+- 新增销量（sales_quantity）指标
+- 引入 keyword_group 规则匹配
+- 支持 TopN 类业务问题
+- 扩展 Golden Cases 至 12 条
+- Evaluator 保持 100% 通过率
+
+---
+
 ## Phase 3
 
 Agent Workflow
@@ -617,6 +630,6 @@ Answer
 # 当前版本
 
 Version: v0.9
-完成度：Day34 / 100
+完成度：Day35 / 100
 当前实现：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → Table → Evaluation
 

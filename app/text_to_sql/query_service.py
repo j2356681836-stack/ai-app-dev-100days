@@ -46,8 +46,11 @@ def ask(question: str):
 
 if __name__ == "__main__":
     questions = [
-        "退款率最高",
-        "最赚钱",
+        "哪个品类销售额最高",
+        "哪个订单支付金额最高",
+        "哪个品类销量最高",
+        "哪个品类订单最多",
+        "销售额Top5品类",
     ]
 
     for question in questions:
