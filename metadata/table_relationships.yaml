@@ -24,3 +24,8 @@ relationships:
     left_field: channel_id
     right_table: dim_channel
     right_field: channel_id
+
+  - left_table: fact_marketing_spend
+    left_field: channel_id
+    right_table: dim_channel
+    right_field: channel_id

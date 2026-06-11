@@ -36,6 +36,7 @@ def search_metrics(query: str) -> list[dict[str, Any]]:
     支持：
     - name / chinese_name / definition / formula / aliases 连续命中
     - keyword_groups 非连续关键词组合命中
+    - 当多个规则命中时，优先保留更具体的命中
     """
 
     metrics = load_metrics()
@@ -43,6 +44,9 @@ def search_metrics(query: str) -> list[dict[str, Any]]:
 
     for metric in metrics:
         matched = False
+        match_type = None
+        matched_text = ""
+        match_score = 0
 
         searchable_items = [
             metric.get("name", ""),
@@ -58,6 +62,8 @@ def search_metrics(query: str) -> list[dict[str, Any]]:
             if item and item in query:
                 matched = True
                 match_type = "alias"
+                matched_text = item
+                match_score = len(item)
                 break
 
         if not matched:
@@ -67,14 +73,27 @@ def search_metrics(query: str) -> list[dict[str, Any]]:
                 if all(keyword in query for keyword in group):
                     matched = True
                     match_type = "keyword_group"
+                    matched_text = "+".join(group)
+                    match_score = sum(len(keyword) for keyword in group)
                     break
 
         if matched:
             metric = metric.copy()
             metric["_match_type"] = match_type
+            metric["_matched_text"] = matched_text
+            metric["_match_score"] = match_score
             results.append(metric)
 
-    return results
+    if len(results) <= 1:
+        return results
+
+    max_score = max(metric["_match_score"] for metric in results)
+
+    return [
+        metric
+        for metric in results
+        if metric["_match_score"] == max_score
+    ]
 
 if __name__ == "__main__":
     results = search_metrics("退款")

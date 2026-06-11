@@ -24,9 +24,6 @@ tables:
         description: 订单原始金额
       discount_amount: 
         description: 订单优惠金额
-      paid_amount: 
-        description: 订单实付金额
-      
 
   - name: fact_order_items
     chinese_name: 订单商品事实表
@@ -108,6 +105,44 @@ tables:
         description: 商品上市时间
       is_active: 
         description: 商品是否在售
+
+  - name: dim_channel
+    chinese_name: 渠道维度表
+    description: >
+      记录销售和营销投放渠道的基础信息，
+      包括渠道名称和渠道类型。
+      用于按渠道分析销售额、订单数、退款率、ROI 和 CAC 等指标。
+    primary_key:
+      - channel_id
+    fields:
+      channel_id:
+        description: 渠道ID
+      channel_name:
+        description: 渠道名称，例如天猫、京东、抖音、小红书、微信小程序
+      channel_type:
+        description: 渠道类型，例如电商平台、内容电商、内容种草、私域
+
+  - name: fact_marketing_spend
+    chinese_name: 营销投放事实表
+    description: >
+      记录不同渠道在不同日期的营销投放花费，
+      包括投放日期、投放活动名称和投放金额。
+      是 ROI、CAC 和渠道投放效率分析的核心事实表。
+    primary_key:
+      - spend_id
+    foreign_keys:
+      - channel_id
+    fields:
+      spend_id:
+        description: 营销投放记录主键ID
+      channel_id:
+        description: 渠道ID，关联 dim_channel.channel_id
+      spend_date:
+        description: 投放日期
+      campaign_name:
+        description: 营销活动名称
+      spend_amount:
+        description: 营销投放金额
 
 
   

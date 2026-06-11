@@ -165,4 +165,88 @@ GOLDEN_QUESTIONS = [
         ],
         "should_execute": True,
     },
+    {
+        "id": "case_018",
+        "question": "哪个渠道销售额最高",
+        "expected_tables": [
+            "fact_orders",
+            "dim_channel",
+        ],
+        "expected_columns": [
+            "channel_name",
+            "channel_sales_amount",
+        ],
+        "should_execute": True,
+    },
+    {
+        "id": "case_019",
+        "question": "各渠道销售额排名",
+        "expected_tables": [
+            "fact_orders",
+            "dim_channel",
+        ],
+        "expected_columns": [
+            "channel_name",
+            "channel_sales_amount",
+        ],
+        "should_execute": True,
+    },
+    {
+        "id": "case_020",
+        "question": "哪个渠道退款率最高",
+        "expected_tables": [
+            "fact_orders",
+            "fact_order_items",
+            "fact_refunds",
+            "dim_channel",
+        ],
+        "expected_columns": [
+            "channel_name",
+            "channel_refund_rate_pct",
+        ],
+        "should_execute": True,
+    },
+    {
+        "id": "case_021",
+        "question": "各渠道退款率排名",
+        "expected_tables": [
+            "fact_orders",
+            "fact_order_items",
+            "fact_refunds",
+            "dim_channel",
+        ],
+        "expected_columns": [
+            "channel_name",
+            "channel_refund_rate_pct",
+        ],
+        "should_execute": True,
+    },
+        {
+        "id": "case_022",
+        "question": "哪个渠道ROI最高",
+        "expected_tables": [
+            "fact_orders",
+            "fact_marketing_spend",
+            "dim_channel",
+        ],
+        "expected_columns": [
+            "channel_name",
+            "roi",
+        ],
+        "should_execute": True,
+    },
+    {
+        "id": "case_023",
+        "question": "各渠道ROI排名",
+        "expected_tables": [
+            "fact_orders",
+            "fact_marketing_spend",
+            "dim_channel",
+        ],
+        "expected_columns": [
+            "channel_name",
+            "roi",
+        ],
+        "should_execute": True,
+    },
 ]

@@ -49,3 +49,6 @@ docs/evaluation/*.json
 # Embedding cache
 *.npy
 *.pkl
+
+# Evaluation Results
+docs/chatgpt_handover.md

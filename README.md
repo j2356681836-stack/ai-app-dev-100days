@@ -305,7 +305,7 @@ Business Semantic Layer + Text-to-SQL
 - Result Formatter
 - Query Service
 
-当前能力：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → 结构化
+当前能力：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → 结构化结果返回 → Evaluation 回归验证
 
 ## Evaluation Framework
 
@@ -373,37 +373,43 @@ LIMIT 1;
 ## Evaluation Framework V2
 
 支持：
-
 - Golden Questions
 - Failure Case Analysis
 - Prompt Optimization
 - Semantic Alias Search
 
 当前评估结果：
-
-- Golden Questions：8
+- Golden Questions：18
 - Pass Rate：100%
 
 支持业务表达：
-
 - 销售额最高
 - 卖得最好
 - 退款率最高
 - 退货最严重
+- 订单最多
+- 销量最高
+- 渠道销售额最高
+- 渠道销售额排名
+- 渠道退款率最高
+- 渠道退款率排名
+- 渠道 ROI 最高
+- 渠道 ROI 排名
+- 哪个渠道投放最划算
 
 当前暂不支持：
-
-- ROI
+- CAC
 - 利润分析
-- 渠道分析
-- 模糊业务口语
+- 复杂时间筛选
+- 多轮追问
+- 结果级数值 Evaluation
+- SQL Template / Query Plan
 
 ---
 
 ## Day31：Semantic Search V2 设计
 
 完成：
-
 - Alias Search 局限分析
 - Embedding Search 原理学习
 - Clarification 机制设计
@@ -412,16 +418,13 @@ LIMIT 1;
 - Metric Text Builder 实现
 
 新增文档：
-
 - docs/architecture/semantic_search_v2.md
 - docs/architecture/metric_embedding_design.md
 
 新增模块：
-
 - app/semantic_layer/metric_text_builder.py
 
 当前状态：
-
 Metric YAML
 ↓
 Metric Text
@@ -441,7 +444,6 @@ Similarity Search
 ## Day32：Embedding Search 与 Vector Cache
 
 完成：
-
 - 接入 BGE-small-zh-v1.5
 - 实现 Embedding Service
 - 实现 Semantic Search V2
@@ -451,13 +453,11 @@ Similarity Search
 - 实现 Metric Vector Cache
 
 新增模块：
-
 - app/semantic_layer/embedding_service.py
 - app/semantic_layer/semantic_search_v2.py
 - app/semantic_layer/vector_store.py
 
 当前能力：
-
 Question
 ↓
 Embedding
@@ -508,7 +508,6 @@ SQL Runner
 ### Day34 Semantic Search Calibration
 
 完成内容：
-
 - Semantic Search Calibration
 - Metric Text 优化
 - Confidence Threshold 调整
@@ -516,7 +515,6 @@ SQL Runner
 - Calibration Report 文档
 
 关键收获：
-
 - Confidence 判断应统一维护
 - Embedding 命中不代表结果可信
 - Search Trace 有助于定位检索问题
@@ -526,13 +524,44 @@ SQL Runner
 ### Day35
 
 完成内容：
-
 - 新增订单数（order_count）指标
 - 新增销量（sales_quantity）指标
 - 引入 keyword_group 规则匹配
 - 支持 TopN 类业务问题
 - 扩展 Golden Cases 至 12 条
 - Evaluator 保持 100% 通过率
+
+---
+
+### Day36
+
+完成内容：
+- 渠道数据层核对
+- 补充 dim_channel 与 fact_marketing_spend 元数据
+- 补充渠道表关系
+- 新增 channel_sales_amount 指标
+- 新增 channel_refund_rate 指标
+- 新增 roi 指标
+- 修复 Rule Layer 短 alias / 长 alias 冲突
+- Prompt Builder 增加跨事实表指标规则
+- Prompt Builder 增加 ROI 专用规则
+- Golden Cases 扩展至 18 条
+- Evaluator 保持 100% 通过率
+
+关键收获：
+- 数据库存在表，不代表语义层已具备业务理解能力。
+- 跨事实表指标必须先分别聚合，再 JOIN 聚合结果。
+- ROI 是倍数，不是百分比，不应乘以 100。
+- Prompt 可以提升正确率，但高风险指标后续应模板化。
+
+当前系统新增支持：
+- 哪个渠道销售额最高
+- 各渠道销售额排名
+- 哪个渠道退款率最高
+- 各渠道退款率排名
+- 哪个渠道 ROI 最高
+- 各渠道 ROI 排名
+- 哪个渠道投放最划算
 
 ---
 
@@ -629,7 +658,7 @@ Answer
 
 # 当前版本
 
-Version: v0.9
-完成度：Day35 / 100
+Version: v0.10
+完成度：Day36 / 100
 当前实现：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → Table → Evaluation
 

@@ -156,3 +156,137 @@ metrics:
     filters:
       - fact_orders.order_status = 'paid'
 
+  - name: channel_sales_amount
+    chinese_name: 渠道销售额
+    aliases:
+      - 渠道销售额
+      - 渠道销售金额
+      - 渠道收入
+      - 渠道成交金额
+      - 渠道GMV
+      - 哪个渠道销售额最高
+      - 哪个渠道收入最高
+      - 哪个渠道卖得最好
+    grain: channel
+    source_field: fact_orders.paid_amount
+    definition: >
+      按销售渠道统计的已支付订单实付金额，
+      用于衡量不同渠道带来的成交收入规模。
+    formula: >
+      SUM(fact_orders.paid_amount)
+    tables:
+      - fact_orders
+      - dim_channel
+    filters:
+      - fact_orders.order_status = 'paid'
+    examples:
+      - 哪个渠道销售额最高
+      - 哪个渠道收入最高
+      - 哪个渠道成交金额最高
+      - 哪个渠道卖得最好
+      - 各渠道销售额排名
+    negative_examples:
+      - 哪个品类销售额最高
+      - 哪个商品销售额最高
+      - 哪个渠道退款率最高
+      - 哪个渠道ROI最高
+      - 哪个渠道获客成本最低
+    keyword_groups:
+      - ["渠道", "销售额"]
+      - ["渠道", "销售金额"]
+      - ["渠道", "收入"]
+      - ["渠道", "成交金额"]
+      - ["渠道", "卖得最好"]
+
+  - name: channel_refund_rate
+    chinese_name: 渠道退款率
+    aliases:
+      - 渠道退款率
+      - 渠道退货率
+      - 渠道售后率
+      - 渠道退款最严重
+      - 渠道退货最严重
+      - 哪个渠道退款率最高
+    grain: channel
+    definition: >
+      按销售渠道统计的退款金额占销售金额比例，
+      用于衡量不同渠道的售后和退款风险。
+    formula: >
+      SUM(fact_refunds.refund_amount) / SUM(fact_order_items.item_paid_amount)
+    tables:
+      - fact_orders
+      - fact_order_items
+      - fact_refunds
+      - dim_channel
+    filters:
+      - fact_orders.order_status = 'paid'
+    examples:
+      - 哪个渠道退款率最高
+      - 哪个渠道退货率最高
+      - 哪个渠道售后问题最严重
+      - 各渠道退款率排名
+    negative_examples:
+      - 哪个品类退款率最高
+      - 哪个商品退款率最高
+      - 哪个渠道销售额最高
+      - 哪个渠道ROI最高
+      - 哪个渠道获客成本最低
+    keyword_groups:
+      - ["渠道", "退款率"]
+      - ["渠道", "退货率"]
+      - ["渠道", "售后"]
+      - ["渠道", "退款最严重"]
+      - ["渠道", "退货最严重"]
+
+  - name: roi
+    chinese_name: 投资回报率
+    aliases:
+      - ROI
+      - roi
+      - 投资回报率
+      - 投放回报率
+      - 营销回报率
+      - 渠道ROI
+      - 渠道roi
+      - 渠道投资回报率
+      - 渠道投放回报率
+      - 哪个渠道ROI最高
+      - 哪个渠道投放最划算
+      - 哪个渠道营销回报最高
+    grain: channel
+    definition: >
+      按渠道统计的销售额与营销投放成本之比，
+      用于衡量不同渠道的投放效率。
+      ROI 越高，表示单位营销成本带来的销售额越高。
+      当同时使用订单表和营销投放表时，必须使用两张表的重叠日期窗口：
+      start_date = GREATEST(MIN(fact_orders.order_date::date), MIN(fact_marketing_spend.spend_date))
+      end_date = LEAST(MAX(fact_orders.order_date::date), MAX(fact_marketing_spend.spend_date))
+
+    formula: >
+      ROI = channel_sales_amount / marketing_spend_amount。
+      channel_sales_amount 必须先从 fact_orders 按 channel_id 聚合；
+      marketing_spend_amount 必须先从 fact_marketing_spend 按 channel_id 聚合；
+      最后再按 channel_id JOIN 两个聚合结果。
+    tables:
+      - fact_orders
+      - fact_marketing_spend
+      - dim_channel
+    filters:
+      - fact_orders.order_status = 'paid'
+    examples:
+      - 哪个渠道ROI最高
+      - 哪个渠道投放最划算
+      - 哪个渠道营销回报最高
+      - 各渠道ROI排名
+    negative_examples:
+      - 哪个渠道销售额最高
+      - 哪个渠道退款率最高
+      - 哪个渠道获客成本最低
+      - 哪个品类销售额最高
+    keyword_groups:
+      - ["渠道", "ROI"]
+      - ["渠道", "roi"]
+      - ["渠道", "投资回报率"]
+      - ["渠道", "投放回报率"]
+      - ["渠道", "营销回报"]
+      - ["渠道", "投放最划算"]

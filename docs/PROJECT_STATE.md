@@ -75,7 +75,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
 
-当前日期：Day35 / 100
+当前日期：Day36 / 100
 
 ---
 ## 已完成能力
@@ -145,7 +145,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 - sql_cleaner.py
 - sql_validator.py
 
-当前能力：
+## 当前能力：
 
 自然语言
 ↓
@@ -166,6 +166,34 @@ PostgreSQL
 Table
 ↓
 Evaluation
+
+### 当前Rule能力
+
+支持：
+- alias
+- keyword_group
+- 更具体 alias 优先
+
+返回：
+method = rule
+search_type:
+- alias
+- keyword_group
+
+新增能力：
+- 当多个 rule 同时命中时，优先保留 match_score 更高的结果
+- 用于解决“退款率”与“渠道退款率”等泛化词和具体词冲突
+
+### Golden Dataset
+
+当前：
+18 Cases
+100% PASS
+
+新增覆盖：
+- 渠道销售额
+- 渠道退款率
+- ROI
 
 ---
 ## 当前项目结构
@@ -206,7 +234,19 @@ metadata/
 - 会员等级历史表
 - 复购行为增强
 
+### 当前指标
+
+item_sales_amount
+order_paid_amount
+refund_rate
+order_count
+sales_quantity
+channel_sales_amount
+channel_refund_rate
+roi
+
 ---
+
 ## 当前系统架构
 
 Question
@@ -225,98 +265,196 @@ SQL Generator
 SQL Runner
 
 ---
+
 ## 当前待办（Next Milestone）
 
-### Day36-Day40 规划
+### Day37-Day43 规划
 
-目标：渠道分析能力建设
+目标：完成渠道分析闭环，并从指标识别升级到业务意图识别。
 
-新增数据表：
-- dim_channel
-- fact_marketing_spend
-
-新增业务指标：
-- channel_sales_amount（渠道销售额）
-- channel_refund_rate（渠道退款率）
-- roi（投资回报率）
-- cac（获客成本）
-
----
-
-#### Day36
-
-渠道维度建模
-
-学习内容：
-- dim_channel 表结构分析
-- fact_marketing_spend 表结构设计
-- 渠道分析场景理解
-交付：
-- 渠道数据字典
-- 渠道指标定义文档
+说明：
+Day36 已提前完成原 Day36、Day37 以及 Day38 中 ROI 已通过的部分。
+后续计划保持 Phase2 学习方向不变，不重新规划路线，只根据当前进度顺延。
 
 ---
 
 #### Day37
 
-渠道销售分析
+CAC 指标建设
 
-新增指标：
-- channel_sales_amount
-- channel_refund_rate
-支持问题：
-- 哪个渠道销售额最高
-- 哪个渠道卖得最好
-- 哪个渠道退款率最高
+目标：完成 CAC 指标的业务口径设计与主链路接入。
+
+学习内容：
+- CAC 业务含义
+- 获客客户数口径设计
+- 首单客户数 vs 活跃客户数区别
+- 营销成本与获客客户数的时间窗口对齐
+- 跨事实表指标的 SQL 风险
+
 交付：
+- CAC 手写 SQL
+- cac 指标定义
 - business_metrics.yaml 扩展
+- query_service 验证
 - Golden Cases 扩展
+
+重点问题：
+- CAC = 营销成本 / 获客客户数
+- 获客客户数优先定义为：分析周期内首单归因到该渠道的客户数
 
 ---
 
 #### Day38
 
-ROI 指标建设
+渠道分析验收与结果级 Evaluation V1
 
-新增指标：ROI
-计算逻辑：ROI = 销售额 / 营销成本
-支持问题：
-- 哪个渠道 ROI 最高
-- 哪个渠道投放最划算
+目标：对渠道销售额、渠道退款率、ROI、CAC 进行统一验收。
+
+学习内容：
+- 结构级 Evaluation 的局限
+- expected_result 设计
+- Top1 结果校验
+- 数值误差容忍
+- 排序结果校验
+
 交付：
-- ROI SQL 模板
-- ROI 指标定义
+- Result-level Evaluation V1
+- expected_result 字段设计
+- 渠道指标结果级回归测试
+- Golden Cases ≥ 22
+
+重点问题：
+当前 evaluator 只能检查 SQL 是否包含预期表和字段，不能证明业务答案一定正确。
+后续需要增加结果级校验。
 
 ---
 
 #### Day39
 
-CAC 指标建设
+高风险指标 SQL Template / Query Plan 设计
 
-新增指标：CAC
-计算逻辑：CAC = 营销成本 / 获客客户数
-支持问题：
-- 哪个渠道获客成本最低
-- 哪个渠道拉新效率最高
+目标：降低 ROI、CAC 等跨事实表指标对 Prompt 的依赖。
+
+学习内容：
+- Prompt-only Text-to-SQL 的不稳定性
+- SQL Template 的价值
+- Metric Query Plan 设计
+- LLM 负责意图识别，模板负责 SQL 骨架
+
 交付：
-- CAC SQL 模板
-- CAC 指标定义
+- SQL Template 设计文档
+- ROI Template V1
+- CAC Template V1 设计
+- 高风险指标模板化方案
+
+重点问题：
+跨事实表指标不应完全依赖 LLM 自由生成 SQL。
 
 ---
 
 #### Day40
 
-渠道分析能力验收
+渠道分析能力总体验收
 
-新增 Golden Cases：
-- 渠道销售额
-- 渠道退款率
-- ROI
-- CAC
+目标：完成渠道分析小闭环验收。
 
-目标：
-- Evaluator 100%通过
-- 渠道分析闭环完成
+验收范围：
+- channel_sales_amount
+- channel_refund_rate
+- roi
+- cac
+
+验收标准：
+- Golden Cases ≥ 22
+- Evaluator 100% PASS
+- ROI / CAC 手写 SQL 与主链路结果一致
+- Rule Layer 无明显冲突
+- Prompt 规则稳定
+- 记录剩余技术债
+
+交付：
+- 渠道分析验收报告
+- evaluation report
+- Day36-Day40 阶段总结
+
+---
+
+#### Day41
+
+Intent Parser V1 设计
+
+目标：从“指标识别”升级为“业务意图识别”。
+
+识别内容：
+- metric
+- dimension
+- ranking
+- limit
+- sort_order
+
+示例：
+
+{
+  "metric": "channel_sales_amount",
+  "dimension": "channel",
+  "ranking": {
+    "type": "top",
+    "value": 1
+  }
+}
+
+交付：
+- Intent Schema
+- Intent Parser V1 设计文档
+
+---
+
+#### Day42
+
+TopN / Ranking 解析能力建设
+
+目标：支持 TopN 与排序类问题的稳定解析。
+
+支持问题：
+- 销售额Top5品类
+- 渠道销售额Top3
+- 退款率前三的渠道
+- ROI最高的渠道
+- CAC最低的渠道
+
+交付：
+- ranking parser
+- limit parser
+- TopN Golden Cases
+
+---
+
+#### Day43
+
+Intent Parser 接入主链路
+
+目标：将 Intent Parser V1 接入现有 Query Service。
+
+目标链路：
+
+自然语言问题
+↓
+Intent Parser
+↓
+Metric Search
+↓
+Context Builder
+↓
+Prompt Builder / SQL Template
+↓
+SQL Execution
+↓
+Evaluation
+
+交付：
+- Intent Parser 接入 query_service
+- Evaluation 回归
+- Intent Trace 输出
 
 ---
 
@@ -637,3 +775,96 @@ Search Trace
 
 新增 keyword_group 规则匹配
 
+---
+
+### Day36
+
+完成：
+- 渠道数据层核对
+- 验证 dim_channel 与 fact_marketing_spend 已存在
+- 验证渠道营销数据完整性
+- 补充 table_dictionary.yaml 中渠道相关表
+- 补充 table_relationships.yaml 中渠道关系
+- 验证 table_loader 与 relationship_loader 能读取新增元数据
+- 新增 channel_sales_amount 指标
+- 新增 channel_refund_rate 指标
+- 新增 roi 指标
+- 修复 Rule Layer 短 alias / 长 alias 冲突
+- Prompt Builder 增加跨事实表先聚合再 JOIN 规则
+- Prompt Builder 修正 ROI 不乘以 100
+- Prompt Builder 增加 ROI 重叠日期窗口规则
+- Golden Cases 扩展到 18 条
+- Evaluator 18/18 通过
+
+实现：
+
+自然语言
+↓
+Rule Layer / Embedding Search
+↓
+Context Builder
+↓
+Prompt Builder
+↓
+DeepSeek
+↓
+SQL Cleaner
+↓
+SQL Validator
+↓
+PostgreSQL
+↓
+Table
+↓
+Evaluation
+
+新增支持问题：
+- 哪个渠道销售额最高
+- 各渠道销售额排名
+- 哪个渠道退款率最高
+- 各渠道退款率排名
+- 哪个渠道ROI最高
+- 各渠道ROI排名
+- 哪个渠道投放最划算
+
+关键结果：
+
+渠道销售额最高：
+- 天猫
+- channel_sales_amount = 2445170.92
+
+渠道退款率最高：
+- 抖音
+- channel_refund_rate_pct = 6.86
+
+渠道 ROI 最高：
+- 天猫
+- roi ≈ 1.68
+
+发现问题：
+1. table_dictionary.yaml 和 table_relationships.yaml 未包含渠道表，导致语义层无法使用渠道数据。
+2. business_metrics.yaml 未定义渠道指标，导致“哪个渠道销售额最高”触发 clarification。
+3. “哪个渠道退款率最高” 同时命中 refund_rate 与 channel_refund_rate。
+4. ROI 初始 SQL 直接 JOIN fact_orders 与 fact_marketing_spend，导致多对多行膨胀。
+5. ROI 曾被错误乘以 100。
+6. ROI 曾未使用订单与营销投放的重叠时间窗口。
+7. Evaluator 暴露出字段别名不稳定问题。
+
+解决：
+1. 补充渠道表元数据与关系。
+2. 新增渠道销售额、渠道退款率、ROI 指标。
+3. metric_loader.search_metrics 增加 match_score，优先保留更具体 alias。
+4. Prompt Builder 增加跨事实表指标规则。
+5. Prompt Builder 明确 ROI 不乘以 100。
+6. Prompt Builder 明确 ROI 使用重叠日期窗口。
+7. Prompt Builder 明确字段别名优先使用指标技术名。
+
+结果：
+
+Golden Dataset：
+12 Cases
+↓
+18 Cases
+
+Pass Rate：
+100%
