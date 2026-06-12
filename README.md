@@ -255,6 +255,7 @@ app/
 ├── evaluation/
 metadata/
 ├── business_metrics.yaml
+├── query_plans.yaml
 ├── table_dictionary.yaml
 ├── table_relationships.yaml
 docs/
@@ -331,9 +332,11 @@ Failure Analysis
 Prompt Optimization
 
 当前评估结果：
-
-- Golden Questions：3
+- Golden Questions：20
 - Pass Rate：100%
+- 支持 SQL 结构级检查
+- 支持 Top1 结果级校验
+- 支持排名顺序校验
 
 ## Text2SQL 示例
 
@@ -378,10 +381,6 @@ LIMIT 1;
 - Prompt Optimization
 - Semantic Alias Search
 
-当前评估结果：
-- Golden Questions：18
-- Pass Rate：100%
-
 支持业务表达：
 - 销售额最高
 - 卖得最好
@@ -396,14 +395,19 @@ LIMIT 1;
 - 渠道 ROI 最高
 - 渠道 ROI 排名
 - 哪个渠道投放最划算
+- 渠道 CAC 最低
+- 渠道获客成本最低
+- 渠道获客成本排名
+- 哪个渠道拉新效率最高
 
 当前暂不支持：
-- CAC
 - 利润分析
 - 复杂时间筛选
 - 多轮追问
-- 结果级数值 Evaluation
-- SQL Template / Query Plan
+- 生产环境动态数据校验
+- SQL Template / Query Plan主链路接入
+- Intent Parser
+- 多指标组合分析
 
 ---
 
@@ -565,6 +569,42 @@ SQL Runner
 
 ---
 
+### Day37
+
+完成内容：
+- 完成 CAC 指标建设
+- 明确 CAC 真实首单新客口径
+- 新增 cac 指标
+- 完成 CAC 手写 SQL 验证
+- 完成 CAC 主链路验证
+- Golden Cases 扩展至 20 条
+- Evaluator 保持 100% 通过率
+- 新增 expected_result 结果级校验
+- 新增 expected_order 排名顺序校验
+- 新增 Metric Query Plan V1 设计文档
+- 新增 metadata/query_plans.yaml
+- 完成 roi_channel_v1 与 cac_channel_v1 读取验证
+
+关键收获：
+- CAC 的核心是获客客户数口径，而不是公式本身。
+- 真实首单新客口径比窗口内首单更严谨。
+- 结构级 Evaluation 不能证明业务结果正确。
+- Result-level Evaluation 可以验证 Top1 对象、关键数值与排名顺序。
+- ROI / CAC 等复杂指标不应长期依赖 LLM 自由生成 SQL。
+- Query Plan / SQL Template 是后续提升稳定性的方向。
+
+当前系统新增支持：
+- 哪个渠道获客成本最低
+- 各渠道获客成本排名
+- 哪个渠道拉新效率最高
+
+当前技术债：
+- query_plans.yaml 尚未接入主链路
+- ROI / CAC 仍暂时依赖 Prompt 生成 SQL
+- 后续需要 template_sql_generator.py
+
+---
+
 ## Phase 3
 
 Agent Workflow
@@ -658,7 +698,7 @@ Answer
 
 # 当前版本
 
-Version: v0.10
-完成度：Day36 / 100
-当前实现：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → Table → Evaluation
+Version: v0.11
+完成度：Day37 / 100
+当前实现：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → Table → Result-level Evaluation
 

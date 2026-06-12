@@ -75,7 +75,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
 
-当前日期：Day36 / 100
+当前日期：Day37 / 100
 
 ---
 ## 已完成能力
@@ -187,13 +187,25 @@ search_type:
 ### Golden Dataset
 
 当前：
-18 Cases
+20 Cases
 100% PASS
 
-新增覆盖：
+当前覆盖：
+- 品类销售额
+- 品类退款率
+- 订单数
+- 销量
 - 渠道销售额
 - 渠道退款率
 - ROI
+- CAC
+
+当前 Evaluation 能力：
+- expected_tables
+- expected_columns
+- expected_result
+- expected_order
+- tolerance 数值误差
 
 ---
 ## 当前项目结构
@@ -244,6 +256,7 @@ sales_quantity
 channel_sales_amount
 channel_refund_rate
 roi
+cac
 
 ---
 
@@ -268,122 +281,179 @@ SQL Runner
 
 ## 当前待办（Next Milestone）
 
-### Day37-Day43 规划
+### Day38-Day44 规划
 
-目标：完成渠道分析闭环，并从指标识别升级到业务意图识别。
+目标：完成 Query Plan / SQL Template V1，并进入 Intent Parser V1。
 
 说明：
-Day36 已提前完成原 Day36、Day37 以及 Day38 中 ROI 已通过的部分。
-后续计划保持 Phase2 学习方向不变，不重新规划路线，只根据当前进度顺延。
-
----
-
-#### Day37
-
-CAC 指标建设
-
-目标：完成 CAC 指标的业务口径设计与主链路接入。
-
-学习内容：
-- CAC 业务含义
-- 获客客户数口径设计
-- 首单客户数 vs 活跃客户数区别
-- 营销成本与获客客户数的时间窗口对齐
-- 跨事实表指标的 SQL 风险
-
-交付：
-- CAC 手写 SQL
-- cac 指标定义
-- business_metrics.yaml 扩展
-- query_service 验证
-- Golden Cases 扩展
-
-重点问题：
-- CAC = 营销成本 / 获客客户数
-- 获客客户数优先定义为：分析周期内首单归因到该渠道的客户数
+Day37 已提前完成 CAC 指标建设、Result-level Evaluation V1、Ranking Evaluation V1，以及 Query Plan YAML V1 的初步建设。
+后续计划保持 Phase2 主线不变，只根据当前真实进度顺延并加厚单日学习内容。
 
 ---
 
 #### Day38
 
-渠道分析验收与结果级 Evaluation V1
+Query Plan Loader 与主链路分流设计
 
-目标：对渠道销售额、渠道退款率、ROI、CAC 进行统一验收。
+目标：
+让系统能够读取 metadata/query_plans.yaml，并判断某个 metric 是否存在 query plan。
 
 学习内容：
-- 结构级 Evaluation 的局限
-- expected_result 设计
-- Top1 结果校验
-- 数值误差容忍
-- 排序结果校验
+- query_plans.yaml 结构设计复盘
+- query_plan_loader.py 实现
+- get_query_plan_by_metric
+- business_metrics.yaml 与 query_plans.yaml 的职责边界
+- query_service 分流设计
 
 交付：
-- Result-level Evaluation V1
-- expected_result 字段设计
-- 渠道指标结果级回归测试
-- Golden Cases ≥ 22
+- app/semantic_layer/query_plan_loader.py
+- query_plan_loader 单元验证
+- roi / cac plan 读取验证
+- Query Plan 分流设计文档
 
-重点问题：
-当前 evaluator 只能检查 SQL 是否包含预期表和字段，不能证明业务答案一定正确。
-后续需要增加结果级校验。
+验收：
+- 能通过 metric_name 读取 roi_channel_v1
+- 能通过 metric_name 读取 cac_channel_v1
+- 普通指标不受影响
 
 ---
 
 #### Day39
 
-高风险指标 SQL Template / Query Plan 设计
+Template SQL Generator V1：ROI
 
-目标：降低 ROI、CAC 等跨事实表指标对 Prompt 的依赖。
+目标：
+为 ROI 建立确定性 SQL Template，降低对 LLM 生成复杂 SQL 的依赖。
 
 学习内容：
-- Prompt-only Text-to-SQL 的不稳定性
-- SQL Template 的价值
-- Metric Query Plan 设计
-- LLM 负责意图识别，模板负责 SQL 骨架
+- ROI SQL 模板拆解
+- date_window CTE
+- channel_sales CTE
+- channel_spend CTE
+- pre-aggregate then join
+- Top1 / Ranking SQL 差异
 
 交付：
-- SQL Template 设计文档
-- ROI Template V1
-- CAC Template V1 设计
-- 高风险指标模板化方案
+- app/text_to_sql/template_sql_generator.py
+- generate_roi_sql()
+- ROI Top1 模板
+- ROI Ranking 模板
+- 手写 SQL 与模板 SQL 对齐验证
 
-重点问题：
-跨事实表指标不应完全依赖 LLM 自由生成 SQL。
+验收：
+- 哪个渠道ROI最高 → 天猫，roi ≈ 1.68
+- 各渠道ROI排名 → 顺序正确
+- Evaluator 20/20 PASS
 
 ---
 
 #### Day40
 
-渠道分析能力总体验收
+Template SQL Generator V1：CAC
 
-目标：完成渠道分析小闭环验收。
+目标：
+为 CAC 建立确定性 SQL Template。
 
-验收范围：
-- channel_sales_amount
-- channel_refund_rate
-- roi
-- cac
-
-验收标准：
-- Golden Cases ≥ 22
-- Evaluator 100% PASS
-- ROI / CAC 手写 SQL 与主链路结果一致
-- Rule Layer 无明显冲突
-- Prompt 规则稳定
-- 记录剩余技术债
+学习内容：
+- CAC 真实首单新客口径
+- first_paid_order CTE
+- acquired_customers CTE
+- channel_spend CTE
+- overlap date_window
+- CAC ASC 排序
 
 交付：
-- 渠道分析验收报告
-- evaluation report
-- Day36-Day40 阶段总结
+- generate_cac_sql()
+- CAC Top1 模板
+- CAC Ranking 模板
+- CAC 结果级验证
+
+验收：
+- 哪个渠道获客成本最低 → 天猫，cac ≈ 2284.40
+- 各渠道获客成本排名 → 顺序正确
+- Evaluator 20/20 PASS
 
 ---
 
 #### Day41
 
+Query Service 接入 Query Plan
+
+目标：
+让 query_service 根据 metric 判断是否使用 Template SQL。
+
+学习内容：
+- search_metric 返回 metric_name
+- query_plan_loader 接入
+- 高风险指标走 Template
+- 普通指标走 LLM
+- 保持原有 Text-to-SQL 链路兼容
+
+目标链路：
+
+自然语言问题
+↓
+search_metric
+↓
+如果存在 query_plan
+    → template_sql_generator
+否则
+    → generate_sql / DeepSeek
+↓
+SQL Validator
+↓
+SQL Runner
+↓
+Result Formatter
+↓
+Evaluator
+
+交付：
+- query_service 分流逻辑
+- ROI / CAC 走模板
+- 其他指标仍走 LLM
+- Evaluation 回归报告
+
+验收：
+- ROI / CAC 不再依赖 LLM 自由生成 SQL
+- 20 Golden Cases 100% PASS
+- SQL 输出稳定
+
+---
+
+#### Day42
+
+Result-level Evaluation V2
+
+目标：
+增强 evaluator 对多行结果和排序数值的检查能力。
+
+学习内容：
+- 多行 expected_rows
+- 数值 tolerance
+- 排名顺序 + 数值联合校验
+- 失败报告可读性优化
+
+交付：
+- expected_rows 支持
+- ranking value validation
+- evaluation report 优化
+- 渠道指标完整结果级测试
+
+验收：
+- 渠道销售额排名校验每一行关键数值
+- 渠道退款率排名校验每一行关键数值
+- ROI 排名校验每一行关键数值
+- CAC 排名校验每一行关键数值
+
+---
+
+#### Day43
+
 Intent Parser V1 设计
 
-目标：从“指标识别”升级为“业务意图识别”。
+目标：
+从“指标识别”升级到“业务意图识别”。
 
 识别内容：
 - metric
@@ -394,130 +464,57 @@ Intent Parser V1 设计
 
 示例：
 
+```json
 {
-  "metric": "channel_sales_amount",
+  "metric": "roi",
   "dimension": "channel",
   "ranking": {
     "type": "top",
-    "value": 1
+    "value": 1,
+    "direction": "desc"
   }
 }
 
-交付：
+
+学习内容：
 - Intent Schema
-- Intent Parser V1 设计文档
+- Top1 / Ranking 区分
+- “最高 / 最低 / 排名 / TopN” 解析
+- ROI 越高越好，CAC 越低越好
+
+交付：
+- docs/architecture/intent_parser_v1.md
+- app/semantic_layer/intent_parser.py 初版设计
+- Intent 解析样例
 
 ---
 
-#### Day42
+#### Day44
 
-TopN / Ranking 解析能力建设
+Intent Parser V1 实现与验证
 
-目标：支持 TopN 与排序类问题的稳定解析。
+目标：实现基础 Intent Parser，并为后续替代 Prompt 判断 TopN 做准备。
 
-支持问题：
-- 销售额Top5品类
-- 渠道销售额Top3
-- 退款率前三的渠道
-- ROI最高的渠道
-- CAC最低的渠道
-
-交付：
-- ranking parser
-- limit parser
-- TopN Golden Cases
-
----
-
-#### Day43
-
-Intent Parser 接入主链路
-
-目标：将 Intent Parser V1 接入现有 Query Service。
-
-目标链路：
-
-自然语言问题
-↓
-Intent Parser
-↓
-Metric Search
-↓
-Context Builder
-↓
-Prompt Builder / SQL Template
-↓
-SQL Execution
-↓
-Evaluation
-
-交付：
-- Intent Parser 接入 query_service
-- Evaluation 回归
+学习内容：
+- Rule-based Intent Parser
+- TopN 解析
+- Ranking direction 解析
+- metric + dimension 组合
 - Intent Trace 输出
 
----
-
-### Day41-Day45 规划
-
-目标：Intent Parser V1
-
-从“指标识别”升级为“业务意图识别”。
-
-识别内容：
-- Metric
-- Dimension
-- Ranking
-
-示例：
-销售额Top5品类
-解析为：
-{
-  "metric": "item_sales_amount",
-  "dimension": "category",
-  "ranking": {
-    "type": "top",
-    "value": 5
-  }
-}
-
 交付：
-- Intent Schema
-- Intent Parser V1
-- TopN 解析能力
-- Ranking 解析能力
+- intent_parser.py
+- intent parser 测试集
+- Top1 / Ranking / TopN 样例验证
+- 与 Query Plan 的接口设计
+
+验收：
+- “哪个渠道ROI最高” 解析为 metric=roi, dimension=channel, limit=1, direction=desc
+- “各渠道CAC排名” 解析为 metric=cac, dimension=channel, ranking=true, direction=asc
+- “销售额Top5品类” 解析为 metric=item_sales_amount, dimension=category, limit=5
 
 ---
 
-### Day46-Day50 规划
-
-目标：Phase2 收尾与验收
-完善：
-- Hybrid Search
-- Intent Parser
-- Golden Dataset
-- Evaluator
-形成完整闭环：
-自然语言
-↓
-业务语义识别
-↓
-指标识别
-↓
-维度识别
-↓
-SQL生成
-↓
-SQL执行
-↓
-结果返回
-
-目标：
-- Golden Cases ≥ 30
-- Evaluator 稳定运行
-- Phase2 验收完成
-
----
 ## 开发日志
 
 ### Day24
@@ -868,3 +865,89 @@ Golden Dataset：
 
 Pass Rate：
 100%
+
+---
+
+### Day37
+
+完成：
+- CAC 指标建设
+- CAC 手写 SQL 验证
+- 明确真实首单新客口径
+- 新增 cac 指标
+- query_service 支持渠道获客成本问题
+- Golden Cases 扩展至 20 条
+- Evaluator 保持 100% PASS
+- 新增 Result-level Evaluation V1
+- 新增 Ranking Result Evaluation V1
+- 新增 expected_result 校验
+- 新增 expected_order 校验
+- 新增 Metric Query Plan V1 设计
+- 新增 metadata/query_plans.yaml
+- 完成 roi_channel_v1 与 cac_channel_v1 读取验证
+
+实现：
+
+自然语言
+↓
+Hybrid Search
+↓
+Context Builder
+↓
+Prompt Builder / Query Plan Metadata
+↓
+SQL Generator
+↓
+SQL Cleaner
+↓
+SQL Validator
+↓
+PostgreSQL
+↓
+Table
+↓
+Result-level Evaluation
+
+新增支持：
+- 哪个渠道获客成本最低
+- 各渠道获客成本排名
+- 哪个渠道拉新效率最高
+
+关键结果：
+CAC 最低渠道：
+- 天猫
+- cac = 2284.40
+
+CAC 排名：
+- 天猫
+- 微信小程序
+- 京东
+- 抖音
+- 小红书
+
+发现问题：
+1. CAC 不能简单使用 COUNT(DISTINCT customer_id)。
+2. CAC 不能使用窗口内首单，应使用真实首单新客。
+3. ROI / CAC 复杂 SQL 多次暴露 Prompt-only 不稳定。
+4. 结构级 Evaluation 无法证明业务答案正确。
+5. 排名类问题需要校验返回顺序。
+
+解决：
+1. CAC 采用真实首单新客口径。
+2. prompt_builder 增加 CAC 首单口径约束。
+3. evaluator 增加 expected_result。
+4. evaluator 增加 expected_order。
+5. 新增 query_plans.yaml，开始将复杂指标 SQL 计划结构化。
+
+结果：
+Golden Dataset：
+18 Cases
+↓
+20 Cases
+
+Evaluation：
+结构级检查
+↓
+结构级 + 结果级 + 排名顺序检查
+
+Pass Rate：100%

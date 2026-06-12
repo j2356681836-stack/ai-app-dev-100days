@@ -1,0 +1,161 @@
+query_plans:
+  - name: roi_channel_v1
+    metric: roi
+    chinese_name: 渠道投资回报率
+    query_type: cross_fact_metric
+    grain: channel
+
+    description: >
+      按渠道计算 ROI。ROI = 渠道销售额 / 渠道营销投放成本。
+      ROI 是倍数，不是百分比，不需要乘以 100。
+
+    date_window:
+      required: true
+      strategy: overlap
+      start_date: >
+        GREATEST(
+          MIN(fact_orders.order_date::date),
+          MIN(fact_marketing_spend.spend_date)
+        )
+      end_date: >
+        LEAST(
+          MAX(fact_orders.order_date::date),
+          MAX(fact_marketing_spend.spend_date)
+        )
+
+    steps:
+      - name: channel_sales
+        source_table: fact_orders
+        group_by:
+          - channel_id
+        metrics:
+          - expression: SUM(paid_amount)
+            alias: sales_amount
+        filters:
+          - order_status = 'paid'
+          - order_date::date BETWEEN start_date AND end_date
+
+      - name: channel_spend
+        source_table: fact_marketing_spend
+        group_by:
+          - channel_id
+        metrics:
+          - expression: SUM(spend_amount)
+            alias: spend_amount
+        filters:
+          - spend_date BETWEEN start_date AND end_date
+
+    join:
+      left: channel_sales
+      right: channel_spend
+      on:
+        - channel_id
+
+    dimension:
+      table: dim_channel
+      join_key: channel_id
+      label_field: channel_name
+      type_field: channel_type
+
+    output:
+      columns:
+        - channel_name
+        - roi
+      formula:
+        expression: sales_amount / spend_amount
+        alias: roi
+        round: 2
+        multiply_by_100: false
+
+    default_sort:
+      field: roi
+      direction: desc
+
+  - name: cac_channel_v1
+    metric: cac
+    chinese_name: 渠道获客成本
+    query_type: acquisition_metric
+    grain: channel
+
+    description: >
+      按渠道计算 CAC。CAC = 渠道营销投放成本 / 渠道获客客户数。
+      CAC 越低表示获客效率越高。
+      获客客户数采用真实首单新客口径。
+
+    date_window:
+      required: true
+      strategy: overlap
+      start_date: >
+        GREATEST(
+          MIN(fact_orders.order_date::date),
+          MIN(fact_marketing_spend.spend_date)
+        )
+      end_date: >
+        LEAST(
+          MAX(fact_orders.order_date::date),
+          MAX(fact_marketing_spend.spend_date)
+        )
+
+    steps:
+      - name: first_paid_order
+        source_table: fact_orders
+        strategy: true_first_order
+        window_function: >
+          ROW_NUMBER() OVER (
+            PARTITION BY customer_id
+            ORDER BY order_date ASC
+          )
+        filters:
+          - order_status = 'paid'
+        output_fields:
+          - customer_id
+          - channel_id
+          - order_date
+          - rn
+
+      - name: acquired_customers
+        source_step: first_paid_order
+        group_by:
+          - channel_id
+        metrics:
+          - expression: COUNT(DISTINCT customer_id)
+            alias: acquired_customer_count
+        filters:
+          - rn = 1
+          - order_date::date BETWEEN start_date AND end_date
+
+      - name: channel_spend
+        source_table: fact_marketing_spend
+        group_by:
+          - channel_id
+        metrics:
+          - expression: SUM(spend_amount)
+            alias: marketing_spend_amount
+        filters:
+          - spend_date BETWEEN start_date AND end_date
+
+    join:
+      left: acquired_customers
+      right: channel_spend
+      on:
+        - channel_id
+
+    dimension:
+      table: dim_channel
+      join_key: channel_id
+      label_field: channel_name
+      type_field: channel_type
+
+    output:
+      columns:
+        - channel_name
+        - cac
+      formula:
+        expression: marketing_spend_amount / acquired_customer_count
+        alias: cac
+        round: 2
+        multiply_by_100: false
+
+    default_sort:
+      field: cac
+      direction: asc

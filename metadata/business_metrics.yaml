@@ -290,3 +290,63 @@ metrics:
       - ["渠道", "投放回报率"]
       - ["渠道", "营销回报"]
       - ["渠道", "投放最划算"]
+
+  - name: cac
+    chinese_name: 获客成本
+    aliases:
+      - CAC
+      - cac
+      - 获客成本
+      - 客户获取成本
+      - 拉新成本
+      - 渠道CAC
+      - 渠道cac
+      - 渠道获客成本
+      - 渠道拉新成本
+      - 哪个渠道CAC最低
+      - 哪个渠道获客成本最低
+      - 哪个渠道拉新成本最低
+      - 哪个渠道拉新效率最高
+    grain: channel
+    definition: >
+      按渠道统计的营销投放成本与获客客户数之比，
+      用于衡量不同渠道获取一个新客户的平均成本。
+      CAC 越低，表示渠道获客效率越高。
+      本项目中获客客户数定义为真实首单新客：
+      先在全量 paid 订单中找到每个客户的第一笔订单，
+      再判断该首单是否落在分析时间窗口内，
+      并将该首单所属渠道作为获客渠道。
+    formula: >
+      CAC = marketing_spend_amount / acquired_customer_count。
+      marketing_spend_amount 必须先从 fact_marketing_spend 按 channel_id 聚合。
+      acquired_customer_count 必须先在全量 paid 订单中使用
+      ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date ASC)
+      找到每个客户的真实首单；
+      然后再判断该真实首单的 order_date 是否落在分析时间窗口内；
+      最后按真实首单的 channel_id 统计获客客户数。
+      禁止先按时间窗口过滤订单后再计算 ROW_NUMBER()，避免把老客在窗口内的复购误判为新客。
+    tables:
+      - fact_marketing_spend
+      - fact_orders
+      - dim_channel
+    filters:
+      - fact_orders.order_status = 'paid'
+    examples:
+      - 哪个渠道CAC最低
+      - 哪个渠道获客成本最低
+      - 哪个渠道拉新成本最低
+      - 哪个渠道拉新效率最高
+      - 各渠道CAC排名
+      - 各渠道获客成本排名
+    negative_examples:
+      - 哪个渠道ROI最高
+      - 哪个渠道销售额最高
+      - 哪个渠道退款率最高
+      - 哪个品类销售额最高
+    keyword_groups:
+      - ["渠道", "CAC"]
+      - ["渠道", "cac"]
+      - ["渠道", "获客成本"]
+      - ["渠道", "客户获取成本"]
+      - ["渠道", "拉新成本"]
+      - ["渠道", "拉新效率"]

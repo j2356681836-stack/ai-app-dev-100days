@@ -176,6 +176,10 @@ GOLDEN_QUESTIONS = [
             "channel_name",
             "channel_sales_amount",
         ],
+        "expected_result": {
+            "channel_name": "天猫",
+            "channel_sales_amount": 2445170.92,
+        },
         "should_execute": True,
     },
     {
@@ -189,6 +193,16 @@ GOLDEN_QUESTIONS = [
             "channel_name",
             "channel_sales_amount",
         ],
+        "expected_order": {
+            "field": "channel_name",
+            "values": [
+                "天猫",
+                "抖音",
+                "京东",
+                "小红书",
+                "微信小程序",
+            ],
+        },
         "should_execute": True,
     },
     {
@@ -204,6 +218,10 @@ GOLDEN_QUESTIONS = [
             "channel_name",
             "channel_refund_rate_pct",
         ],
+        "expected_result": {
+            "channel_name": "抖音",
+            "channel_refund_rate_pct": 6.86,
+        },
         "should_execute": True,
     },
     {
@@ -219,6 +237,16 @@ GOLDEN_QUESTIONS = [
             "channel_name",
             "channel_refund_rate_pct",
         ],
+        "expected_order": {
+            "field": "channel_name",
+            "values": [
+                "抖音",
+                "天猫",
+                "京东",
+                "微信小程序",
+                "小红书",
+            ],
+        },
         "should_execute": True,
     },
         {
@@ -233,6 +261,10 @@ GOLDEN_QUESTIONS = [
             "channel_name",
             "roi",
         ],
+        "expected_result": {
+            "channel_name": "天猫",
+            "roi": 1.68,
+        },
         "should_execute": True,
     },
     {
@@ -247,6 +279,58 @@ GOLDEN_QUESTIONS = [
             "channel_name",
             "roi",
         ],
+        "expected_order": {
+            "field": "channel_name",
+            "values": [
+                "天猫",
+                "微信小程序",
+                "京东",
+                "抖音",
+                "小红书",
+            ],
+        },
+        "should_execute": True,
+    },
+        {
+        "id": "case_024",
+        "question": "哪个渠道获客成本最低",
+        "expected_tables": [
+            "fact_orders",
+            "fact_marketing_spend",
+            "dim_channel",
+        ],
+        "expected_columns": [
+            "channel_name",
+            "cac",
+        ],
+        "expected_result": {
+            "channel_name": "天猫",
+            "cac": 2284.40,
+        },
+        "should_execute": True,
+    },
+    {
+        "id": "case_025",
+        "question": "各渠道获客成本排名",
+        "expected_tables": [
+            "fact_orders",
+            "fact_marketing_spend",
+            "dim_channel",
+        ],
+        "expected_columns": [
+            "channel_name",
+            "cac",
+        ],
+        "expected_order": {
+            "field": "channel_name",
+            "values": [
+                "天猫",
+                "微信小程序",
+                "京东",
+                "抖音",
+                "小红书",
+            ],
+        },
         "should_execute": True,
     },
 ]

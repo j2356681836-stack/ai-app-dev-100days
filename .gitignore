@@ -50,5 +50,5 @@ docs/evaluation/*.json
 *.npy
 *.pkl
 
-# Evaluation Results
+# chatgpt_prompt
 docs/chatgpt_handover.md
