@@ -3,6 +3,8 @@ from app.text_to_sql.sql_cleaner import clean_sql
 from app.text_to_sql.sql_generator import generate_sql
 from app.text_to_sql.sql_validator import validate_sql
 from app.text_to_sql.result_formatter import format_result, to_table
+from app.semantic_layer.hybrid_search import search_metric
+from app.text_to_sql.template_sql_generator import generate_template_sql
 
 import time
 
@@ -14,8 +16,39 @@ def ask(question: str):
     """
 
     try:
-        raw_sql = generate_sql(question)
+        metric_result = search_metric(question)
+
+        if metric_result.get("status") != "matched":
+            return {
+                "success": False,
+                **metric_result,
+            }
+
+        metrics = metric_result.get("metrics", [])
+
+        if not metrics:
+            return {
+                "success": False,
+                "status": "error",
+                "message": "未识别到业务指标",
+            }
+
+        metric_name = metrics[0]["name"]
+
+        template_sql = generate_template_sql(
+            metric_name=metric_name,
+            question=question,
+        )
+
+        if template_sql:
+            raw_sql = template_sql
+            generation_method = "template"
+        else:
+            raw_sql = generate_sql(question)
+            generation_method = "llm"
+
         sql = clean_sql(raw_sql)
+
     except ValueError as e:
         payload = e.args[0]
         if isinstance(payload, dict):
@@ -39,6 +72,7 @@ def ask(question: str):
         "success": True,
         "status": "completed",
         "question": question,
+        "generation_method": generation_method,
         "sql": sql,
         "table": table,
     }

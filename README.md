@@ -100,6 +100,7 @@ ORDER BY refund_rate DESC;
 
 metadata/
 ├── business_metrics.yaml
+├── query_plans.yaml
 ├── table_dictionary.yaml
 ├── table_relationships.yaml
 
@@ -137,19 +138,24 @@ fact_refunds.order_item_id = fact_order_items.order_item_id
 ## Text-to-SQL
 
 支持：
+
 Question
 ↓
-Semantic Search
+Hybrid Search
 ↓
-Context Builder
+Metric Recognition
 ↓
-Prompt Builder
-↓
-DeepSeek
+Query Plan Routing
+├── ROI / CAC → Template SQL
+└── 普通指标 → LLM SQL
 ↓
 SQL Cleaner
 ↓
-SQL
+SQL Validator
+↓
+PostgreSQL
+↓
+Table
 
 
 已验证问题：
@@ -306,7 +312,7 @@ Business Semantic Layer + Text-to-SQL
 - Result Formatter
 - Query Service
 
-当前能力：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → 结构化结果返回 → Evaluation 回归验证
+当前能力：自然语言问题 → 业务语义检索 → Query Plan Routing → Template / LLM SQL生成 → SQL校验 → PostgreSQL执行 → 结构化结果返回 → Result-level Evaluation
 
 ## Evaluation Framework
 
@@ -334,9 +340,11 @@ Prompt Optimization
 当前评估结果：
 - Golden Questions：20
 - Pass Rate：100%
+- Template SQL Tests：12/12 PASS
 - 支持 SQL 结构级检查
 - 支持 Top1 结果级校验
 - 支持排名顺序校验
+- 支持 generation_method 校验
 
 ## Text2SQL 示例
 
@@ -605,6 +613,43 @@ SQL Runner
 
 ---
 
+### Day38
+
+完成内容：
+
+- 新增 query_plan_loader.py
+- 支持读取 metadata/query_plans.yaml
+- 新增 template_sql_generator.py
+- 实现 ROI Template SQL
+- 实现 CAC Template SQL
+- 实现 parse_limit，支持 Top1 / TopN / Ranking
+- 实现 generate_template_sql 统一入口
+- query_service 接入 Query Plan Routing
+- ROI / CAC 走 template
+- 普通指标继续走 LLM
+- query_service 返回 generation_method
+- 新增 template_sql_tests.py
+- evaluator 增加 expected_generation_method 校验
+- Evaluator 保持 20/20 通过
+
+关键收获：
+
+- ROI / CAC 等复杂指标不应长期依赖 LLM 自由生成 SQL。
+- Query Plan Routing 可以让高风险指标走确定性模板。
+- 普通指标继续走 LLM，避免过度模板化。
+- TopN 解析需要优先识别明确数量，再处理最高/最低等极值词。
+- template_sql_tests 与 evaluator 分别保护模板层和端到端业务链路。
+
+当前系统新增能力：
+
+- ROI / CAC Template SQL
+- TopN Template SQL
+- Query Plan Routing
+- generation_method 评估
+
+---
+
+
 ## Phase 3
 
 Agent Workflow
@@ -698,7 +743,7 @@ Answer
 
 # 当前版本
 
-Version: v0.11
-完成度：Day37 / 100
+Version: v0.12
+完成度：Day38 / 100
 当前实现：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → Table → Result-level Evaluation
 

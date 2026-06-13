@@ -205,7 +205,32 @@ search_type:
 - expected_columns
 - expected_result
 - expected_order
+- expected_generation_method
 - tolerance 数值误差
+
+### Metric Query Plan
+
+当前状态：V1 已接入主链路。
+
+已完成：
+- metadata/query_plans.yaml
+- app/semantic_layer/query_plan_loader.py
+- app/text_to_sql/template_sql_generator.py
+
+当前支持：
+- roi_channel_v1
+- cac_channel_v1
+
+当前路由：
+- roi → template
+- cac → template
+- 其他普通指标 → llm
+
+当前模板能力：
+- ROI Template SQL
+- CAC Template SQL
+- Top1 / TopN / Ranking LIMIT 解析
+- generate_template_sql 统一入口
 
 ---
 ## 当前项目结构
@@ -264,254 +289,225 @@ cac
 
 Question
 ↓
-Hybrid Search
+Hybrid Search / Metric Recognition
 ├─ Alias Match
 ├─ Embedding Match
 └─ Clarification
 ↓
-Context Builder
+Query Plan Routing
+├─ ROI / CAC → Template SQL
+└─ 普通指标 → LLM SQL
 ↓
-Prompt Builder
+SQL Cleaner
 ↓
-SQL Generator
+SQL Validator
 ↓
-SQL Runner
+PostgreSQL
+↓
+Table
+↓
+Result-level Evaluation
 
 ---
 
 ## 当前待办（Next Milestone）
 
-### Day38-Day44 规划
+### Day39-Day45 规划
 
-目标：完成 Query Plan / SQL Template V1，并进入 Intent Parser V1。
-
+目标：完成 Query Plan 稳定化，并进入 Intent Parser V1。
 说明：
-Day37 已提前完成 CAC 指标建设、Result-level Evaluation V1、Ranking Evaluation V1，以及 Query Plan YAML V1 的初步建设。
-后续计划保持 Phase2 主线不变，只根据当前真实进度顺延并加厚单日学习内容。
-
----
-
-#### Day38
-
-Query Plan Loader 与主链路分流设计
-
-目标：
-让系统能够读取 metadata/query_plans.yaml，并判断某个 metric 是否存在 query plan。
-
-学习内容：
-- query_plans.yaml 结构设计复盘
-- query_plan_loader.py 实现
-- get_query_plan_by_metric
-- business_metrics.yaml 与 query_plans.yaml 的职责边界
-- query_service 分流设计
-
-交付：
-- app/semantic_layer/query_plan_loader.py
-- query_plan_loader 单元验证
-- roi / cac plan 读取验证
-- Query Plan 分流设计文档
-
-验收：
-- 能通过 metric_name 读取 roi_channel_v1
-- 能通过 metric_name 读取 cac_channel_v1
-- 普通指标不受影响
+Day38 已完成 Query Plan Routing 主链路接入，ROI / CAC 已走 Template SQL。
+后续计划保持 Phase2 主线不变，重点从“复杂指标稳定生成 SQL”升级到“业务意图识别”。
 
 ---
 
 #### Day39
 
-Template SQL Generator V1：ROI
+Query Plan 参数化 V1
 
 目标：
-为 ROI 建立确定性 SQL Template，降低对 LLM 生成复杂 SQL 的依赖。
+减少 template_sql_generator.py 中的硬编码，让部分信息从 query_plans.yaml 读取。
 
 学习内容：
-- ROI SQL 模板拆解
-- date_window CTE
-- channel_sales CTE
-- channel_spend CTE
-- pre-aggregate then join
-- Top1 / Ranking SQL 差异
+- query_plans.yaml 与 template_sql_generator.py 的职责边界
+- 从 plan 读取 default_sort
+- 从 plan 读取 output alias
+- 从 plan 读取 multiply_by_100
+- 从 plan 读取 query_type
+- 专用模板与参数化模板的取舍
 
 交付：
-- app/text_to_sql/template_sql_generator.py
-- generate_roi_sql()
-- ROI Top1 模板
-- ROI Ranking 模板
-- 手写 SQL 与模板 SQL 对齐验证
+- generate_template_sql 引入 query_plan 参数
+- ROI / CAC 部分参数从 query_plans.yaml 读取
+- template_sql_tests 扩展
+- evaluator 20/20 PASS
 
 验收：
-- 哪个渠道ROI最高 → 天猫，roi ≈ 1.68
-- 各渠道ROI排名 → 顺序正确
-- Evaluator 20/20 PASS
+- ROI / CAC 结果不变
+- generation_method 仍为 template
+- 普通指标仍走 llm
 
 ---
 
 #### Day40
 
-Template SQL Generator V1：CAC
+Intent Parser V1 设计
 
 目标：
-为 CAC 建立确定性 SQL Template。
+从 parse_limit 过渡到独立 Intent Parser 设计。
 
 学习内容：
-- CAC 真实首单新客口径
-- first_paid_order CTE
-- acquired_customers CTE
-- channel_spend CTE
-- overlap date_window
-- CAC ASC 排序
+- limit 与 sort_direction 的拆分
+- Top1 / TopN / Ranking 的区别
+- ROI 越高越好，CAC 越低越好
+- 指标默认排序方向
+- 用户问题中的业务意图结构化
 
 交付：
-- generate_cac_sql()
-- CAC Top1 模板
-- CAC Ranking 模板
-- CAC 结果级验证
+- docs/architecture/intent_parser_v1.md
+- Intent Schema 设计
+- intent examples
+- parse_limit 迁移方案
 
-验收：
-- 哪个渠道获客成本最低 → 天猫，cac ≈ 2284.40
-- 各渠道获客成本排名 → 顺序正确
-- Evaluator 20/20 PASS
+示例输出：
+
+```json
+{
+  "metric": "cac",
+  "dimension": "channel",
+  "ranking": {
+    "enabled": true,
+    "limit": 3,
+    "direction": "asc"
+  }
+}
 
 ---
 
 #### Day41
 
-Query Service 接入 Query Plan
+Intent Parser V1 实现
 
-目标：
-让 query_service 根据 metric 判断是否使用 Template SQL。
+目标：实现 Rule-based Intent Parser。
 
 学习内容：
-- search_metric 返回 metric_name
-- query_plan_loader 接入
-- 高风险指标走 Template
-- 普通指标走 LLM
-- 保持原有 Text-to-SQL 链路兼容
-
-目标链路：
-
-自然语言问题
-↓
-search_metric
-↓
-如果存在 query_plan
-    → template_sql_generator
-否则
-    → generate_sql / DeepSeek
-↓
-SQL Validator
-↓
-SQL Runner
-↓
-Result Formatter
-↓
-Evaluator
+- parse_metric
+- parse_dimension
+- parse_limit
+- parse_sort_direction
+- parse_ranking
+- Intent Trace
 
 交付：
-- query_service 分流逻辑
-- ROI / CAC 走模板
-- 其他指标仍走 LLM
-- Evaluation 回归报告
+- app/semantic_layer/intent_parser.py
+- intent parser 测试脚本
+- Top1 / TopN / Ranking 测试集
 
 验收：
-- ROI / CAC 不再依赖 LLM 自由生成 SQL
-- 20 Golden Cases 100% PASS
-- SQL 输出稳定
+- 哪个渠道ROI最高 → metric=roi, limit=1, direction=desc
+- 获客成本最低的三个渠道 → metric=cac, limit=3, direction=asc
+- 各渠道销售额排名 → metric=channel_sales_amount, limit=None, direction=desc
 
 ---
 
 #### Day42
 
-Result-level Evaluation V2
+Intent Parser 接入 Query Plan Template
 
-目标：
-增强 evaluator 对多行结果和排序数值的检查能力。
+目标：让 template_sql_generator 不再直接解析 question，而是使用 intent。
 
 学习内容：
-- 多行 expected_rows
-- 数值 tolerance
-- 排名顺序 + 数值联合校验
-- 失败报告可读性优化
+- intent 与 SQL Template 的接口
+- limit 从 intent 传入
+- sort_direction 从 intent 传入
+- query_service 中 intent 的位置
 
 交付：
-- expected_rows 支持
-- ranking value validation
-- evaluation report 优化
-- 渠道指标完整结果级测试
+- generate_roi_sql(intent)
+- generate_cac_sql(intent)
+- template_sql_tests 改造为 intent-based
+- evaluator 回归
 
 验收：
-- 渠道销售额排名校验每一行关键数值
-- 渠道退款率排名校验每一行关键数值
-- ROI 排名校验每一行关键数值
-- CAC 排名校验每一行关键数值
+- ROI / CAC Top1、TopN、Ranking 全部稳定
+- 20/20 PASS
 
 ---
 
 #### Day43
 
-Intent Parser V1 设计
+普通指标 Intent 接入设计
 
-目标：
-从“指标识别”升级到“业务意图识别”。
-
-识别内容：
-- metric
-- dimension
-- ranking
-- limit
-- sort_order
-
-示例：
-
-```json
-{
-  "metric": "roi",
-  "dimension": "channel",
-  "ranking": {
-    "type": "top",
-    "value": 1,
-    "direction": "desc"
-  }
-}
-
+目标：让普通指标也能使用 Intent 中的 dimension / ranking 信息，减少 Prompt 负担。
 
 学习内容：
-- Intent Schema
-- Top1 / Ranking 区分
-- “最高 / 最低 / 排名 / TopN” 解析
-- ROI 越高越好，CAC 越低越好
+- 品类维度
+- 渠道维度
+- TopN
+- 默认维度规则
+- Prompt Builder 如何使用 intent
 
 交付：
-- docs/architecture/intent_parser_v1.md
-- app/semantic_layer/intent_parser.py 初版设计
-- Intent 解析样例
+- prompt_builder 增加 intent context
+- 普通指标仍走 LLM，但 Prompt 更结构化
+- Golden Cases 回归
 
+验收：
+- 销售额Top5品类稳定
+- 各渠道销售额排名稳定
+- 品类退款率前三稳定
 ---
 
 #### Day44
 
-Intent Parser V1 实现与验证
+Result-level Evaluation V2
 
-目标：实现基础 Intent Parser，并为后续替代 Prompt 判断 TopN 做准备。
+目标：扩展 evaluator 支持多行 expected_rows 和数值校验。
 
 学习内容：
-- Rule-based Intent Parser
-- TopN 解析
-- Ranking direction 解析
-- metric + dimension 组合
-- Intent Trace 输出
+- expected_rows
+- 多行结果校验
+- 排名顺序 + 数值联合校验
+- 失败报告优化
 
 交付：
-- intent_parser.py
-- intent parser 测试集
-- Top1 / Ranking / TopN 样例验证
-- 与 Query Plan 的接口设计
+- expected_rows 支持
+- 渠道指标完整结果级校验
+- evaluation report 优化
 
 验收：
-- “哪个渠道ROI最高” 解析为 metric=roi, dimension=channel, limit=1, direction=desc
-- “各渠道CAC排名” 解析为 metric=cac, dimension=channel, ranking=true, direction=asc
-- “销售额Top5品类” 解析为 metric=item_sales_amount, dimension=category, limit=5
+- 渠道销售额排名每行数值可校验
+- ROI 排名每行数值可校验
+- CAC 排名每行数值可校验
+
+---
+
+#### Day45
+
+Phase2 中段验收与重构缓冲
+
+目标：对 Day36-Day44 的渠道分析、Query Plan、Intent Parser、Evaluation 做一次阶段验收。
+
+学习内容：
+- 回顾新增指标
+- 回顾 Query Plan 架构
+- 回顾 Evaluation 演进
+- 检查代码重复
+- 检查 metadata 职责边界
+- 梳理技术债
+
+交付：
+- Phase2 Midpoint Review
+- architecture update
+- README / PROJECT_STATE 全量校准
+- evaluator 完整报告
+
+验收：
+- Golden Cases ≥ 20
+- Pass Rate 100%
+- ROI / CAC Template 稳定
+- Intent Parser V1 可用
+- 技术债清单清晰
 
 ---
 
@@ -951,3 +947,79 @@ Evaluation：
 结构级 + 结果级 + 排名顺序检查
 
 Pass Rate：100%
+
+---
+
+### Day38
+
+完成：
+- 新增 query_plan_loader.py
+- metadata/query_plans.yaml 接入 loader
+- 新增 template_sql_generator.py
+- 实现 ROI Template SQL
+- 实现 CAC Template SQL
+- 实现 parse_limit 与 build_limit_clause
+- 支持 Top1 / TopN / Ranking
+- 实现 generate_template_sql 统一入口
+- query_service 接入 Query Plan Routing
+- ROI / CAC 走 template
+- 普通指标继续走 llm
+- query_service 返回 generation_method
+- 新增 template_sql_tests.py
+- evaluator 增加 expected_generation_method
+- Evaluator 20/20 通过
+
+实现：
+  Question
+  ↓
+  Hybrid Search
+  ↓
+  Metric Name
+  ↓
+  Template Routing
+  ├─ roi / cac → Template SQL
+  └─ ordinary metrics → LLM SQL
+  ↓
+  SQL Cleaner
+  ↓
+  SQL Validator
+  ↓
+  PostgreSQL
+  ↓
+  Table
+  ↓
+  Result-level Evaluation
+
+新增支持：
+- 渠道ROI Top3
+- 获客成本最低的三个渠道
+- ROI / CAC template generation
+- generation_method validation
+
+关键结果：
+
+Template SQL Tests：
+- 12/12 PASS
+
+Golden Dataset：
+- 20 Cases
+- 100% PASS
+
+发现问题：
+1. 仅用 should_limit_one 无法支持 TopN。
+2. “最低的三个渠道” 不能被误判为 LIMIT 1。
+3. query_plans.yaml 与 template_sql_generator.py 之间存在一定重复，但当前阶段是合理过渡。
+4. 需要验证 ROI / CAC 确实走 template，而不是 LLM 恰好生成正确 SQL。
+
+解决：
+1. 用 parse_limit 替代 should_limit_one。
+2. 明确数量表达优先于极值表达。
+3. 增加 generate_template_sql 统一入口。
+4. query_service 增加 generation_method。
+5. evaluator 增加 expected_generation_method。
+
+结果：
+- Query Plan Routing 已接入主链路。
+- ROI / CAC 已从 Prompt-only 生成升级为 Template SQL。
+- 普通指标保持 LLM 生成。
+- Evaluator 保持 100% PASS。

@@ -180,6 +180,7 @@ GOLDEN_QUESTIONS = [
             "channel_name": "天猫",
             "channel_sales_amount": 2445170.92,
         },
+        "expected_generation_method": "llm",
         "should_execute": True,
     },
     {
@@ -203,6 +204,7 @@ GOLDEN_QUESTIONS = [
                 "微信小程序",
             ],
         },
+        "expected_generation_method": "llm",
         "should_execute": True,
     },
     {
@@ -222,6 +224,7 @@ GOLDEN_QUESTIONS = [
             "channel_name": "抖音",
             "channel_refund_rate_pct": 6.86,
         },
+        "expected_generation_method": "llm",
         "should_execute": True,
     },
     {
@@ -247,6 +250,7 @@ GOLDEN_QUESTIONS = [
                 "小红书",
             ],
         },
+        "expected_generation_method": "llm",
         "should_execute": True,
     },
         {
@@ -265,6 +269,7 @@ GOLDEN_QUESTIONS = [
             "channel_name": "天猫",
             "roi": 1.68,
         },
+        "expected_generation_method": "template",
         "should_execute": True,
     },
     {
@@ -288,6 +293,7 @@ GOLDEN_QUESTIONS = [
                 "抖音",
                 "小红书",
             ],
+        "expected_generation_method": "template",
         },
         "should_execute": True,
     },
@@ -307,6 +313,7 @@ GOLDEN_QUESTIONS = [
             "channel_name": "天猫",
             "cac": 2284.40,
         },
+        "expected_generation_method": "template",
         "should_execute": True,
     },
     {
@@ -330,6 +337,7 @@ GOLDEN_QUESTIONS = [
                 "抖音",
                 "小红书",
             ],
+        "expected_generation_method": "template",
         },
         "should_execute": True,
     },

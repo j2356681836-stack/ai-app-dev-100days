@@ -89,6 +89,31 @@ def check_expected_result(
     return mismatches
 
 
+def check_generation_method(
+    result: dict,
+    expected_generation_method: str | None,
+) -> list[dict]:
+    """
+    检查 SQL 生成方式是否符合预期。
+    """
+    if not expected_generation_method:
+        return []
+
+    actual_generation_method = result.get("generation_method")
+
+    if actual_generation_method == expected_generation_method:
+        return []
+
+    return [
+        {
+            "field": "generation_method",
+            "expected": expected_generation_method,
+            "actual": actual_generation_method,
+            "reason": "generation method mismatch",
+        }
+    ]
+
+
 def check_expected_order(
     table: dict,
     expected_order: dict,
@@ -154,12 +179,19 @@ def evaluate_case(case: dict) -> dict:
             expected_order=case.get("expected_order", {}),
         )
 
+        generation_method_mismatches = check_generation_method(
+            result=result,
+            expected_generation_method=case.get("expected_generation_method"),
+        )
+
         passed = (
             result["success"] is True
             and len(missing_tables) == 0
             and len(missing_columns) == 0
             and table["row_count"] >= 0
             and len(result_mismatches) == 0
+            and len(order_mismatches) == 0
+            and len(generation_method_mismatches) == 0
         )
 
         return {
@@ -170,6 +202,8 @@ def evaluate_case(case: dict) -> dict:
             "missing_columns": missing_columns,
             "result_mismatches": result_mismatches,
             "order_mismatches": order_mismatches,
+            "generation_method": result.get("generation_method"),
+            "generation_method_mismatches": generation_method_mismatches,
             "sql": sql,
             "row_count": table["row_count"],
             "error": None,
@@ -184,6 +218,8 @@ def evaluate_case(case: dict) -> dict:
             "missing_columns": case.get("expected_columns", []),
             "result_mismatches": [],
             "order_mismatches": [],
+            "generation_method": None,
+            "generation_method_mismatches": [],
             "sql": None,
             "row_count": 0,
             "error": str(e),
@@ -210,6 +246,7 @@ def run_evaluation() -> list[dict]:
             print(f"Missing columns: {result['missing_columns']}")
             print(f"Result mismatches: {result.get('result_mismatches', [])}")
             print(f"Order mismatches: {result.get('order_mismatches', [])}")
+            print(f"Generation method mismatches: {result.get('generation_method_mismatches', [])}")
             print(f"Error: {result['error']}")
 
         print("-" * 60)
