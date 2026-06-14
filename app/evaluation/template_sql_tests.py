@@ -1,3 +1,8 @@
+import json
+
+from datetime import datetime
+from pathlib import Path
+
 from app.text_to_sql.template_sql_generator import (
     parse_limit,
     generate_template_sql,
@@ -164,6 +169,53 @@ def print_results(title: str, results: list[dict]) -> None:
     print(f"Failed: {total - passed}")
 
 
+def save_report(
+    limit_results: list[dict],
+    routing_results: list[dict],
+) -> Path:
+    """
+    保存 Template SQL 测试报告。
+    """
+    project_root = Path(__file__).resolve().parents[2]
+    output_dir = project_root / "docs" / "evaluation"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = output_dir / f"template_sql_tests_{timestamp}.json"
+
+    all_results = limit_results + routing_results
+    total = len(all_results)
+    passed = sum(1 for item in all_results if item["passed"])
+
+    report = {
+        "test_suite": "template_sql_tests",
+        "timestamp": timestamp,
+        "summary": {
+            "total": total,
+            "passed": passed,
+            "failed": total - passed,
+            "pass_rate": round(passed / total * 100, 2) if total > 0 else 0,
+        },
+        "sections": {
+            "limit_tests": {
+                "total": len(limit_results),
+                "passed": sum(1 for item in limit_results if item["passed"]),
+                "results": limit_results,
+            },
+            "routing_tests": {
+                "total": len(routing_results),
+                "passed": sum(1 for item in routing_results if item["passed"]),
+                "results": routing_results,
+            },
+        },
+    }
+
+    with output_path.open("w", encoding="utf-8") as f:
+        json.dump(report, f, ensure_ascii=False, indent=2)
+
+    return output_path
+
+
 if __name__ == "__main__":
     limit_results = test_parse_limit()
     routing_results = test_template_routing()
@@ -182,6 +234,10 @@ if __name__ == "__main__":
     print(f"Total: {total}")
     print(f"Passed: {passed}")
     print(f"Failed: {total - passed}")
+
+    output_path = save_report(limit_results, routing_results)
+    print()
+    print(f"Saved to: {output_path}")
 
     if passed != total:
         raise SystemExit(1)

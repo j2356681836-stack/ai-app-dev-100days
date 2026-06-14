@@ -75,7 +75,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
 
-当前日期：Day37 / 100
+当前日期：Day39 / 100
 
 ---
 ## 已完成能力
@@ -1023,3 +1023,55 @@ Golden Dataset：
 - ROI / CAC 已从 Prompt-only 生成升级为 Template SQL。
 - 普通指标保持 LLM 生成。
 - Evaluator 保持 100% PASS。
+
+---
+
+### Day39
+
+完成：
+
+- template_sql_generator.py 读取 query_plans.yaml
+- ROI / CAC 的 output alias 从 query plan 读取
+- ROI / CAC 的 round 从 query plan 读取
+- ROI / CAC 的 multiply_by_100 从 query plan 读取
+- ROI / CAC 的 default_sort 从 query plan 读取
+- 新增 build_formula_expression
+- query_plan_tests.py 增强为 Query Plan 配置测试
+- query_plan_tests.py 支持配置结构校验
+- query_plan_tests.py 支持模板实现一致性校验
+- query_plan_tests.py 支持业务规则校验
+- query_plan_tests.py 输出 JSON 报告
+- template_sql_tests.py 输出 JSON 报告
+- 新增 Query Plan Testing V1 文档
+
+当前测试体系：
+
+配置层：
+- query_plan_tests.py
+- 2/2 PASS
+- 输出 docs/evaluation/query_plan_tests_*.json
+
+模板层：
+- template_sql_tests.py
+- 12/12 PASS
+- 输出 docs/evaluation/template_sql_tests_*.json
+
+端到端业务层：
+- evaluator.py
+- 20/20 PASS
+- 输出 docs/evaluation/evaluation_*.json
+
+当前 Query Plan 参数化范围：
+
+- output.formula.alias
+- output.formula.round
+- output.formula.multiply_by_100
+- default_sort.field
+- default_sort.direction
+
+关键结论：
+
+- query_plans.yaml 已开始参与 SQL Template 生成。
+- ROI / CAC 的业务口径必须通过测试保护。
+- 三层测试体系可以分别定位配置、模板和主链路问题。
+- 从 Day40 开始，学习方式调整为 B 模式：函数骨架 + TODO + 用户补逻辑 + code review。

@@ -649,6 +649,40 @@ SQL Runner
 
 ---
 
+### Day39
+
+完成内容：
+
+- Query Plan 参数化 V1
+- template_sql_generator.py 开始读取 query_plans.yaml
+- alias 从 query plan 读取
+- round 从 query plan 读取
+- multiply_by_100 从 query plan 读取
+- default_sort.field 从 query plan 读取
+- default_sort.direction 从 query plan 读取
+- 新增 build_formula_expression
+- 增强 query_plan_tests.py
+- query_plan_tests 支持配置结构校验
+- query_plan_tests 支持模板实现一致性校验
+- query_plan_tests 支持 ROI / CAC 业务规则校验
+- query_plan_tests 支持 JSON 报告输出
+- template_sql_tests 支持 JSON 报告输出
+- 新增 docs/architecture/query_plan_testing_v1.md
+
+当前测试结果：
+
+- query_plan_tests.py：2/2 PASS
+- template_sql_tests.py：12/12 PASS
+- evaluator.py：20/20 PASS
+
+关键收获：
+
+- query_plans.yaml 已经从“分流依据”升级为“模板 SQL 参数来源”。
+- ROI / CAC 的 multiply_by_100、排序方向等业务口径需要测试保护。
+- 配置层、模板层、端到端业务层应分别测试。
+- 后续学习模式调整为 B 模式：AI 给骨架和 TODO，用户补关键逻辑，AI 再 review。
+
+---
 
 ## Phase 3
 
@@ -743,7 +777,7 @@ Answer
 
 # 当前版本
 
-Version: v0.12
-完成度：Day38 / 100
-当前实现：自然语言问题 → 业务语义检索 → Prompt构建 → SQL生成 → SQL校验 → PostgreSQL执行 → Table → Result-level Evaluation
+Version: v0.13
+完成度：Day39 / 100
+当前实现：自然语言问题 → 业务语义检索 → Query Plan Routing → Query Plan 参数化 Template / LLM SQL生成 → SQL执行 → Result-level Evaluation
 

@@ -1,5 +1,7 @@
 import re
 
+from app.semantic_layer.query_plan_loader import get_query_plan_by_metric
+
 
 def parse_limit(question: str) -> int | None:
     """
@@ -88,6 +90,57 @@ def build_limit_clause(question: str) -> str:
     return f"LIMIT {limit}"
 
 
+def get_template_config(metric_name: str) -> dict:
+    """
+    获取模板生成所需的 query plan 配置。
+    当前 V1 从 metadata/query_plans.yaml 中读取。
+    """
+    plan = get_query_plan_by_metric(metric_name)
+
+    if not plan:
+        raise ValueError(f"未找到指标对应的 query plan: {metric_name}")
+
+    return plan
+
+
+def build_order_by_clause(plan: dict) -> str:
+    """
+    根据 query plan 构建 ORDER BY 子句。
+    """
+    default_sort = plan.get("default_sort", {})
+    field = default_sort.get("field")
+    direction = default_sort.get("direction", "desc").upper()
+
+    if not field:
+        raise ValueError("query plan 缺少 default_sort.field")
+
+    return f"ORDER BY {field} {direction}"
+    
+
+def build_formula_expression(
+    base_expression: str,
+    plan: dict,
+) -> str:
+    """
+    根据 query plan 的 output.formula 配置构建最终表达式。
+
+    当前支持：
+    - multiply_by_100: 是否乘以 100
+    - round: 保留小数位
+    """
+    formula_config = plan.get("output", {}).get("formula", {})
+
+    multiply_by_100 = formula_config.get("multiply_by_100", False)
+    round_digits = formula_config.get("round", 2)
+
+    expression = base_expression
+
+    if multiply_by_100:
+        expression = f"({expression}) * 100"
+
+    return f"ROUND({expression}, {round_digits})"
+
+
 def generate_roi_sql(question: str) -> str:
     """
     Generate stable ROI SQL from template.
@@ -101,8 +154,14 @@ def generate_roi_sql(question: str) -> str:
     - 再 JOIN 聚合结果
     - ROI 越高越好，默认 DESC
     """
-
+    plan = get_template_config("roi")
+    order_by_clause = build_order_by_clause(plan)
+    output_alias = plan["output"]["formula"]["alias"]
     limit_clause = build_limit_clause(question)
+    formula_expression = build_formula_expression(
+        base_expression="cs.sales_amount / NULLIF(csp.spend_amount, 0)",
+        plan=plan,
+    )
 
     sql = f"""
 WITH date_window AS (
@@ -137,17 +196,14 @@ channel_spend AS (
 )
 SELECT
     dc.channel_name,
-    ROUND(
-        cs.sales_amount / NULLIF(csp.spend_amount, 0),
-        2
-    ) AS roi
+    {formula_expression} AS {output_alias}
 FROM channel_sales cs
 JOIN channel_spend csp
     ON cs.channel_id = csp.channel_id
 JOIN dim_channel dc
     ON cs.channel_id = dc.channel_id
-ORDER BY roi DESC
-{limit_clause};
+{order_by_clause}
+{limit_clause};;
 """
 
     return sql.strip()
@@ -167,8 +223,14 @@ def generate_cac_sql(question: str) -> str:
     - 按真实首单 channel_id 统计获客客户数
     - 按 channel_id 聚合营销花费
     """
-
+    plan = get_template_config("cac")
+    order_by_clause = build_order_by_clause(plan)
+    output_alias = plan["output"]["formula"]["alias"]
     limit_clause = build_limit_clause(question)
+    formula_expression = build_formula_expression(
+        base_expression="cs.marketing_spend_amount / NULLIF(ac.acquired_customer_count, 0)",
+        plan=plan,
+    )
 
     sql = f"""
 WITH date_window AS (
@@ -215,16 +277,13 @@ channel_spend AS (
 )
 SELECT
     dc.channel_name,
-    ROUND(
-        cs.marketing_spend_amount / NULLIF(ac.acquired_customer_count, 0),
-        2
-    ) AS cac
+    {formula_expression} AS {output_alias}
 FROM channel_spend cs
 JOIN acquired_customers ac
     ON cs.channel_id = ac.channel_id
 JOIN dim_channel dc
     ON cs.channel_id = dc.channel_id
-ORDER BY cac ASC
+{order_by_clause}
 {limit_clause};
 """
 
