@@ -6,7 +6,10 @@ from pathlib import Path
 from app.text_to_sql.template_sql_generator import (
     parse_limit,
     generate_template_sql,
+    generate_template_sql_from_intent
 )
+
+from app.semantic_layer.intent_parser import parse_intent
 
 
 LIMIT_TEST_CASES = [
@@ -95,6 +98,25 @@ TEMPLATE_ROUTING_CASES = [
     },
 ]
 
+INTENT_TEMPLATE_CASES = [
+    {
+        "metric_name": "roi",
+        "question": "渠道ROI Top3",
+        "expected_contains": [
+            "ORDER BY roi DESC",
+            "LIMIT 3",
+        ],
+    },
+    {
+        "metric_name": "cac",
+        "question": "获客成本最低的三个渠道",
+        "expected_contains": [
+            "ORDER BY cac ASC",
+            "LIMIT 3",
+        ],
+    },
+]
+
 
 def test_parse_limit() -> list[dict]:
     results = []
@@ -147,6 +169,34 @@ def test_template_routing() -> list[dict]:
     return results
 
 
+def test_template_from_intent() -> list[dict]:
+    results = []
+
+    for case in INTENT_TEMPLATE_CASES:
+        intent = parse_intent(case["question"])
+        sql = generate_template_sql_from_intent(
+            metric_name=case["metric_name"],
+            intent=intent,
+        )
+
+        missing = [
+            item
+            for item in case["expected_contains"]
+            if sql is None or item not in sql
+        ]
+
+        results.append(
+            {
+                "metric_name": case["metric_name"],
+                "question": case["question"],
+                "passed": len(missing) == 0,
+                "missing": missing,
+            }
+        )
+
+    return results
+
+
 def print_results(title: str, results: list[dict]) -> None:
     print()
     print("=" * 80)
@@ -172,6 +222,7 @@ def print_results(title: str, results: list[dict]) -> None:
 def save_report(
     limit_results: list[dict],
     routing_results: list[dict],
+    intent_results: list[dict],
 ) -> Path:
     """
     保存 Template SQL 测试报告。
@@ -183,7 +234,7 @@ def save_report(
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     output_path = output_dir / f"template_sql_tests_{timestamp}.json"
 
-    all_results = limit_results + routing_results
+    all_results = limit_results + routing_results + intent_results
     total = len(all_results)
     passed = sum(1 for item in all_results if item["passed"])
 
@@ -200,12 +251,23 @@ def save_report(
             "limit_tests": {
                 "total": len(limit_results),
                 "passed": sum(1 for item in limit_results if item["passed"]),
+                "failed": len(limit_results)
+                - sum(1 for item in limit_results if item["passed"]),
                 "results": limit_results,
             },
             "routing_tests": {
                 "total": len(routing_results),
                 "passed": sum(1 for item in routing_results if item["passed"]),
+                "failed": len(routing_results)
+                - sum(1 for item in routing_results if item["passed"]),
                 "results": routing_results,
+            },
+            "intent_template_tests": {
+                "total": len(intent_results),
+                "passed": sum(1 for item in intent_results if item["passed"]),
+                "failed": len(intent_results)
+                - sum(1 for item in intent_results if item["passed"]),
+                "results": intent_results,
             },
         },
     }
@@ -219,11 +281,13 @@ def save_report(
 if __name__ == "__main__":
     limit_results = test_parse_limit()
     routing_results = test_template_routing()
+    intent_results = test_template_from_intent()
 
     print_results("Parse Limit Tests", limit_results)
     print_results("Template Routing Tests", routing_results)
+    print_results("Template From Intent Tests", intent_results)
 
-    all_results = limit_results + routing_results
+    all_results = limit_results + routing_results + intent_results
     total = len(all_results)
     passed = sum(1 for item in all_results if item["passed"])
 
@@ -235,7 +299,7 @@ if __name__ == "__main__":
     print(f"Passed: {passed}")
     print(f"Failed: {total - passed}")
 
-    output_path = save_report(limit_results, routing_results)
+    output_path = save_report(limit_results, routing_results, intent_results)
     print()
     print(f"Saved to: {output_path}")
 

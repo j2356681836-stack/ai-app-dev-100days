@@ -52,3 +52,6 @@ docs/evaluation/*.json
 
 # chatgpt_prompt
 docs/chatgpt_handover.md
+
+# study knowledge
+docs/study/

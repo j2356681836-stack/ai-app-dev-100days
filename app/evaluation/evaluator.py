@@ -147,6 +147,35 @@ def check_expected_order(
     ]
 
 
+def check_expected_intent(
+    result: dict,
+    expected_intent: dict | None,
+) -> list[dict]:
+    """
+    检查 query_service 返回的 intent 是否符合预期。
+    """
+    if not expected_intent:
+        return []
+
+    actual_intent = result.get("intent", {})
+    mismatches = []
+
+    for field, expected_value in expected_intent.items():
+        actual_value = actual_intent.get(field)
+
+        if actual_value != expected_value:
+            mismatches.append(
+                {
+                    "field": field,
+                    "expected": expected_value,
+                    "actual": actual_value,
+                    "reason": "intent mismatch",
+                }
+            )
+
+    return mismatches
+
+
 def evaluate_case(case: dict) -> dict:
     """
     评估单个问题。
@@ -184,6 +213,11 @@ def evaluate_case(case: dict) -> dict:
             expected_generation_method=case.get("expected_generation_method"),
         )
 
+        intent_mismatches = check_expected_intent(
+            result=result,
+            expected_intent=case.get("expected_intent"),
+        )
+
         passed = (
             result["success"] is True
             and len(missing_tables) == 0
@@ -192,6 +226,7 @@ def evaluate_case(case: dict) -> dict:
             and len(result_mismatches) == 0
             and len(order_mismatches) == 0
             and len(generation_method_mismatches) == 0
+            and len(intent_mismatches) == 0
         )
 
         return {
@@ -204,6 +239,8 @@ def evaluate_case(case: dict) -> dict:
             "order_mismatches": order_mismatches,
             "generation_method": result.get("generation_method"),
             "generation_method_mismatches": generation_method_mismatches,
+            "intent": result.get("intent"),
+            "intent_mismatches": intent_mismatches,
             "sql": sql,
             "row_count": table["row_count"],
             "error": None,
@@ -220,6 +257,8 @@ def evaluate_case(case: dict) -> dict:
             "order_mismatches": [],
             "generation_method": None,
             "generation_method_mismatches": [],
+            "intent": None,
+            "intent_mismatches": [],
             "sql": None,
             "row_count": 0,
             "error": str(e),
@@ -247,6 +286,7 @@ def run_evaluation() -> list[dict]:
             print(f"Result mismatches: {result.get('result_mismatches', [])}")
             print(f"Order mismatches: {result.get('order_mismatches', [])}")
             print(f"Generation method mismatches: {result.get('generation_method_mismatches', [])}")
+            print(f"Intent mismatches: {result.get('intent_mismatches', [])}")
             print(f"Error: {result['error']}")
 
         print("-" * 60)

@@ -4,7 +4,9 @@ from app.text_to_sql.sql_generator import generate_sql
 from app.text_to_sql.sql_validator import validate_sql
 from app.text_to_sql.result_formatter import format_result, to_table
 from app.semantic_layer.hybrid_search import search_metric
-from app.text_to_sql.template_sql_generator import generate_template_sql
+from app.text_to_sql.template_sql_generator import generate_template_sql,generate_template_sql_from_intent
+from app.semantic_layer.intent_parser import parse_intent
+
 
 import time
 
@@ -16,6 +18,8 @@ def ask(question: str):
     """
 
     try:
+        intent = parse_intent(question)
+
         metric_result = search_metric(question)
 
         if metric_result.get("status") != "matched":
@@ -35,9 +39,9 @@ def ask(question: str):
 
         metric_name = metrics[0]["name"]
 
-        template_sql = generate_template_sql(
+        template_sql = generate_template_sql_from_intent(
             metric_name=metric_name,
-            question=question,
+            intent=intent,
         )
 
         if template_sql:
@@ -73,6 +77,7 @@ def ask(question: str):
         "status": "completed",
         "question": question,
         "generation_method": generation_method,
+        "intent": intent,
         "sql": sql,
         "table": table,
     }

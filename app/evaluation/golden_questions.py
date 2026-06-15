@@ -270,6 +270,11 @@ GOLDEN_QUESTIONS = [
             "roi": 1.68,
         },
         "expected_generation_method": "template",
+        "expected_intent": {
+            "limit": 1,
+            "ranking_type": "top1",
+            "dimension": "channel",
+        },
         "should_execute": True,
     },
     {
@@ -293,7 +298,12 @@ GOLDEN_QUESTIONS = [
                 "抖音",
                 "小红书",
             ],
+        },
         "expected_generation_method": "template",
+        "expected_intent": {
+            "limit": None,
+            "ranking_type": "ranking",
+            "dimension": "channel",
         },
         "should_execute": True,
     },
@@ -314,6 +324,12 @@ GOLDEN_QUESTIONS = [
             "cac": 2284.40,
         },
         "expected_generation_method": "template",
+        "expected_intent": {
+            "limit": 1,
+            "ranking_type": "top1",
+            "sort_hint": "asc",
+            "dimension": "channel",
+        },
         "should_execute": True,
     },
     {
@@ -337,7 +353,12 @@ GOLDEN_QUESTIONS = [
                 "抖音",
                 "小红书",
             ],
+        },
         "expected_generation_method": "template",
+        "expected_intent": {
+            "limit": None,
+            "ranking_type": "ranking",
+            "dimension": "channel",
         },
         "should_execute": True,
     },

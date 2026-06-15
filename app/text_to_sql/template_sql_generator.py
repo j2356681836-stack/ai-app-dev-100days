@@ -1,6 +1,7 @@
 import re
 
 from app.semantic_layer.query_plan_loader import get_query_plan_by_metric
+from app.semantic_layer.intent_parser import parse_intent
 
 
 def parse_limit(question: str) -> int | None:
@@ -81,8 +82,11 @@ def build_limit_clause(question: str) -> str:
     return f"LIMIT {limit}"
 
 
-def build_limit_clause(question: str) -> str:
-    limit = parse_limit(question)
+def build_limit_clause_from_intent(intent: dict) -> str:
+    """
+    根据 intent 构建 LIMIT 子句。
+    """
+    limit = intent.get("limit")
 
     if limit is None:
         return ""
@@ -141,7 +145,13 @@ def build_formula_expression(
     return f"ROUND({expression}, {round_digits})"
 
 
-def generate_roi_sql(question: str) -> str:
+def generate_roi_sql_from_intent(intent: dict) -> str:
+    question = intent.get("question", "")
+    limit_clause = build_limit_clause_from_intent(intent)
+    return generate_roi_sql(question, limit_clause=limit_clause)
+
+
+def generate_roi_sql(question: str, limit_clause: str | None = None) -> str:
     """
     Generate stable ROI SQL from template.
 
@@ -157,7 +167,8 @@ def generate_roi_sql(question: str) -> str:
     plan = get_template_config("roi")
     order_by_clause = build_order_by_clause(plan)
     output_alias = plan["output"]["formula"]["alias"]
-    limit_clause = build_limit_clause(question)
+    if limit_clause is None:
+        limit_clause = build_limit_clause(question)
     formula_expression = build_formula_expression(
         base_expression="cs.sales_amount / NULLIF(csp.spend_amount, 0)",
         plan=plan,
@@ -209,7 +220,13 @@ JOIN dim_channel dc
     return sql.strip()
 
 
-def generate_cac_sql(question: str) -> str:
+def generate_cac_sql_from_intent(intent: dict) -> str:
+    question = intent.get("question", "")
+    limit_clause = build_limit_clause_from_intent(intent)
+    return generate_cac_sql(question, limit_clause=limit_clause)
+
+
+def generate_cac_sql(question: str, limit_clause: str | None = None) -> str:
     """
     Generate stable CAC SQL from template.
 
@@ -226,7 +243,8 @@ def generate_cac_sql(question: str) -> str:
     plan = get_template_config("cac")
     order_by_clause = build_order_by_clause(plan)
     output_alias = plan["output"]["formula"]["alias"]
-    limit_clause = build_limit_clause(question)
+    if limit_clause is None:
+        limit_clause = build_limit_clause(question)
     formula_expression = build_formula_expression(
         base_expression="cs.marketing_spend_amount / NULLIF(ac.acquired_customer_count, 0)",
         plan=plan,
@@ -288,6 +306,24 @@ JOIN dim_channel dc
 """
 
     return sql.strip()
+
+def generate_template_sql_from_intent(
+    metric_name: str,
+    intent: dict,
+) -> str | None:
+    """
+    根据 metric_name 和 intent 生成模板 SQL。
+    当前支持：
+    - roi
+    - cac
+    """
+    if metric_name == "roi":
+        return generate_roi_sql_from_intent(intent)
+
+    if metric_name == "cac":
+        return generate_cac_sql_from_intent(intent)
+
+    return None
 
 
 def generate_template_sql(metric_name: str, question: str) -> str | None:

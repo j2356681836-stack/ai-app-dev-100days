@@ -75,7 +75,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
 
-当前日期：Day39 / 100
+当前日期：Day40 / 100
 
 ---
 ## 已完成能力
@@ -346,41 +346,6 @@ Query Plan 参数化 V1
 - ROI / CAC 结果不变
 - generation_method 仍为 template
 - 普通指标仍走 llm
-
----
-
-#### Day40
-
-Intent Parser V1 设计
-
-目标：
-从 parse_limit 过渡到独立 Intent Parser 设计。
-
-学习内容：
-- limit 与 sort_direction 的拆分
-- Top1 / TopN / Ranking 的区别
-- ROI 越高越好，CAC 越低越好
-- 指标默认排序方向
-- 用户问题中的业务意图结构化
-
-交付：
-- docs/architecture/intent_parser_v1.md
-- Intent Schema 设计
-- intent examples
-- parse_limit 迁移方案
-
-示例输出：
-
-```json
-{
-  "metric": "cac",
-  "dimension": "channel",
-  "ranking": {
-    "enabled": true,
-    "limit": 3,
-    "direction": "asc"
-  }
-}
 
 ---
 
@@ -1075,3 +1040,101 @@ Golden Dataset：
 - ROI / CAC 的业务口径必须通过测试保护。
 - 三层测试体系可以分别定位配置、模板和主链路问题。
 - 从 Day40 开始，学习方式调整为 B 模式：函数骨架 + TODO + 用户补逻辑 + code review。
+
+---
+
+---
+
+### Day40
+
+完成：
+
+- 新增 `app/semantic_layer/intent_parser.py`
+- 实现 Intent Parser V1
+- 支持解析 limit
+- 支持解析 ranking_type
+- 支持解析 sort_hint
+- 支持解析 dimension
+- 新增 `app/evaluation/intent_parser_tests.py`
+- intent_parser_tests 支持 JSON 报告输出
+- `template_sql_generator.py` 新增 intent-based 入口
+- 新增 `build_limit_clause_from_intent`
+- 新增 `generate_roi_sql_from_intent`
+- 新增 `generate_cac_sql_from_intent`
+- 新增 `generate_template_sql_from_intent`
+- ROI / CAC 模板 SQL 支持从 intent.limit 生成 LIMIT
+- `template_sql_tests.py` 扩展到 14 个测试
+- template_sql_tests JSON 报告增加 intent_template_tests section
+- `query_service.py` 接入 parse_intent
+- query_service 返回 intent
+- evaluator 增加 expected_intent 校验
+- Golden Cases 保持 20/20 PASS
+
+当前主链路：
+
+```text
+Question
+↓
+Intent Parser
+↓
+Hybrid Search / Metric Recognition
+↓
+Query Plan Routing
+├─ ROI / CAC → Template SQL from Intent
+└─ 普通指标 → LLM SQL
+↓
+SQL Cleaner
+↓
+SQL Validator
+↓
+PostgreSQL
+↓
+Table
+↓
+Result-level Evaluation
+```
+
+当前 Intent Parser V1 输出：
+
+```python
+{
+    "question": question,
+    "limit": int | None,
+    "ranking_type": "top1" | "topn" | "ranking" | "unknown",
+    "sort_hint": "asc" | "desc" | None,
+    "dimension": "channel" | "category" | None,
+}
+```
+
+当前测试结果：
+
+```text
+intent_parser_tests.py      5/5 PASS
+template_sql_tests.py      14/14 PASS
+evaluator.py               20/20 PASS
+```
+
+当前测试报告：
+
+```text
+docs/evaluation/
+├── evaluation_*.json
+├── query_plan_tests_*.json
+├── template_sql_tests_*.json
+├── intent_parser_tests_*.json
+```
+
+关键结论：
+
+- Intent Parser 已正式接入 query_service 主链路。
+- ROI / CAC 模板 SQL 已开始消费 intent.limit。
+- query_service 返回 intent 后，系统可评估用户问题是否被正确理解。
+- evaluator 已从“结果正确性评估”扩展到“意图解析 + 生成路径 + 业务结果”的综合评估。
+- 后续应将最终排序方向逻辑抽象为 final_sort_direction。
+
+技术债：
+
+1. `template_sql_generator.py` 中仍保留旧的 question 解析逻辑，后续可逐步迁移到 Intent Parser。
+2. `sort_hint` 当前尚未真正参与最终排序方向决策。
+3. Intent Parser V1 仍是规则型，后续需要支持更多中文表达。
+4. expected_intent 当前只覆盖关键 cases，后续可逐步扩展。

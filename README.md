@@ -684,6 +684,68 @@ SQL Runner
 
 ---
 
+### Day40
+
+完成内容：
+
+- 新增 `app/semantic_layer/intent_parser.py`
+- 实现 Intent Parser V1
+- 支持解析 `limit`
+- 支持解析 `ranking_type`
+- 支持解析 `sort_hint`
+- 支持解析 `dimension`
+- 新增 `app/evaluation/intent_parser_tests.py`
+- `intent_parser_tests.py` 支持 JSON 报告输出
+- `template_sql_generator.py` 新增 intent-based template 入口
+- 新增 `generate_template_sql_from_intent`
+- intent.limit 接入 ROI / CAC 模板 SQL 的 LIMIT 生成
+- `template_sql_tests.py` 扩展到 14 个测试
+- template SQL 测试报告新增 `intent_template_tests`
+- `query_service.py` 接入 `parse_intent`
+- query_service 返回 `intent`
+- evaluator 增加 `expected_intent` 校验
+- evaluator 保持 20/20 PASS
+
+当前主链路：
+
+```text
+Question
+↓
+Intent Parser
+↓
+Metric Recognition / Hybrid Search
+↓
+Query Plan Routing
+├─ ROI / CAC → Template SQL from Intent
+└─ 普通指标 → LLM SQL
+↓
+SQL Cleaner
+↓
+SQL Validator
+↓
+PostgreSQL
+↓
+Result Formatter
+↓
+Evaluator
+```
+
+当前测试结果：
+
+- intent_parser_tests.py：5/5 PASS
+- template_sql_tests.py：14/14 PASS
+- evaluator.py：20/20 PASS
+
+关键收获：
+
+- Intent Parser 属于语义层，不应长期放在 SQL 模板层。
+- limit / ranking_type / dimension / sort_hint 应先结构化，再交给 SQL 生成层使用。
+- query_service 返回 intent 后，问题排查可以区分“意图解析错误”和“SQL 生成错误”。
+- intent-based template 入口采用兼容式重构，保留旧入口，降低主链路风险。
+
+---
+
+
 ## Phase 3
 
 Agent Workflow
@@ -777,7 +839,7 @@ Answer
 
 # 当前版本
 
-Version: v0.13
-完成度：Day39 / 100
-当前实现：自然语言问题 → 业务语义检索 → Query Plan Routing → Query Plan 参数化 Template / LLM SQL生成 → SQL执行 → Result-level Evaluation
+Version: v0.14
+完成度：Day40 / 100
+当前实现：自然语言问题 → Intent Parser → 业务语义检索 → Query Plan Routing → Intent-based Template / LLM SQL生成 → SQL执行 → Result-level Evaluation
 
