@@ -94,6 +94,34 @@ def build_limit_clause_from_intent(intent: dict) -> str:
     return f"LIMIT {limit}"
 
 
+def build_order_by_clause_from_intent(intent: dict, plan: dict) -> str:
+    """
+    根据 intent 和 query plan 构建 ORDER BY 子句。
+
+    优先使用 intent 中已经解析好的：
+    - sort_field
+    - final_sort_direction
+
+    如果 intent 中没有，则回退到 query plan 的 default_sort。
+    """
+    sort_field = intent.get("sort_field")
+    sort_direction = intent.get("final_sort_direction")
+
+    if not sort_field:
+        sort_field = plan.get("default_sort", {}).get("field")
+
+    if not sort_direction:
+        sort_direction = plan.get("default_sort", {}).get("direction")
+
+    if not sort_field:
+        raise ValueError("缺少排序字段 sort_field")
+
+    if not sort_direction:
+        raise ValueError("缺少排序方向 sort_direction")
+
+    return f"ORDER BY {sort_field} {sort_direction.upper()}"
+
+
 def get_template_config(metric_name: str) -> dict:
     """
     获取模板生成所需的 query plan 配置。
@@ -121,10 +149,7 @@ def build_order_by_clause(plan: dict) -> str:
     return f"ORDER BY {field} {direction}"
     
 
-def build_formula_expression(
-    base_expression: str,
-    plan: dict,
-) -> str:
+def build_formula_expression(base_expression: str,plan: dict,) -> str:
     """
     根据 query plan 的 output.formula 配置构建最终表达式。
 
@@ -147,11 +172,15 @@ def build_formula_expression(
 
 def generate_roi_sql_from_intent(intent: dict) -> str:
     question = intent.get("question", "")
+    plan = get_template_config("roi")
+
     limit_clause = build_limit_clause_from_intent(intent)
-    return generate_roi_sql(question, limit_clause=limit_clause)
+    order_by_clause = build_order_by_clause_from_intent(intent, plan)
+
+    return generate_roi_sql(question, limit_clause=limit_clause, order_by_clause=order_by_clause,)
 
 
-def generate_roi_sql(question: str, limit_clause: str | None = None) -> str:
+def generate_roi_sql(question: str, limit_clause: str | None = None, order_by_clause: str | None = None,) -> str:
     """
     Generate stable ROI SQL from template.
 
@@ -165,7 +194,8 @@ def generate_roi_sql(question: str, limit_clause: str | None = None) -> str:
     - ROI 越高越好，默认 DESC
     """
     plan = get_template_config("roi")
-    order_by_clause = build_order_by_clause(plan)
+    if order_by_clause is None:
+        order_by_clause = build_order_by_clause(plan)
     output_alias = plan["output"]["formula"]["alias"]
     if limit_clause is None:
         limit_clause = build_limit_clause(question)
@@ -222,11 +252,15 @@ JOIN dim_channel dc
 
 def generate_cac_sql_from_intent(intent: dict) -> str:
     question = intent.get("question", "")
+    plan = get_template_config("cac")
+
     limit_clause = build_limit_clause_from_intent(intent)
-    return generate_cac_sql(question, limit_clause=limit_clause)
+    order_by_clause = build_order_by_clause_from_intent(intent, plan)
+
+    return generate_cac_sql(question, limit_clause=limit_clause, order_by_clause=order_by_clause,)
 
 
-def generate_cac_sql(question: str, limit_clause: str | None = None) -> str:
+def generate_cac_sql(question: str, limit_clause: str | None = None,  order_by_clause: str | None = None,) -> str:
     """
     Generate stable CAC SQL from template.
 
@@ -241,7 +275,8 @@ def generate_cac_sql(question: str, limit_clause: str | None = None) -> str:
     - 按 channel_id 聚合营销花费
     """
     plan = get_template_config("cac")
-    order_by_clause = build_order_by_clause(plan)
+    if order_by_clause is None:
+        order_by_clause = build_order_by_clause(plan)
     output_alias = plan["output"]["formula"]["alias"]
     if limit_clause is None:
         limit_clause = build_limit_clause(question)

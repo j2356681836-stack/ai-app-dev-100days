@@ -745,6 +745,68 @@ Evaluator
 
 ---
 
+### Day41
+
+完成内容：
+
+- 新增 `resolve_sort_direction`
+- 新增 `enrich_intent_with_query_plan`
+- query_service 接入 enriched intent
+- intent 增加 `final_sort_direction`
+- intent 增加 `sort_field`
+- template_sql_generator 新增 `build_order_by_clause_from_intent`
+- ROI / CAC 模板 SQL 支持从 intent 生成 ORDER BY
+- 支持用户显式排序方向覆盖指标默认排序方向
+- 新增问题能力：`渠道ROI从低到高排名`
+- Golden Cases 从 20 扩展到 21
+- 新增 `intent_resolver_tests.py`
+- 更新 `docs/architecture/query_plan_testing_v1.md`
+- template_sql_tests 扩展到 15 个测试
+
+当前主链路：
+
+```text
+Question
+↓
+Intent Parser
+↓
+Intent Resolver
+↓
+Metric Recognition / Hybrid Search
+↓
+Query Plan Routing
+├─ ROI / CAC → Template SQL from Intent
+└─ 普通指标 → LLM SQL
+↓
+SQL Cleaner
+↓
+SQL Validator
+↓
+PostgreSQL
+↓
+Result Formatter
+↓
+Evaluator
+```
+
+当前测试结果：
+
+- query_plan_tests.py：2/2 PASS
+- intent_parser_tests.py：5/5 PASS
+- intent_resolver_tests.py：5/5 PASS
+- template_sql_tests.py：15/15 PASS
+- evaluator.py：21/21 PASS
+
+关键收获：
+
+- `sort_hint` 来自用户问题。
+- `default_sort` 来自 query_plans.yaml。
+- `final_sort_direction` 是二者融合后的最终排序方向。
+- 用户显式排序方向优先于指标默认排序方向。
+- 测试链路必须模拟真实主链路，否则可能出现测试失败但主链路正确的情况。
+
+---
+
 
 ## Phase 3
 
@@ -839,7 +901,7 @@ Answer
 
 # 当前版本
 
-Version: v0.14
-完成度：Day40 / 100
+Version: v0.15
+完成度：Day41 / 100
 当前实现：自然语言问题 → Intent Parser → 业务语义检索 → Query Plan Routing → Intent-based Template / LLM SQL生成 → SQL执行 → Result-level Evaluation
 

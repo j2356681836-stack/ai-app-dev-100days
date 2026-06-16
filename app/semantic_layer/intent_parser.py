@@ -153,6 +153,61 @@ def parse_intent(question: str) -> dict[str, Any]:
     }
 
 
+def resolve_sort_direction(intent: dict, query_plan: dict | None) -> str | None:
+    """
+    解析最终排序方向。
+
+    优先级：
+    1. 用户问题中显式表达的 sort_hint
+    2. query_plan.default_sort.direction
+    3. None
+
+    示例：
+    - "获客成本最低的三个渠道" → sort_hint = asc → final = asc
+    - "各渠道ROI排名" → sort_hint = None, query_plan 默认 desc → final = desc
+    """
+
+    sort_hint = intent.get("sort_hint")
+
+    if sort_hint:
+        return sort_hint
+
+    if not query_plan:
+        return None
+
+    default_sort = query_plan.get("default_sort", {})
+    default_direction = default_sort.get("direction")
+
+    return default_direction
+
+
+def enrich_intent_with_query_plan(intent: dict,query_plan: dict | None,) -> dict:
+    """
+    使用 query plan 补全 intent。
+
+    当前补充：
+    - final_sort_direction
+    - sort_field
+    """
+
+    enriched_intent = intent.copy()
+
+    final_sort_direction = resolve_sort_direction(
+        intent=intent,
+        query_plan=query_plan,
+    )
+
+    sort_field = None
+
+    if query_plan:
+        sort_field = query_plan.get("default_sort", {}).get("field")
+
+    enriched_intent["final_sort_direction"] = final_sort_direction
+    enriched_intent["sort_field"] = sort_field
+
+    return enriched_intent
+
+
 if __name__ == "__main__":
     questions = [
         "哪个渠道ROI最高",

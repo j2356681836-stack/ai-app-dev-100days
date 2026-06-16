@@ -75,7 +75,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
 
-当前日期：Day40 / 100
+当前日期：Day41 / 100
 
 ---
 ## 已完成能力
@@ -147,15 +147,22 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 ## 当前能力：
 
-自然语言
+当前系统已从 Prompt-only Text-to-SQL 演进为：
+Question
 ↓
-Semantic Search
+Intent Parser
 ↓
-Context Builder
+Intent Resolver
 ↓
-Prompt Builder
+Hybrid Search / Metric Recognition
+├─ Alias Match
+├─ Keyword Group Match
+├─ Embedding Match
+└─ Clarification
 ↓
-DeepSeek
+Query Plan Routing
+├─ ROI / CAC → Template SQL from Intent
+└─ 普通指标 → LLM SQL
 ↓
 SQL Cleaner
 ↓
@@ -163,9 +170,45 @@ SQL Validator
 ↓
 PostgreSQL
 ↓
-Table
+Result Formatter
 ↓
-Evaluation
+Evaluator
+
+当前核心能力：
+1. 业务指标识别
+   - alias match
+   - keyword_group match
+   - embedding match
+   - clarification
+   - 更具体 alias 优先
+
+2. Intent Parser V1
+   - 解析 limit
+   - 解析 ranking_type
+   - 解析 sort_hint
+   - 解析 dimension
+
+3. Intent Resolver V1
+   - 融合用户排序意图与 query_plan 默认排序
+   - 生成 final_sort_direction
+   - 生成 sort_field
+
+4. Query Plan Routing
+   - ROI / CAC 走 Template SQL
+   - 普通指标继续走 LLM SQL
+
+5. Intent-based Template SQL
+   - ROI Template SQL
+   - CAC Template SQL
+   - intent.limit → SQL LIMIT
+   - intent.final_sort_direction → SQL ORDER BY
+
+6. Evaluation Framework
+   - 结构级校验
+   - 结果级校验
+   - 排名顺序校验
+   - generation_method 校验
+   - expected_intent 校验
 
 ### 当前Rule能力
 
@@ -184,13 +227,31 @@ search_type:
 - 当多个 rule 同时命中时，优先保留 match_score 更高的结果
 - 用于解决“退款率”与“渠道退款率”等泛化词和具体词冲突
 
-### Golden Dataset
+### Golden Dataset / Evaluation
 
-当前：
-20 Cases
-100% PASS
+当前测试体系：
+query_plan_tests.py          2/2 PASS
+intent_parser_tests.py       5/5 PASS
+intent_resolver_tests.py     5/5 PASS
+template_sql_tests.py       15/15 PASS
+evaluator.py                21/21 PASS
 
-当前覆盖：
+当前 Golden Cases：
+21 Cases,
+Pass Rate：100%
+
+当前覆盖指标：
+- item_sales_amount
+- order_paid_amount
+- refund_rate
+- order_count
+- sales_quantity
+- channel_sales_amount
+- channel_refund_rate
+- roi
+- cac
+
+当前覆盖问题类型：
 - 品类销售额
 - 品类退款率
 - 订单数
@@ -199,6 +260,10 @@ search_type:
 - 渠道退款率
 - ROI
 - CAC
+- Top1
+- TopN
+- Ranking
+- 反向排序：渠道ROI从低到高排名
 
 当前 Evaluation 能力：
 - expected_tables
@@ -206,9 +271,87 @@ search_type:
 - expected_result
 - expected_order
 - expected_generation_method
+- expected_intent
 - tolerance 数值误差
 
+当前测试报告目录：
+docs/evaluation/
+├── evaluation_*.json
+├── query_plan_tests_*.json
+├── template_sql_tests_*.json
+├── intent_parser_tests_*.json
+├── intent_resolver_tests_*.json
+
 ### Metric Query Plan
+
+当前状态：V1 已接入主链路，并开始与 Intent Resolver 协同。
+
+已完成：
+- metadata/query_plans.yaml
+- app/semantic_layer/query_plan_loader.py
+- app/text_to_sql/template_sql_generator.py
+- app/semantic_layer/intent_parser.py
+- app/evaluation/query_plan_tests.py
+- app/evaluation/template_sql_tests.py
+- app/evaluation/intent_resolver_tests.py
+
+当前支持 Query Plan：
+- roi_channel_v1
+- cac_channel_v1
+
+当前路由：
+roi → template
+cac → template
+其他普通指标 → llm
+
+当前 query_plans.yaml 参数化范围：
+- output.formula.alias
+- output.formula.round
+- output.formula.multiply_by_100
+- default_sort.field
+- default_sort.direction
+
+当前 Template SQL 能力：
+- ROI Template SQL
+- CAC Template SQL
+- generate_template_sql
+- generate_template_sql_from_intent
+- build_limit_clause_from_intent
+- build_order_by_clause_from_intent
+
+当前 Intent-based Template 能力：
+intent.limit
+↓
+SQL LIMIT
+
+intent.sort_field
++
+intent.final_sort_direction
+↓
+SQL ORDER BY
+
+当前排序决策规则：
+intent.sort_hint
+>
+query_plan.default_sort.direction
+>
+None
+
+示例：
+各渠道ROI排名
+→ sort_hint = None
+→ query_plan.default_sort.direction = desc
+→ final_sort_direction = desc
+
+渠道ROI从低到高排名
+→ sort_hint = asc
+→ query_plan.default_sort.direction = desc
+→ final_sort_direction = asc
+
+各渠道获客成本排名
+→ sort_hint = None
+→ query_plan.default_sort.direction = asc
+→ final_sort_direction = asc
 
 当前状态：V1 已接入主链路。
 
@@ -289,13 +432,24 @@ cac
 
 Question
 ↓
+Intent Parser
+├─ parse_limit
+├─ parse_ranking_type
+├─ parse_sort_hint
+└─ parse_dimension
+↓
+Intent Resolver
+├─ resolve_sort_direction
+└─ enrich_intent_with_query_plan
+↓
 Hybrid Search / Metric Recognition
 ├─ Alias Match
+├─ Keyword Group Match
 ├─ Embedding Match
 └─ Clarification
 ↓
 Query Plan Routing
-├─ ROI / CAC → Template SQL
+├─ ROI / CAC → Template SQL from Intent
 └─ 普通指标 → LLM SQL
 ↓
 SQL Cleaner
@@ -304,13 +458,267 @@ SQL Validator
 ↓
 PostgreSQL
 ↓
-Table
+Result Formatter
 ↓
-Result-level Evaluation
+Evaluator
+
+当前主链路特点：
+- ROI / CAC 复杂指标不再依赖 LLM 自由生成 SQL。
+- ROI / CAC 使用 Query Plan + Template SQL。
+- Template SQL 已消费 intent.limit 和 intent.final_sort_direction。
+- 普通指标仍走 LLM，但下一步将注入 Intent Context。
+- evaluator 已能校验业务结果、排序顺序、生成路径和 intent。
 
 ---
 
 ## 当前待办（Next Milestone）
+
+### Day42-Day48 规划
+
+目标：在 Day38-Day41 已完成 Query Plan Routing、Intent Parser、Intent Resolver、Intent-based Template SQL 的基础上，继续推进：
+
+普通 LLM 指标稳定化
++
+Intent Context 注入 Prompt
++
+Result-level Evaluation V2
++
+Phase2 中段重构与验收
+
+Day40-Day41 已提前完成原计划中 “Intent Parser 接入 Query Plan Template” 和 “final_sort_direction” 相关任务，因此 Day42 起不再重复做 Intent 接入，而是转向普通指标 LLM 路径稳定化。
+
+---
+
+#### Day42：普通指标 Prompt 接入 Intent
+
+目标：让普通指标虽然仍走 LLM，但 Prompt 中可以使用 enriched intent。
+
+当前：
+ROI / CAC → Template SQL from Intent
+普通指标 → LLM SQL
+
+Day42 目标：
+
+普通指标 → LLM SQL with Intent Context
+
+学习内容：
+- Prompt Builder 与 Intent 的职责边界
+- 哪些 intent 字段适合注入 Prompt
+- dimension / limit / ranking_type / final_sort_direction 如何帮助 LLM
+- 避免 Prompt 过度复杂化
+
+实现任务：
+- 修改 prompt_builder.py
+- 让 build_prompt 支持 intent 参数
+- 修改 sql_generator.py 或 query_service.py，使 LLM 路径可以传入 intent
+- 普通指标仍走 LLM，不改为 template
+- 验证渠道销售额、渠道退款率、品类退款率等普通指标
+
+验收标准：
+query_plan_tests.py          2/2 PASS
+intent_parser_tests.py       5/5 PASS
+intent_resolver_tests.py     5/5 PASS
+template_sql_tests.py       15/15 PASS
+evaluator.py                21/21 PASS
+
+
+重点：
+- intent 是辅助 LLM，不替代 metric search
+- 普通指标不应误走 template
+- Prompt 中应明确最终排序方向和 limit
+
+---
+
+#### Day43：普通指标 Intent Cases 扩展
+
+目标：扩展普通指标 Golden Cases，验证 Intent Context 对 LLM 普通指标链路的稳定性。
+
+新增候选问题：
+哪个渠道销售额最高
+各渠道销售额排名
+渠道销售额从低到高排名
+哪个渠道退款率最高
+各渠道退款率排名
+品类退款率从低到高排名
+销售额Top3品类
+退款率Top3品类
+
+
+学习内容：
+- 普通指标与复杂指标的边界
+- expected_intent 如何覆盖普通指标
+- expected_order 如何验证反向排序
+- Result-level evaluation 与 Prompt 稳定性的关系
+
+实现任务：
+- 增加普通指标 Golden Cases
+- 为更多普通指标补充 expected_intent
+- 增加 expected_order
+- 验证 LLM 是否正确使用 Intent Context
+- 如果 LLM 不稳定，优先修 Prompt，不急着做 template
+
+验收标准：
+Golden Cases ≥ 25
+Pass Rate 100%
+普通指标 generation_method = llm
+ROI / CAC generation_method = template
+
+---
+
+#### Day44：Result-level Evaluation V2
+
+目标：将 evaluator 从 Top1 / 排序顺序校验，升级为多行结果值校验。
+新增能力：expected_rows
+
+示例：
+```python
+"expected_rows": [
+    {"channel_name": "天猫", "roi": 1.68},
+    {"channel_name": "微信小程序", "roi": 1.51},
+    {"channel_name": "京东", "roi": 1.44},
+]
+```
+
+学习内容：
+- expected_result 与 expected_rows 的区别
+- 多行顺序校验与数值校验如何结合
+- tolerance 数值误差如何复用
+- Evaluation Report 如何展示失败差异
+
+实现任务：
+- 新增 check_expected_rows
+- 支持多行字段级 mismatch
+- 给 ROI / CAC / 渠道销售额排名补充 expected_rows
+- 优化 evaluator 失败日志
+- JSON 报告中输出 row_mismatches
+
+验收标准：
+Golden Cases ≥ 25
+expected_rows 可校验多行结果
+Evaluator 100% PASS
+
+
+---
+
+#### Day45：Intent Parser V2
+
+目标：增强 Intent Parser 对中文排序与 TopN 表达的覆盖。
+
+当前支持：
+最高 / 最低
+从高到低 / 从低到高
+Top3
+前3 / 前三
+三个渠道
+排名 / 各
+
+增强方向：
+倒数前三
+后五名
+最差
+最好
+由高到低
+由低到高
+升序排列
+降序排列
+前五个
+前5名
+
+实现任务：
+- 扩展 parse_limit
+- 扩展 parse_sort_hint
+- 评估是否新增 ranking_type = bottomn
+- 增加 intent_parser_tests
+- 增加 intent_resolver_tests
+- 增加 template_sql_tests
+
+验收标准：
+intent_parser_tests ≥ 10 cases
+intent_resolver_tests ≥ 8 cases
+所有测试 100% PASS
+
+
+---
+
+#### Day46：Prompt Debug Trace 与 Explainability
+
+目标：让系统返回更清晰的 debug trace，方便定位问题。
+
+当前 query_service 已返回：
+generation_method
+intent
+sql
+table
+
+Day46 目标新增：
+
+```python
+"debug_trace": {
+    "metric_name": "roi",
+    "generation_method": "template",
+    "intent": {...},
+    "query_plan_name": "roi_channel_v1",
+    "sort_source": "user_sort_hint",
+    "limit_source": "intent"
+}
+```
+
+实现任务：
+- query_service 增加 debug_trace
+- template 路径记录 query_plan_name
+- LLM 路径记录 prompt intent context
+- evaluator 可选校验 debug_trace
+- JSON report 记录 trace
+
+验收标准：
+ROI / CAC 能看到 template trace
+普通指标能看到 llm trace
+Evaluator 100% PASS
+
+---
+
+#### Day47：Phase2 中段重构与文件职责校准
+
+目标：对 Day36-Day46 新增能力做一次结构性整理，避免代码继续膨胀。
+检查对象：
+app/semantic_layer/
+app/text_to_sql/
+app/evaluation/
+metadata/
+docs/architecture/
+
+重点检查：
+- semantic_layer 与 text_to_sql 的职责边界
+- intent_parser 是否需要拆出 intent_resolver
+- template_sql_generator 是否过大
+- evaluation 测试文件是否需要公共工具函数
+- JSON report 保存逻辑是否重复
+
+验收标准：
+所有测试保持 100% PASS
+文档中明确当前技术债
+代码职责边界更清楚
+
+---
+
+#### Day48：Phase2 Midpoint Review
+
+目标：对 Phase2 中段做一次完整验收，形成可用于面试表达的阶段性总结。
+产出文档：docs/architecture/phase2_midpoint_review.md
+建议结构：
+1. 当前系统能做什么
+2. 为什么不能只靠 LLM 生成 SQL
+3. Query Plan 解决了什么
+4. Intent Parser / Resolver 解决了什么
+5. Evaluation 如何保证结果可信
+6. 当前系统边界
+7. 下一阶段方向
+
+验收标准：
+Golden Cases ≥ 25
+所有测试 100% PASS
+README / PROJECT_STATE 完整更新
+可用 3-5 分钟讲清项目当前架构
 
 ### Day39-Day45 规划
 
@@ -318,60 +726,6 @@ Result-level Evaluation
 说明：
 Day38 已完成 Query Plan Routing 主链路接入，ROI / CAC 已走 Template SQL。
 后续计划保持 Phase2 主线不变，重点从“复杂指标稳定生成 SQL”升级到“业务意图识别”。
-
----
-
-#### Day39
-
-Query Plan 参数化 V1
-
-目标：
-减少 template_sql_generator.py 中的硬编码，让部分信息从 query_plans.yaml 读取。
-
-学习内容：
-- query_plans.yaml 与 template_sql_generator.py 的职责边界
-- 从 plan 读取 default_sort
-- 从 plan 读取 output alias
-- 从 plan 读取 multiply_by_100
-- 从 plan 读取 query_type
-- 专用模板与参数化模板的取舍
-
-交付：
-- generate_template_sql 引入 query_plan 参数
-- ROI / CAC 部分参数从 query_plans.yaml 读取
-- template_sql_tests 扩展
-- evaluator 20/20 PASS
-
-验收：
-- ROI / CAC 结果不变
-- generation_method 仍为 template
-- 普通指标仍走 llm
-
----
-
-#### Day41
-
-Intent Parser V1 实现
-
-目标：实现 Rule-based Intent Parser。
-
-学习内容：
-- parse_metric
-- parse_dimension
-- parse_limit
-- parse_sort_direction
-- parse_ranking
-- Intent Trace
-
-交付：
-- app/semantic_layer/intent_parser.py
-- intent parser 测试脚本
-- Top1 / TopN / Ranking 测试集
-
-验收：
-- 哪个渠道ROI最高 → metric=roi, limit=1, direction=desc
-- 获客成本最低的三个渠道 → metric=cac, limit=3, direction=asc
-- 各渠道销售额排名 → metric=channel_sales_amount, limit=None, direction=desc
 
 ---
 
@@ -1072,7 +1426,6 @@ Golden Dataset：
 
 当前主链路：
 
-```text
 Question
 ↓
 Intent Parser
@@ -1092,11 +1445,9 @@ PostgreSQL
 Table
 ↓
 Result-level Evaluation
-```
 
 当前 Intent Parser V1 输出：
 
-```python
 {
     "question": question,
     "limit": int | None,
@@ -1104,25 +1455,20 @@ Result-level Evaluation
     "sort_hint": "asc" | "desc" | None,
     "dimension": "channel" | "category" | None,
 }
-```
 
 当前测试结果：
 
-```text
 intent_parser_tests.py      5/5 PASS
 template_sql_tests.py      14/14 PASS
 evaluator.py               20/20 PASS
-```
 
 当前测试报告：
 
-```text
 docs/evaluation/
 ├── evaluation_*.json
 ├── query_plan_tests_*.json
 ├── template_sql_tests_*.json
 ├── intent_parser_tests_*.json
-```
 
 关键结论：
 
@@ -1138,3 +1484,231 @@ docs/evaluation/
 2. `sort_hint` 当前尚未真正参与最终排序方向决策。
 3. Intent Parser V1 仍是规则型，后续需要支持更多中文表达。
 4. expected_intent 当前只覆盖关键 cases，后续可逐步扩展。
+
+---
+
+### Day41
+
+完成：
+- 新增 `resolve_sort_direction`
+- 新增 `enrich_intent_with_query_plan`
+- query_service 接入 enriched intent
+- intent 增加 `final_sort_direction`
+- intent 增加 `sort_field`
+- template_sql_generator 新增 `build_order_by_clause_from_intent`
+- ROI / CAC 模板 SQL 支持从 intent 生成 ORDER BY
+- generate_roi_sql 支持外部传入 order_by_clause
+- generate_cac_sql 支持外部传入 order_by_clause
+- 支持用户显式排序方向覆盖指标默认排序方向
+- 新增问题能力：`渠道ROI从低到高排名`
+- 新增 Golden Case：case_026
+- Golden Cases 从 20 扩展到 21
+- 新增 `intent_resolver_tests.py`
+- 更新 `docs/architecture/query_plan_testing_v1.md`
+- template_sql_tests 扩展到 15 个测试
+
+当前排序决策规则：
+
+intent.sort_hint
+>
+query_plan.default_sort.direction
+>
+None
+
+示例：
+
+各渠道ROI排名
+→ sort_hint = None
+→ query_plan.default_sort.direction = desc
+→ final_sort_direction = desc
+
+渠道ROI从低到高排名
+→ sort_hint = asc
+→ query_plan.default_sort.direction = desc
+→ final_sort_direction = asc
+
+各渠道获客成本排名
+→ sort_hint = None
+→ query_plan.default_sort.direction = asc
+→ final_sort_direction = asc
+
+当前 enriched intent 示例：
+{
+    "question": "渠道ROI从低到高排名",
+    "limit": None,
+    "ranking_type": "ranking",
+    "sort_hint": "asc",
+    "dimension": "channel",
+    "final_sort_direction": "asc",
+    "sort_field": "roi",
+}
+
+当前主链路：
+
+Question
+↓
+Intent Parser
+↓
+Intent Resolver
+↓
+Hybrid Search / Metric Recognition
+↓
+Query Plan Routing
+├─ ROI / CAC → Template SQL from Intent
+└─ 普通指标 → LLM SQL
+↓
+SQL Cleaner
+↓
+SQL Validator
+↓
+PostgreSQL
+↓
+Table
+↓
+Result-level Evaluation
+
+当前测试体系：
+query_plan_tests.py          2/2 PASS
+intent_parser_tests.py       5/5 PASS
+intent_resolver_tests.py     5/5 PASS
+template_sql_tests.py       15/15 PASS
+evaluator.py                21/21 PASS
+
+当前测试报告：
+docs/evaluation/
+├── evaluation_*.json
+├── query_plan_tests_*.json
+├── template_sql_tests_*.json
+├── intent_parser_tests_*.json
+├── intent_resolver_tests_*.json
+
+关键结论：
+- `sort_hint` 表示用户显式排序方向。
+- `default_sort` 表示指标默认排序规则。
+- `final_sort_direction` 表示系统最终排序决策。
+- 用户显式排序方向应优先于指标默认排序方向。
+- intent-based template 现在已同时消费 `limit` 和 `final_sort_direction`。
+- evaluator 已支持校验 expected_intent，可验证用户问题是否被正确理解。
+
+技术债：
+1. 普通指标仍主要走 LLM，尚未充分利用 intent。
+2. 普通指标尚未纳入 query_plan，因此 `sort_field` 可能为 None。
+3. template_sql_generator 中仍保留旧 question 解析逻辑。
+4. sort_hint 规则仍需支持更多中文表达。
+
+---
+
+## 当前交接摘要（Day41结束）
+
+当前处于：
+Phase2：Business Semantic Layer & Text-to-SQL
+Day41 / 100
+
+
+当前系统主线：
+自然语言问题
+↓
+Intent Parser
+↓
+Intent Resolver
+↓
+Hybrid Search / Metric Recognition
+↓
+Query Plan Routing
+├─ ROI / CAC → Template SQL from Intent
+└─ 普通指标 → LLM SQL
+↓
+SQL Cleaner
+↓
+SQL Validator
+↓
+PostgreSQL
+↓
+Result Formatter
+↓
+Evaluator
+
+当前关键模块：
+app/semantic_layer/intent_parser.py
+app/semantic_layer/query_plan_loader.py
+app/semantic_layer/hybrid_search.py
+app/text_to_sql/template_sql_generator.py
+app/text_to_sql/query_service.py
+app/text_to_sql/prompt_builder.py
+app/text_to_sql/sql_generator.py
+app/evaluation/evaluator.py
+app/evaluation/golden_questions.py
+
+
+当前新增测试：
+app/evaluation/query_plan_tests.py
+app/evaluation/intent_parser_tests.py
+app/evaluation/intent_resolver_tests.py
+app/evaluation/template_sql_tests.py
+app/evaluation/evaluator.py
+
+当前测试结果：
+query_plan_tests.py          2/2 PASS
+intent_parser_tests.py       5/5 PASS
+intent_resolver_tests.py     5/5 PASS
+template_sql_tests.py       15/15 PASS
+
+
+当前支持指标：
+item_sales_amount
+order_paid_amount
+refund_rate
+order_count
+sales_quantity
+channel_sales_amount
+channel_refund_rate
+roi
+cac
+
+当前复杂指标策略：
+roi → Query Plan + Template SQL
+cac → Query Plan + Template SQL
+其他普通指标 → LLM SQL
+
+当前 intent 输出字段：
+
+```python
+{
+    "question": question,
+    "limit": int | None,
+    "ranking_type": "top1" | "topn" | "ranking" | "unknown",
+    "sort_hint": "asc" | "desc" | None,
+    "dimension": "channel" | "category" | None,
+    "final_sort_direction": "asc" | "desc" | None,
+    "sort_field": str | None,
+}
+```
+
+当前最重要的设计结论：
+1. ROI / CAC 这类复杂跨事实表指标不应长期依赖 LLM 自由生成 SQL。
+2. Query Plan Routing 负责把高风险复杂指标分流到 Template SQL。
+3. Intent Parser 负责解析用户问题中的 limit / ranking / dimension / sort_hint。
+4. Intent Resolver 负责融合用户排序意图和指标默认排序规则。
+5. Template SQL 当前已消费 intent.limit 和 intent.final_sort_direction。
+6. 普通指标仍走 LLM，下一步要把 enriched intent 注入 Prompt。
+7. evaluator 已从“SQL 是否能执行”升级为“结构 + 结果 + 排名 + 生成路径 + intent”的综合评估。
+
+当前主要技术债：
+1. 普通指标尚未充分利用 intent。
+2. prompt_builder 还没有接收 enriched intent。
+3. 普通指标没有 query_plan，因此 sort_field 可能为 None。
+4. template_sql_generator 仍保留旧 question 解析逻辑。
+5. evaluation 测试文件中 JSON report 保存逻辑有重复。
+6. Intent Parser V1 仍是规则型，对中文表达覆盖有限。
+
+下一步 Day42：
+
+普通指标 Prompt 接入 Intent
+
+具体目标：普通指标 → LLM SQL with Intent Context
+
+优先处理：
+prompt_builder.py
+sql_generator.py
+query_service.py
+普通指标 Golden Cases

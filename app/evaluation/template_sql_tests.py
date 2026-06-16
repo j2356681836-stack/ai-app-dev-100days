@@ -9,7 +9,8 @@ from app.text_to_sql.template_sql_generator import (
     generate_template_sql_from_intent
 )
 
-from app.semantic_layer.intent_parser import parse_intent
+from app.semantic_layer.intent_parser import parse_intent, enrich_intent_with_query_plan
+from app.semantic_layer.query_plan_loader import get_query_plan_by_metric
 
 
 LIMIT_TEST_CASES = [
@@ -115,6 +116,13 @@ INTENT_TEMPLATE_CASES = [
             "LIMIT 3",
         ],
     },
+    {
+        "metric_name": "roi",
+        "question": "渠道ROI从低到高排名",
+        "expected_contains": [
+            "ORDER BY roi ASC",
+        ],
+    },
 ]
 
 
@@ -174,6 +182,13 @@ def test_template_from_intent() -> list[dict]:
 
     for case in INTENT_TEMPLATE_CASES:
         intent = parse_intent(case["question"])
+        query_plan = get_query_plan_by_metric(case["metric_name"])
+
+        intent = enrich_intent_with_query_plan(
+            intent=intent,
+            query_plan=query_plan,
+        )
+
         sql = generate_template_sql_from_intent(
             metric_name=case["metric_name"],
             intent=intent,
