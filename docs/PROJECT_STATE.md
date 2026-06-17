@@ -75,7 +75,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
 
-当前日期：Day41 / 100
+当前日期：Day42 / 100
 
 ---
 ## 已完成能力
@@ -147,7 +147,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 ## 当前能力：
 
-当前系统已从 Prompt-only Text-to-SQL 演进为：
+当前系统已形成双路径 SQL 生成架构：
 Question
 ↓
 Intent Parser
@@ -162,7 +162,7 @@ Hybrid Search / Metric Recognition
 ↓
 Query Plan Routing
 ├─ ROI / CAC → Template SQL from Intent
-└─ 普通指标 → LLM SQL
+└─ 普通指标 → LLM SQL with Intent Context
 ↓
 SQL Cleaner
 ↓
@@ -203,7 +203,15 @@ Evaluator
    - intent.limit → SQL LIMIT
    - intent.final_sort_direction → SQL ORDER BY
 
-6. Evaluation Framework
+6. LLM SQL with Intent Context
+   - 普通指标继续走 LLM
+   - Prompt 注入 dimension
+   - Prompt 注入 ranking_type
+   - Prompt 注入 limit
+   - Prompt 注入 final_sort_direction
+   - Prompt 明确字段别名规则
+
+7. Evaluation Framework
    - 结构级校验
    - 结果级校验
    - 排名顺序校验
@@ -234,10 +242,11 @@ query_plan_tests.py          2/2 PASS
 intent_parser_tests.py       5/5 PASS
 intent_resolver_tests.py     5/5 PASS
 template_sql_tests.py       15/15 PASS
-evaluator.py                21/21 PASS
+prompt_builder_tests.py      2/2 PASS
+evaluator.py                23/23 PASS
 
 当前 Golden Cases：
-21 Cases,
+23 Cases,
 Pass Rate：100%
 
 当前覆盖指标：
@@ -264,6 +273,8 @@ Pass Rate：100%
 - TopN
 - Ranking
 - 反向排序：渠道ROI从低到高排名
+- 普通指标 TopN
+- 普通指标反向排序
 
 当前 Evaluation 能力：
 - expected_tables
@@ -281,6 +292,7 @@ docs/evaluation/
 ├── template_sql_tests_*.json
 ├── intent_parser_tests_*.json
 ├── intent_resolver_tests_*.json
+├── prompt_builder_tests_*.json
 
 ### Metric Query Plan
 
@@ -450,7 +462,7 @@ Hybrid Search / Metric Recognition
 ↓
 Query Plan Routing
 ├─ ROI / CAC → Template SQL from Intent
-└─ 普通指标 → LLM SQL
+└─ 普通指标 → LLM SQL with Intent Context
 ↓
 SQL Cleaner
 ↓
@@ -466,7 +478,7 @@ Evaluator
 - ROI / CAC 复杂指标不再依赖 LLM 自由生成 SQL。
 - ROI / CAC 使用 Query Plan + Template SQL。
 - Template SQL 已消费 intent.limit 和 intent.final_sort_direction。
-- 普通指标仍走 LLM，但下一步将注入 Intent Context。
+- 普通指标仍走 LLM，但 Prompt 已注入 Intent Context。
 - evaluator 已能校验业务结果、排序顺序、生成路径和 intent。
 
 ---
@@ -489,344 +501,111 @@ Day40-Day41 已提前完成原计划中 “Intent Parser 接入 Query Plan Templ
 
 ---
 
-#### Day42：普通指标 Prompt 接入 Intent
+Day43：普通指标 Intent Cases 收尾
+目标：
+- 再补 2-3 个普通指标 Golden Cases
+- 覆盖退款率 TopN / 反向排序
+- Golden Cases 达到 25-26
+- 不再继续无限扩普通指标
 
-目标：让普通指标虽然仍走 LLM，但 Prompt 中可以使用 enriched intent。
-
-当前：
-ROI / CAC → Template SQL from Intent
-普通指标 → LLM SQL
-
-Day42 目标：
-
-普通指标 → LLM SQL with Intent Context
-
-学习内容：
-- Prompt Builder 与 Intent 的职责边界
-- 哪些 intent 字段适合注入 Prompt
-- dimension / limit / ranking_type / final_sort_direction 如何帮助 LLM
-- 避免 Prompt 过度复杂化
-
-实现任务：
-- 修改 prompt_builder.py
-- 让 build_prompt 支持 intent 参数
-- 修改 sql_generator.py 或 query_service.py，使 LLM 路径可以传入 intent
-- 普通指标仍走 LLM，不改为 template
-- 验证渠道销售额、渠道退款率、品类退款率等普通指标
-
-验收标准：
-query_plan_tests.py          2/2 PASS
-intent_parser_tests.py       5/5 PASS
-intent_resolver_tests.py     5/5 PASS
-template_sql_tests.py       15/15 PASS
-evaluator.py                21/21 PASS
-
-
-重点：
-- intent 是辅助 LLM，不替代 metric search
-- 普通指标不应误走 template
-- Prompt 中应明确最终排序方向和 limit
+交付：
+- evaluator ≥ 25 cases
+- 100% PASS
 
 ---
 
-#### Day43：普通指标 Intent Cases 扩展
+Day44：Result-level Evaluation V2
+目标：
+- 新增 expected_rows
+- 多行结果值校验
+- 不只是检查顺序，也检查每行数值
 
-目标：扩展普通指标 Golden Cases，验证 Intent Context 对 LLM 普通指标链路的稳定性。
-
-新增候选问题：
-哪个渠道销售额最高
-各渠道销售额排名
-渠道销售额从低到高排名
-哪个渠道退款率最高
-各渠道退款率排名
-品类退款率从低到高排名
-销售额Top3品类
-退款率Top3品类
-
-
-学习内容：
-- 普通指标与复杂指标的边界
-- expected_intent 如何覆盖普通指标
-- expected_order 如何验证反向排序
-- Result-level evaluation 与 Prompt 稳定性的关系
-
-实现任务：
-- 增加普通指标 Golden Cases
-- 为更多普通指标补充 expected_intent
-- 增加 expected_order
-- 验证 LLM 是否正确使用 Intent Context
-- 如果 LLM 不稳定，优先修 Prompt，不急着做 template
-
-验收标准：
-Golden Cases ≥ 25
-Pass Rate 100%
-普通指标 generation_method = llm
-ROI / CAC generation_method = template
+交付：
+- check_expected_rows
+- ROI / CAC / 渠道销售额 expected_rows
+- evaluator 100% PASS
 
 ---
 
-#### Day44：Result-level Evaluation V2
-
-目标：将 evaluator 从 Top1 / 排序顺序校验，升级为多行结果值校验。
-新增能力：expected_rows
+Day45：Answer Layer V1
+目标：
+- SQL Table → 中文业务回答
+- 让系统不仅返回 table，还能生成业务解释
 
 示例：
-```python
-"expected_rows": [
-    {"channel_name": "天猫", "roi": 1.68},
-    {"channel_name": "微信小程序", "roi": 1.51},
-    {"channel_name": "京东", "roi": 1.44},
-]
-```
-
-学习内容：
-- expected_result 与 expected_rows 的区别
-- 多行顺序校验与数值校验如何结合
-- tolerance 数值误差如何复用
-- Evaluation Report 如何展示失败差异
-
-实现任务：
-- 新增 check_expected_rows
-- 支持多行字段级 mismatch
-- 给 ROI / CAC / 渠道销售额排名补充 expected_rows
-- 优化 evaluator 失败日志
-- JSON 报告中输出 row_mismatches
-
-验收标准：
-Golden Cases ≥ 25
-expected_rows 可校验多行结果
-Evaluator 100% PASS
-
-
----
-
-#### Day45：Intent Parser V2
-
-目标：增强 Intent Parser 对中文排序与 TopN 表达的覆盖。
-
-当前支持：
-最高 / 最低
-从高到低 / 从低到高
-Top3
-前3 / 前三
-三个渠道
-排名 / 各
-
-增强方向：
-倒数前三
-后五名
-最差
-最好
-由高到低
-由低到高
-升序排列
-降序排列
-前五个
-前5名
-
-实现任务：
-- 扩展 parse_limit
-- 扩展 parse_sort_hint
-- 评估是否新增 ranking_type = bottomn
-- 增加 intent_parser_tests
-- 增加 intent_resolver_tests
-- 增加 template_sql_tests
-
-验收标准：
-intent_parser_tests ≥ 10 cases
-intent_resolver_tests ≥ 8 cases
-所有测试 100% PASS
-
-
----
-
-#### Day46：Prompt Debug Trace 与 Explainability
-
-目标：让系统返回更清晰的 debug trace，方便定位问题。
-
-当前 query_service 已返回：
-generation_method
-intent
-sql
-table
-
-Day46 目标新增：
-
-```python
-"debug_trace": {
-    "metric_name": "roi",
-    "generation_method": "template",
-    "intent": {...},
-    "query_plan_name": "roi_channel_v1",
-    "sort_source": "user_sort_hint",
-    "limit_source": "intent"
-}
-```
-
-实现任务：
-- query_service 增加 debug_trace
-- template 路径记录 query_plan_name
-- LLM 路径记录 prompt intent context
-- evaluator 可选校验 debug_trace
-- JSON report 记录 trace
-
-验收标准：
-ROI / CAC 能看到 template trace
-普通指标能看到 llm trace
-Evaluator 100% PASS
-
----
-
-#### Day47：Phase2 中段重构与文件职责校准
-
-目标：对 Day36-Day46 新增能力做一次结构性整理，避免代码继续膨胀。
-检查对象：
-app/semantic_layer/
-app/text_to_sql/
-app/evaluation/
-metadata/
-docs/architecture/
-
-重点检查：
-- semantic_layer 与 text_to_sql 的职责边界
-- intent_parser 是否需要拆出 intent_resolver
-- template_sql_generator 是否过大
-- evaluation 测试文件是否需要公共工具函数
-- JSON report 保存逻辑是否重复
-
-验收标准：
-所有测试保持 100% PASS
-文档中明确当前技术债
-代码职责边界更清楚
-
----
-
-#### Day48：Phase2 Midpoint Review
-
-目标：对 Phase2 中段做一次完整验收，形成可用于面试表达的阶段性总结。
-产出文档：docs/architecture/phase2_midpoint_review.md
-建议结构：
-1. 当前系统能做什么
-2. 为什么不能只靠 LLM 生成 SQL
-3. Query Plan 解决了什么
-4. Intent Parser / Resolver 解决了什么
-5. Evaluation 如何保证结果可信
-6. 当前系统边界
-7. 下一阶段方向
-
-验收标准：
-Golden Cases ≥ 25
-所有测试 100% PASS
-README / PROJECT_STATE 完整更新
-可用 3-5 分钟讲清项目当前架构
-
-### Day39-Day45 规划
-
-目标：完成 Query Plan 稳定化，并进入 Intent Parser V1。
-说明：
-Day38 已完成 Query Plan Routing 主链路接入，ROI / CAC 已走 Template SQL。
-后续计划保持 Phase2 主线不变，重点从“复杂指标稳定生成 SQL”升级到“业务意图识别”。
-
----
-
-#### Day42
-
-Intent Parser 接入 Query Plan Template
-
-目标：让 template_sql_generator 不再直接解析 question，而是使用 intent。
-
-学习内容：
-- intent 与 SQL Template 的接口
-- limit 从 intent 传入
-- sort_direction 从 intent 传入
-- query_service 中 intent 的位置
+“渠道销售额最高的是天猫，销售额为 244.52 万元。”
 
 交付：
-- generate_roi_sql(intent)
-- generate_cac_sql(intent)
-- template_sql_tests 改造为 intent-based
-- evaluator 回归
-
-验收：
-- ROI / CAC Top1、TopN、Ranking 全部稳定
-- 20/20 PASS
+- answer_generator.py
+- query_service 返回 answer
+- Golden Cases 增加 expected_answer_points
 
 ---
 
-#### Day43
+Day46：Ragas Feasibility Spike
+目标：
+- 明确 Ragas 在本项目中评估什么、不评估什么
+- 小规模接入 3-5 个 answer cases
 
-普通指标 Intent 接入设计
-
-目标：让普通指标也能使用 Intent 中的 dimension / ranking 信息，减少 Prompt 负担。
-
-学习内容：
-- 品类维度
-- 渠道维度
-- TopN
-- 默认维度规则
-- Prompt Builder 如何使用 intent
+重点：
+- Ragas 不替代 SQL result evaluator
+- Ragas 评估 answer relevancy / faithfulness
+- 自研 evaluator 评估 SQL 和数值正确性
 
 交付：
-- prompt_builder 增加 intent context
-- 普通指标仍走 LLM，但 Prompt 更结构化
-- Golden Cases 回归
-
-验收：
-- 销售额Top5品类稳定
-- 各渠道销售额排名稳定
-- 品类退款率前三稳定
----
-
-#### Day44
-
-Result-level Evaluation V2
-
-目标：扩展 evaluator 支持多行 expected_rows 和数值校验。
-
-学习内容：
-- expected_rows
-- 多行结果校验
-- 排名顺序 + 数值联合校验
-- 失败报告优化
-
-交付：
-- expected_rows 支持
-- 渠道指标完整结果级校验
-- evaluation report 优化
-
-验收：
-- 渠道销售额排名每行数值可校验
-- ROI 排名每行数值可校验
-- CAC 排名每行数值可校验
+- docs/architecture/ragas_eval_design.md
+- ragas_eval_spike.py
 
 ---
 
-#### Day45
-
-Phase2 中段验收与重构缓冲
-
-目标：对 Day36-Day44 的渠道分析、Query Plan、Intent Parser、Evaluation 做一次阶段验收。
-
-学习内容：
-- 回顾新增指标
-- 回顾 Query Plan 架构
-- 回顾 Evaluation 演进
-- 检查代码重复
-- 检查 metadata 职责边界
-- 梳理技术债
+Day47：Ragas / LLM-as-Judge Evaluation V1
+目标：
+- 对 Answer Layer 进行回答质量评估
+- 形成 deterministic eval + answer quality eval 双层体系
 
 交付：
-- Phase2 Midpoint Review
-- architecture update
+- answer_eval_cases.py
+- ragas 或 LLM Judge 小规模报告
+- docs/evaluation/ragas_*.json 或 answer_eval_*.json
+
+---
+
+Day48：Prompt Builder V2 / 模块化收束
+目标：
+- 解决 prompt_builder.py 规则臃肿
+- 不继续堆规则
+
+交付：
+- build_global_rules
+- build_intent_rules
+- build_dimension_rules
+- build_legacy_metric_rules
+- prompt_builder_tests 扩展
+
+---
+
+Day49：Phase2 Midpoint Review
+目标：
+- 整理 Phase2 当前能力
+- 形成面试表达材料
+
+交付：
+- docs/architecture/phase2_midpoint_review.md
+- 架构图文字版
+- 技术债清单
+
+---
+
+Day50：Phase2 Final Review / Phase3 准备
+目标：
+- 确认是否进入 LangGraph
+- 把 Text-to-SQL 封装成 Tool
+- 准备 Phase3 Agent Workflow
+
+交付：
+- sql_agent_tool 设计文档
+- phase3_entry_plan.md
 - README / PROJECT_STATE 全量校准
-- evaluator 完整报告
-
-验收：
-- Golden Cases ≥ 20
-- Pass Rate 100%
-- ROI / CAC Template 稳定
-- Intent Parser V1 可用
-- 技术债清单清晰
 
 ---
 
@@ -1316,7 +1095,6 @@ Pass Rate：100%
 - generation_method validation
 
 关键结果：
-
 Template SQL Tests：
 - 12/12 PASS
 
@@ -1348,7 +1126,6 @@ Golden Dataset：
 ### Day39
 
 完成：
-
 - template_sql_generator.py 读取 query_plans.yaml
 - ROI / CAC 的 output alias 从 query plan 读取
 - ROI / CAC 的 round 从 query plan 读取
@@ -1394,8 +1171,6 @@ Golden Dataset：
 - ROI / CAC 的业务口径必须通过测试保护。
 - 三层测试体系可以分别定位配置、模板和主链路问题。
 - 从 Day40 开始，学习方式调整为 B 模式：函数骨架 + TODO + 用户补逻辑 + code review。
-
----
 
 ---
 
@@ -1598,12 +1373,95 @@ docs/evaluation/
 
 ---
 
-## 当前交接摘要（Day41结束）
+### Day42
+
+完成：
+- prompt_builder 支持 intent 参数
+- 新增 build_intent_context
+- Prompt 中加入结构化意图上下文
+- Prompt 增加 intent 使用规则
+- sql_generator 支持 intent 参数
+- query_service 在 LLM 路径传入 enriched intent
+- 普通指标 LLM SQL 接入 Intent Context
+- 修复普通指标字段别名漂移问题
+- 新增 Golden Case：case_027 渠道销售额从低到高排名
+- 新增 Golden Case：case_028 渠道销售额Top3
+- Golden Cases 从 21 扩展到 23
+- 新增 prompt_builder_tests.py
+- prompt_builder_tests 输出 JSON 报告
+- evaluator 保持 23/23 PASS
+
+当前普通指标 LLM 路径：
+question
+↓
+parse_intent
+↓
+enrich_intent_with_query_plan
+↓
+generate_sql(question, intent=intent)
+↓
+build_prompt(question, intent=intent)
+↓
+LLM SQL
+
+当前双路径 SQL 生成：
+ROI / CAC → Intent + Query Plan + Template SQL
+普通指标 → Intent + Prompt + LLM SQL
+
+新增验证：
+case_027：渠道销售额从低到高排名
+→ generation_method = llm
+→ final_sort_direction = asc
+→ ORDER BY channel_sales_amount ASC
+→ 23/23 PASS
+
+case_028：渠道销售额Top3
+→ generation_method = llm
+→ limit = 3
+→ LIMIT 3
+→ 23/23 PASS
+
+
+发现问题：
+1. Prompt 接入 Intent 后，LLM 将 dimension = channel 误用为字段别名 channel。
+2. prompt_builder.py 规则数量接近 30 条，开始出现臃肿风险。
+3. 普通指标没有 query_plan，因此 sort_field 仍为 None。
+4. TopN 默认排序方向仍主要依赖 LLM 语义理解。
+
+解决：
+1. Prompt 明确 dimension = channel 时必须使用 dim_channel.channel_name。
+2. Prompt 明确 channel 维度输出字段别名必须是 channel_name，禁止使用 channel。
+3. 新增 prompt_builder_tests.py，保护 intent context 注入。
+4. 新增普通指标 Golden Cases，验证 LLM 路径是否受 Intent Context 约束。
+
+结果：
+query_plan_tests.py          2/2 PASS
+intent_parser_tests.py       5/5 PASS
+intent_resolver_tests.py     5/5 PASS
+template_sql_tests.py       15/15 PASS
+prompt_builder_tests.py      2/2 PASS
+evaluator.py                23/23 PASS
+
+关键结论：
+- Intent 不等于 Template。
+- 普通指标不走 Template，但仍然需要 Intent Context。
+- Intent 负责理解用户问题，Template / LLM 负责生成 SQL。
+- Prompt 接入 Intent 后，需要明确字段映射，避免 LLM 将 intent 枚举值当作 SQL 字段别名。
+- prompt_builder.py 后续需要模块化，避免继续堆规则。
+
+技术债：
+1. prompt_builder.py 规则臃肿，需要 Prompt Builder V2。
+2. 普通指标尚未纳入 query_plan，sort_field 仍可能为 None。
+3. TopN 默认排序方向是否要在 Intent Resolver 中兜底，后续需要评估。
+4. prompt_builder_tests 当前只检查 Prompt 片段，后续可扩展字段别名规则检查。
+
+---
+
+## 当前交接摘要（Day42结束）
 
 当前处于：
 Phase2：Business Semantic Layer & Text-to-SQL
 Day41 / 100
-
 
 当前系统主线：
 自然语言问题
@@ -1639,19 +1497,21 @@ app/text_to_sql/sql_generator.py
 app/evaluation/evaluator.py
 app/evaluation/golden_questions.py
 
-
 当前新增测试：
 app/evaluation/query_plan_tests.py
 app/evaluation/intent_parser_tests.py
 app/evaluation/intent_resolver_tests.py
 app/evaluation/template_sql_tests.py
+app/evaluation/prompt_builder_tests.py  
 app/evaluation/evaluator.py
 
 当前测试结果：
-query_plan_tests.py          2/2 PASS
-intent_parser_tests.py       5/5 PASS
-intent_resolver_tests.py     5/5 PASS
-template_sql_tests.py       15/15 PASS
+- query_plan_tests.py：2/2 PASS
+- intent_parser_tests.py：5/5 PASS
+- intent_resolver_tests.py：5/5 PASS
+- template_sql_tests.py：15/15 PASS
+- prompt_builder_tests.py：2/2 PASS
+- evaluator.py：23/23 PASS
 
 
 当前支持指标：

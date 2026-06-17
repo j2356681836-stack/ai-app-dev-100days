@@ -16,8 +16,8 @@ client = OpenAI(
 )
 
 
-def generate_sql(question: str) -> str:
-    prompt = build_prompt(question)
+def generate_sql(question: str, intent: dict | None = None) -> str:
+    prompt = build_prompt(question, intent=intent)
 
     response = client.chat.completions.create(
         model="deepseek-chat",

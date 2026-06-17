@@ -1,23 +1,42 @@
 from app.semantic_layer.context_builder import build_context
 
+def build_intent_context(intent: dict | None) -> str:
+    """
+    将结构化 intent 转换为 Prompt 中可读的文本。
+    """
+    if not intent:
+        return "未提供结构化意图。"
 
-def build_prompt(user_question: str) -> str:
+    return f"""
+结构化意图：
+- 分析维度 dimension: {intent.get("dimension")}
+- 排名类型 ranking_type: {intent.get("ranking_type")}
+- 返回行数 limit: {intent.get("limit")}
+- 用户排序提示 sort_hint: {intent.get("sort_hint")}
+- 最终排序方向 final_sort_direction: {intent.get("final_sort_direction")}
+- 排序字段 sort_field: {intent.get("sort_field")}
+""".strip()
+
+
+def build_prompt(user_question: str, intent: dict | None = None) -> str:
     """
     Build prompt for Text-to-SQL.
     """
 
     context = build_context(user_question)
+    intent_context = build_intent_context(intent)
 
     prompt = f"""
 你是一名 PostgreSQL 数据分析助手。
 
 用户问题：
-
 {user_question}
 
 业务上下文：
-
 {context}
+
+结构化意图上下文：
+{intent_context}
 
 任务：
 
@@ -50,12 +69,21 @@ end_date = LEAST(MAX(fact_orders.order_date::date), MAX(fact_marketing_spend.spe
 再判断该真实首单是否落在分析时间窗口内，
 最后按真实首单 channel_id 统计 acquired_customer_count。禁止先按时间窗口过滤订单后再计算 ROW_NUMBER()。
 18. 计算 CAC / 获客成本时，如果未指定日期范围，必须使用 fact_orders 与 fact_marketing_spend 的重叠日期窗口，而不是只使用订单表自身的 MIN(order_date) 和 MAX(order_date)。
-19. 18. 计算 ROI 时，如果使用 CTE，必须使用以下结构：
+19. 计算 ROI 时，如果使用 CTE，必须使用以下结构：
 channel_sales CTE 只包含 channel_id 和 sales_amount；
 channel_spend CTE 只包含 channel_id 和 spend_amount；
 最终 SELECT 必须同时 JOIN channel_sales cs 和 channel_spend csp；
 ROI 必须写为 ROUND(cs.sales_amount / NULLIF(csp.spend_amount, 0), 2) AS roi；
 禁止使用 cs.spend_amount，因为 spend_amount 不属于 channel_sales。
+20. 如果提供了结构化意图上下文，必须优先遵守其中的 dimension、ranking_type、limit、final_sort_direction。
+21. 如果 final_sort_direction = "asc"，排序必须使用 ASC；如果 final_sort_direction = "desc"，排序必须使用 DESC。
+22. 如果 limit 为数字，SQL 必须添加对应 LIMIT。
+23. 如果 dimension = "channel"，分析维度必须使用 dim_channel.channel_name，输出字段别名必须是 channel_name，禁止使用 channel 作为字段别名。
+24. 如果 dimension = "channel"，必须通过 channel_id 关联 dim_channel，常见 JOIN 为 fact_orders.channel_id = dim_channel.channel_id。
+25. 如果 dimension = "category"，分析维度必须使用 dim_product.category，输出字段别名必须是 category。
+26. 如果 dimension 字段已经有标准字段名，例如 channel_name 或 category，SELECT 输出必须使用该标准字段名，不能自行缩写或改名。
+27. 如果 ranking_type = "ranking"，返回完整排名，不要添加 LIMIT，除非 limit 明确为数字。
+28. 字段别名必须稳定，不要随意缩写业务字段名。例如 dim_channel.channel_name 必须输出为 channel_name，不要输出为 channel。
 """
 
     return prompt

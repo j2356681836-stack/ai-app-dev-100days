@@ -54,7 +54,7 @@ def ask(question: str):
             raw_sql = template_sql
             generation_method = "template"
         else:
-            raw_sql = generate_sql(question)
+            raw_sql = generate_sql(question, intent=intent)
             generation_method = "llm"
 
         sql = clean_sql(raw_sql)

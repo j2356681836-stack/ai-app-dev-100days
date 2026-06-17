@@ -748,7 +748,6 @@ Evaluator
 ### Day41
 
 完成内容：
-
 - 新增 `resolve_sort_direction`
 - 新增 `enrich_intent_with_query_plan`
 - query_service 接入 enriched intent
@@ -764,8 +763,6 @@ Evaluator
 - template_sql_tests 扩展到 15 个测试
 
 当前主链路：
-
-```text
 Question
 ↓
 Intent Parser
@@ -787,10 +784,8 @@ PostgreSQL
 Result Formatter
 ↓
 Evaluator
-```
 
 当前测试结果：
-
 - query_plan_tests.py：2/2 PASS
 - intent_parser_tests.py：5/5 PASS
 - intent_resolver_tests.py：5/5 PASS
@@ -798,7 +793,6 @@ Evaluator
 - evaluator.py：21/21 PASS
 
 关键收获：
-
 - `sort_hint` 来自用户问题。
 - `default_sort` 来自 query_plans.yaml。
 - `final_sort_direction` 是二者融合后的最终排序方向。
@@ -807,6 +801,60 @@ Evaluator
 
 ---
 
+### Day42
+
+完成内容：
+- prompt_builder 支持 intent 参数
+- 新增 build_intent_context
+- Prompt 中加入结构化意图上下文
+- sql_generator 支持 intent 参数
+- query_service 在 LLM 路径传入 enriched intent
+- 普通指标 LLM SQL 接入 Intent Context
+- 修复普通指标字段别名漂移问题
+- 新增 case_027：渠道销售额从低到高排名
+- 新增 case_028：渠道销售额Top3
+- Golden Cases 从 21 扩展到 23
+- 新增 prompt_builder_tests.py
+- prompt_builder_tests 输出 JSON 测试报告
+
+当前主链路：
+Question
+↓
+Intent Parser
+↓
+Intent Resolver
+↓
+Hybrid Search / Metric Recognition
+↓
+Query Plan Routing
+├─ ROI / CAC → Template SQL from Intent
+└─ 普通指标 → LLM SQL with Intent Context
+↓
+SQL Cleaner
+↓
+SQL Validator
+↓
+PostgreSQL
+↓
+Result Formatter
+↓
+Evaluator
+
+当前测试结果：
+- query_plan_tests.py：2/2 PASS
+- intent_parser_tests.py：5/5 PASS
+- intent_resolver_tests.py：5/5 PASS
+- template_sql_tests.py：15/15 PASS
+- prompt_builder_tests.py：2/2 PASS
+- evaluator.py：23/23 PASS
+
+关键收获：
+- Intent 不等于 Template。
+- 普通指标不走 Template，但仍然需要 Intent Context 来约束 LLM。
+- Prompt 接入 Intent 后，需要明确区分 dimension 枚举值和 SQL 输出字段别名。
+- prompt_builder.py 已开始臃肿，后续需要做 Prompt Builder V2 模块化。
+
+---
 
 ## Phase 3
 
@@ -901,7 +949,7 @@ Answer
 
 # 当前版本
 
-Version: v0.15
-完成度：Day41 / 100
-当前实现：自然语言问题 → Intent Parser → 业务语义检索 → Query Plan Routing → Intent-based Template / LLM SQL生成 → SQL执行 → Result-level Evaluation
+Version: v0.16
+完成度：Day42 / 100
+当前实现：自然语言问题 → Intent Parser → 业务语义检索 → Query Plan Routing → Template SQL / LLM SQL with Intent Context → SQL执行 → Result-level Evaluation
 

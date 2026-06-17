@@ -405,4 +405,64 @@ GOLDEN_QUESTIONS = [
             ],
         },
     },
+    {
+        "id": "case_027",
+        "question": "渠道销售额从低到高排名",
+        "expected_tables": [
+            "fact_orders",
+            "dim_channel",
+        ],
+        "expected_columns": [
+            "channel_name",
+            "channel_sales_amount",
+        ],
+        "expected_generation_method": "llm",
+        "expected_intent": {
+            "limit": None,
+            "ranking_type": "ranking",
+            "sort_hint": "asc",
+            "dimension": "channel",
+            "final_sort_direction": "asc",
+            "sort_field": None,
+        },
+        "expected_order": {
+            "field": "channel_name",
+            "values": [
+                "微信小程序",
+                "小红书",
+                "京东",
+                "抖音",
+                "天猫",
+            ],
+        },
+    },
+    {
+        "id": "case_028",
+        "question": "渠道销售额Top3",
+        "expected_tables": [
+            "fact_orders",
+            "dim_channel",
+        ],
+        "expected_columns": [
+            "channel_name",
+            "channel_sales_amount",
+        ],
+        "expected_generation_method": "llm",
+        "expected_intent": {
+            "limit": 3,
+            "ranking_type": "topn",
+            "sort_hint": None,
+            "dimension": "channel",
+            "final_sort_direction": None,
+            "sort_field": None,
+        },
+        "expected_order": {
+            "field": "channel_name",
+            "values": [
+                "天猫",
+                "抖音",
+                "京东",
+            ],
+        },
+    }
 ]
