@@ -89,6 +89,56 @@ def check_expected_result(
     return mismatches
 
 
+def check_expected_rows(
+    table: dict,
+    expected_rows: list[dict],
+    tolerance: float = 0.01,
+) -> list[dict]:
+    """
+    检查多行结果是否符合预期。
+
+    适用于 TopN / Ranking 类问题。
+    会同时检查：
+    - 行顺序
+    - 每一行的字段值
+    - 数值字段允许 tolerance 误差
+    """
+    if not expected_rows:
+        return []
+
+    mismatches = []
+    actual_rows = table.get("rows", [])
+
+    if len(actual_rows) < len(expected_rows):
+        return [
+            {
+                "field": "__row_count__",
+                "expected": len(expected_rows),
+                "actual": len(actual_rows),
+                "reason": "not enough rows returned",
+            }
+        ]
+
+    for row_index, expected_row in enumerate(expected_rows):
+        actual_row = actual_rows[row_index]
+
+        for field, expected_value in expected_row.items():
+            actual_value = actual_row.get(field)
+
+            if not values_equal(actual_value, expected_value, tolerance):
+                mismatches.append(
+                    {
+                        "row_index": row_index,
+                        "field": field,
+                        "expected": expected_value,
+                        "actual": actual_value,
+                        "reason": "row value mismatch",
+                    }
+                )
+
+    return mismatches
+
+
 def check_generation_method(
     result: dict,
     expected_generation_method: str | None,
@@ -203,6 +253,11 @@ def evaluate_case(case: dict) -> dict:
             expected_result=case.get("expected_result", {}),
         )
 
+        rows_mismatches = check_expected_rows(
+            table=table,
+            expected_rows=case.get("expected_rows", []),
+        )
+
         order_mismatches = check_expected_order(
             table=table,
             expected_order=case.get("expected_order", {}),
@@ -224,6 +279,7 @@ def evaluate_case(case: dict) -> dict:
             and len(missing_columns) == 0
             and table["row_count"] >= 0
             and len(result_mismatches) == 0
+            and len(rows_mismatches) == 0
             and len(order_mismatches) == 0
             and len(generation_method_mismatches) == 0
             and len(intent_mismatches) == 0
@@ -236,6 +292,7 @@ def evaluate_case(case: dict) -> dict:
             "missing_tables": missing_tables,
             "missing_columns": missing_columns,
             "result_mismatches": result_mismatches,
+            "rows_mismatches": rows_mismatches,
             "order_mismatches": order_mismatches,
             "generation_method": result.get("generation_method"),
             "generation_method_mismatches": generation_method_mismatches,
@@ -254,6 +311,7 @@ def evaluate_case(case: dict) -> dict:
             "missing_tables": case.get("expected_tables", []),
             "missing_columns": case.get("expected_columns", []),
             "result_mismatches": [],
+            "rows_mismatches": [],
             "order_mismatches": [],
             "generation_method": None,
             "generation_method_mismatches": [],
@@ -284,6 +342,7 @@ def run_evaluation() -> list[dict]:
             print(f"Missing tables: {result['missing_tables']}")
             print(f"Missing columns: {result['missing_columns']}")
             print(f"Result mismatches: {result.get('result_mismatches', [])}")
+            print(f"Rows mismatches: {result.get('rows_mismatches', [])}")
             print(f"Order mismatches: {result.get('order_mismatches', [])}")
             print(f"Generation method mismatches: {result.get('generation_method_mismatches', [])}")
             print(f"Intent mismatches: {result.get('intent_mismatches', [])}")

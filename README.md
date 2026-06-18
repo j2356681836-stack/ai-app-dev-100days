@@ -314,108 +314,29 @@ Business Semantic Layer + Text-to-SQL
 
 当前能力：自然语言问题 → 业务语义检索 → Query Plan Routing → Template / LLM SQL生成 → SQL校验 → PostgreSQL执行 → 结构化结果返回 → Result-level Evaluation
 
-## Evaluation Framework
+## Evaluation Framework V3
 
-支持：
+当前支持：
 
 - Golden Questions
-- SQL Evaluation
-- Failure Case Analysis
-- Prompt Optimization
-
-评估流程：
-
-Question
-↓
-SQL Generation
-↓
-SQL Validation
-↓
-Evaluation
-↓
-Failure Analysis
-↓
-Prompt Optimization
+- SQL 结构级检查
+- Top1 expected_result 校验
+- Ranking expected_order 校验
+- 多行 expected_rows 校验
+- generation_method 校验
+- expected_intent 校验
+- Evaluation JSON 报告输出
 
 当前评估结果：
-- Golden Questions：20
+
+- Golden Questions：26
 - Pass Rate：100%
-- Template SQL Tests：12/12 PASS
-- 支持 SQL 结构级检查
-- 支持 Top1 结果级校验
-- 支持排名顺序校验
-- 支持 generation_method 校验
-
-## Text2SQL 示例
-
-问题：哪个品类的退款率最高？
-
-生成SQL：
-
-```sql
-SELECT
-    dp.category,
-    ROUND(
-        COALESCE(SUM(fr.refund_amount), 0)
-        / NULLIF(SUM(foi.item_paid_amount), 0)
-        * 100,
-        2
-    ) AS refund_rate_pct
-FROM fact_order_items foi
-INNER JOIN dim_product dp
-    ON foi.product_id = dp.product_id
-INNER JOIN fact_orders fo
-    ON foi.order_id = fo.order_id
-LEFT JOIN fact_refunds fr
-    ON foi.order_item_id = fr.order_item_id
-WHERE fo.order_status = 'paid'
-GROUP BY dp.category
-ORDER BY refund_rate_pct DESC
-LIMIT 1;
-
-返回结果：
-[
-  {
-    "category": "精华",
-    "refund_rate_pct": 10.0
-  }
-]
-
-## Evaluation Framework V2
-
-支持：
-- Golden Questions
-- Failure Case Analysis
-- Prompt Optimization
-- Semantic Alias Search
-
-支持业务表达：
-- 销售额最高
-- 卖得最好
-- 退款率最高
-- 退货最严重
-- 订单最多
-- 销量最高
-- 渠道销售额最高
-- 渠道销售额排名
-- 渠道退款率最高
-- 渠道退款率排名
-- 渠道 ROI 最高
-- 渠道 ROI 排名
-- 哪个渠道投放最划算
-- 渠道 CAC 最低
-- 渠道获客成本最低
-- 渠道获客成本排名
-- 哪个渠道拉新效率最高
-
-当前暂不支持：
-- 利润分析
-- 复杂时间筛选
-- 多轮追问
-- 生产环境动态数据校验
-- SQL Template / Query Plan主链路接入
-- Intent Parser
-- 多指标组合分析
+- query_plan_tests.py：2/2 PASS
+- intent_parser_tests.py：5/5 PASS
+- intent_resolver_tests.py：5/5 PASS
+- template_sql_tests.py：15/15 PASS
+- prompt_builder_tests.py：2/2 PASS
+- evaluator.py：26/26 PASS
 
 ---
 
@@ -856,6 +777,29 @@ Evaluator
 
 ---
 
+### Day43
+
+完成内容：
+
+- 合并完成原 Day43 普通指标 Intent Cases 收尾
+- 合并完成原 Day44 Result-level Evaluation V2
+- 新增 case_029：品类退款率Top3
+- 新增 case_030：品类退款率从低到高排名
+- 新增 case_031：销量最低的三个品类
+- Golden Cases 扩展至 26
+- 普通指标 LLM 路径继续验证 Intent Context
+- 新增 expected_rows 多行结果值校验
+- evaluator 支持 rows_mismatches
+- evaluator 保持 26/26 PASS
+
+关键收获：
+
+- 普通指标虽然可以由 LLM 生成 SQL，但仍需要 intent 来提升可控性、可解释性和可评估性。
+- expected_order 只能检查顺序，expected_result 只检查首行，expected_rows 可以检查多行对象和多行数值。
+- Result-level Evaluation V2 为后续 Answer Layer 提供可信结果基础。
+
+---
+
 ## Phase 3
 
 Agent Workflow
@@ -949,7 +893,7 @@ Answer
 
 # 当前版本
 
-Version: v0.16
-完成度：Day42 / 100
-当前实现：自然语言问题 → Intent Parser → 业务语义检索 → Query Plan Routing → Template SQL / LLM SQL with Intent Context → SQL执行 → Result-level Evaluation
+Version: v0.17
+完成度：Day43 / 100
+当前实现：自然语言问题 → Intent Parser → 业务语义检索 → Query Plan Routing → Template SQL / LLM SQL with Intent Context → SQL执行 → Result-level Evaluation V2
 

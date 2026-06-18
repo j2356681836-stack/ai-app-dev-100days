@@ -75,7 +75,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
 
-当前日期：Day42 / 100
+当前日期：Day43 / 100
 
 ---
 ## 已完成能力
@@ -243,10 +243,9 @@ intent_parser_tests.py       5/5 PASS
 intent_resolver_tests.py     5/5 PASS
 template_sql_tests.py       15/15 PASS
 prompt_builder_tests.py      2/2 PASS
-evaluator.py                23/23 PASS
+evaluator.py                26/26 PASS
 
-当前 Golden Cases：
-23 Cases,
+当前 Golden Cases：26 Cases
 Pass Rate：100%
 
 当前覆盖指标：
@@ -281,9 +280,11 @@ Pass Rate：100%
 - expected_columns
 - expected_result
 - expected_order
+- expected_rows
 - expected_generation_method
 - expected_intent
 - tolerance 数值误差
+- rows_mismatches 报告
 
 当前测试报告目录：
 docs/evaluation/
@@ -365,29 +366,8 @@ None
 → query_plan.default_sort.direction = asc
 → final_sort_direction = asc
 
-当前状态：V1 已接入主链路。
-
-已完成：
-- metadata/query_plans.yaml
-- app/semantic_layer/query_plan_loader.py
-- app/text_to_sql/template_sql_generator.py
-
-当前支持：
-- roi_channel_v1
-- cac_channel_v1
-
-当前路由：
-- roi → template
-- cac → template
-- 其他普通指标 → llm
-
-当前模板能力：
-- ROI Template SQL
-- CAC Template SQL
-- Top1 / TopN / Ranking LIMIT 解析
-- generate_template_sql 统一入口
-
 ---
+
 ## 当前项目结构
 
 app/
@@ -485,127 +465,168 @@ Evaluator
 
 ## 当前待办（Next Milestone）
 
-### Day42-Day48 规划
-
-目标：在 Day38-Day41 已完成 Query Plan Routing、Intent Parser、Intent Resolver、Intent-based Template SQL 的基础上，继续推进：
-
-普通 LLM 指标稳定化
-+
-Intent Context 注入 Prompt
-+
-Result-level Evaluation V2
-+
-Phase2 中段重构与验收
-
-Day40-Day41 已提前完成原计划中 “Intent Parser 接入 Query Plan Template” 和 “final_sort_direction” 相关任务，因此 Day42 起不再重复做 Intent 接入，而是转向普通指标 LLM 路径稳定化。
+### Day44-Day50 规划
 
 ---
 
-Day43：普通指标 Intent Cases 收尾
+Day44：Answer Layer V1
+
 目标：
-- 再补 2-3 个普通指标 Golden Cases
-- 覆盖退款率 TopN / 反向排序
-- Golden Cases 达到 25-26
-- 不再继续无限扩普通指标
+- SQL Table → 中文业务回答
+- 让系统不仅返回 table，还能生成业务解释
+- 优先使用规则型 Answer Layer，避免过早引入新的 LLM 不确定性
+
+学习安排：
+1. 设计 answer_generator.py 的输入输出
+2. 实现 Top1 / TopN / Ranking 三类基础回答
+3. query_service 返回 answer
+4. Golden Cases 增加 expected_answer_points
+5. evaluator 增加 answer point 校验
+6. 复盘 Answer Layer 与 SQL Result Evaluator 的关系
 
 交付：
-- evaluator ≥ 25 cases
-- 100% PASS
-
----
-
-Day44：Result-level Evaluation V2
-目标：
-- 新增 expected_rows
-- 多行结果值校验
-- 不只是检查顺序，也检查每行数值
-
-交付：
-- check_expected_rows
-- ROI / CAC / 渠道销售额 expected_rows
+- app/text_to_sql/answer_generator.py
+- query_service 返回 answer
+- evaluator 支持 expected_answer_points
+- 3-5 个 answer cases
 - evaluator 100% PASS
 
 ---
 
-Day45：Answer Layer V1
-目标：
-- SQL Table → 中文业务回答
-- 让系统不仅返回 table，还能生成业务解释
+Day45：Answer Layer V1 加固 + Ragas Feasibility Spike
 
-示例：
-“渠道销售额最高的是天猫，销售额为 244.52 万元。”
-
-交付：
-- answer_generator.py
-- query_service 返回 answer
-- Golden Cases 增加 expected_answer_points
-
----
-
-Day46：Ragas Feasibility Spike
-目标：
+目标
+- 加固 Answer Layer
 - 明确 Ragas 在本项目中评估什么、不评估什么
-- 小规模接入 3-5 个 answer cases
+- 不让 Ragas 替代 deterministic evaluator
 
-重点：
-- Ragas 不替代 SQL result evaluator
-- Ragas 评估 answer relevancy / faithfulness
-- 自研 evaluator 评估 SQL 和数值正确性
+学习安排：
+1. 扩展 answer cases
+2. 分析规则型 Answer Layer 的边界
+3. 编写 ragas_eval_design.md
+4. 明确 Ragas 只评估 answer relevance / faithfulness
+5. 明确 SQL、数值、排序仍由自研 evaluator 评估
+6. 设计小规模 Ragas / LLM-as-Judge 输入格式
 
 交付：
+
 - docs/architecture/ragas_eval_design.md
-- ragas_eval_spike.py
+- answer cases 扩展
+- Ragas / LLM-as-Judge 评估边界说明
 
 ---
 
-Day47：Ragas / LLM-as-Judge Evaluation V1
+Day46：Ragas / LLM-as-Judge Evaluation V1
+
 目标：
 - 对 Answer Layer 进行回答质量评估
 - 形成 deterministic eval + answer quality eval 双层体系
 
+学习安排：
+1. 新增 answer_eval_cases.py
+2. 实现小规模 LLM-as-Judge 或 Ragas spike
+3. 设计 answer quality rubric
+4. 生成 answer_eval 报告
+5. 对比 deterministic evaluator 与 LLM Judge 的分工
+6. 记录 LLM-as-Judge 的风险与偏差
+
 交付：
-- answer_eval_cases.py
-- ragas 或 LLM Judge 小规模报告
-- docs/evaluation/ragas_*.json 或 answer_eval_*.json
+- app/evaluation/answer_eval_cases.py
+- app/evaluation/answer_judge.py 或 ragas_eval_spike.py
+- docs/evaluation/answer_eval_*.json
+- deterministic eval + answer quality eval 双层设计
 
 ---
 
-Day48：Prompt Builder V2 / 模块化收束
+Day47：Prompt Builder V2 / 模块化收束
+
 目标：
 - 解决 prompt_builder.py 规则臃肿
 - 不继续堆规则
+- 为 Phase3 Tool 化做准备
+
+学习安排：
+1. 拆分 build_global_rules
+2. 拆分 build_intent_rules
+3. 拆分 build_dimension_rules
+4. 拆分 build_metric_rules
+5. prompt_builder_tests 扩展
+6. 复盘 Prompt 规则、Intent、Query Plan 的边界
 
 交付：
-- build_global_rules
-- build_intent_rules
-- build_dimension_rules
-- build_legacy_metric_rules
+- prompt_builder.py 模块化
 - prompt_builder_tests 扩展
+- docs/architecture/prompt_builder_v2.md
 
 ---
 
-Day49：Phase2 Midpoint Review
+Day48：Phase2 Midpoint Review
+
 目标：
 - 整理 Phase2 当前能力
 - 形成面试表达材料
+- 梳理技术债和架构演进
+
+学习安排：
+1. 梳理 Phase2 架构图文字版
+2. 梳理主链路模块职责
+3. 梳理 Evaluation 体系演进
+4. 梳理 Query Plan / Template SQL 价值
+5. 梳理普通指标 LLM 路径 tradeoff
+6. 输出面试表达材料
 
 交付：
 - docs/architecture/phase2_midpoint_review.md
 - 架构图文字版
 - 技术债清单
+- 面试表达草稿
 
 ---
 
-Day50：Phase2 Final Review / Phase3 准备
+Day49：Phase2 Final Review / Phase3 准备
+
 目标：
-- 确认是否进入 LangGraph
-- 把 Text-to-SQL 封装成 Tool
+- 判断是否进入 LangGraph
+- 把 Text-to-SQL 能力封装为 Tool
 - 准备 Phase3 Agent Workflow
 
+学习安排：
+1. 设计 sql_agent_tool 输入输出
+2. 明确 Tool 返回结构
+3. 明确 error / clarification / success 三类状态
+4. 设计 Phase3 LangGraph State
+5. 编写 phase3_entry_plan.md
+6. README / PROJECT_STATE 全量校准
+
 交付：
-- sql_agent_tool 设计文档
-- phase3_entry_plan.md
-- README / PROJECT_STATE 全量校准
+- docs/architecture/sql_agent_tool_design.md
+- docs/architecture/phase3_entry_plan.md
+- README 更新
+- PROJECT_STATE 全量校准
+
+---
+
+Day50：Phase2 缓冲与阶段复习
+
+目标：
+- 如果 Day44-Day49 有未完成内容，用 Day50 补齐
+- 如果已完成，则进行 Phase2 阶段复习和面试表达训练
+- 不再新增大功能，避免 Phase2 失控
+
+学习安排：
+1. 回归所有测试
+2. 清理文档状态
+3. 整理 Phase2 技术债
+4. 整理项目亮点
+5. 准备 Phase3 新窗口交接文档
+6. 进行 Phase2 面试问答训练
+
+交付：
+- 全量测试通过
+- PROJECT_STATE 校准
+- README 校准
+- chatgpt_handover.md 更新
+- Phase3 开始前检查清单
 
 ---
 
@@ -1457,11 +1478,84 @@ evaluator.py                23/23 PASS
 
 ---
 
+### Day43
+
+完成：
+
+- 合并完成原 Day43：普通指标 Intent Cases 收尾
+- 合并完成原 Day44：Result-level Evaluation V2
+- 新增 case_029：品类退款率Top3
+- 新增 case_030：品类退款率从低到高排名
+- 新增 case_031：销量最低的三个品类
+- Golden Cases 扩展至 26
+- 普通指标 LLM 路径继续验证 Intent Context
+- 新增 expected_order 覆盖普通指标排序结果
+- 新增 check_expected_rows
+- evaluator 支持 expected_rows 多行结果校验
+- evaluator 支持 rows_mismatches 报告
+- evaluator 保持 26/26 PASS
+
+当前新增验证：
+
+case_029：品类退款率Top3
+→ generation_method = llm
+→ limit = 3
+→ ranking_type = topn
+→ dimension = category
+→ ORDER BY refund_rate_pct DESC
+→ LIMIT 3
+→ expected_rows 校验前三行品类与退款率数值
+
+case_030：品类退款率从低到高排名
+→ generation_method = llm
+→ ranking_type = ranking
+→ sort_hint = asc
+→ final_sort_direction = asc
+→ dimension = category
+→ ORDER BY refund_rate_pct ASC
+→ expected_rows 校验完整品类退款率升序结果
+
+case_031：销量最低的三个品类
+→ generation_method = llm
+→ limit = 3
+→ ranking_type = topn
+→ sort_hint = asc
+→ final_sort_direction = asc
+→ dimension = category
+→ ORDER BY sales_quantity ASC
+→ LIMIT 3
+→ expected_rows 校验前三行品类与销量数值
+
+当前测试结果：
+
+Total: 26
+Passed: 26
+Failed: 0
+Pass Rate: 100.0%
+
+关键结论：
+
+1. 普通指标接入 Intent Context 的价值不是让简单 SQL 从错变对，而是提升系统的可控性、可解释性、可评估性和可扩展性。
+2. 普通指标仍走 LLM SQL，但 intent 可以约束 dimension、limit、ranking_type、sort_hint 和 final_sort_direction。
+3. expected_rows 可以同时校验多行对象、顺序和数值，是 Result-level Evaluation V2 的核心能力。
+4. expected_result、expected_order、expected_rows 不互相删除，而是分层使用。
+5. Result-level Evaluation V2 为 Answer Layer 提供可信数据基础。
+
+技术债：
+
+1. 普通指标目前没有 query_plan，因此 sort_field 通常为 None。
+2. 普通指标 TopN 默认排序方向仍部分依赖 LLM 语义理解。
+3. 后续可考虑为普通指标增加 lightweight query_plan / default_sort。
+4. evaluator 测试报告保存逻辑仍有重复，后续可统一 report writer。
+5. prompt_builder.py 规则臃肿，后续需要 Prompt Builder V2 模块化。
+
+---
+
 ## 当前交接摘要（Day42结束）
 
 当前处于：
 Phase2：Business Semantic Layer & Text-to-SQL
-Day41 / 100
+Day43 / 100
 
 当前系统主线：
 自然语言问题
@@ -1511,7 +1605,7 @@ app/evaluation/evaluator.py
 - intent_resolver_tests.py：5/5 PASS
 - template_sql_tests.py：15/15 PASS
 - prompt_builder_tests.py：2/2 PASS
-- evaluator.py：23/23 PASS
+- evaluator.py：26/26 PASS
 
 
 当前支持指标：
@@ -1561,14 +1655,24 @@ cac → Query Plan + Template SQL
 5. evaluation 测试文件中 JSON report 保存逻辑有重复。
 6. Intent Parser V1 仍是规则型，对中文表达覆盖有限。
 
-下一步 Day42：
+下一步 Day44：Answer Layer V1
 
-普通指标 Prompt 接入 Intent
+目标：
+- SQL Table → 中文业务回答
+- 让系统不仅返回 table，还能生成业务解释
+- 优先使用规则型 Answer Layer，避免过早引入新的 LLM 不确定性
 
-具体目标：普通指标 → LLM SQL with Intent Context
+学习安排：
+1. 设计 answer_generator.py 的输入输出
+2. 实现 Top1 / TopN / Ranking 三类基础回答
+3. query_service 返回 answer
+4. Golden Cases 增加 expected_answer_points
+5. evaluator 增加 answer point 校验
+6. 复盘 Answer Layer 与 SQL Result Evaluator 的关系
 
-优先处理：
-prompt_builder.py
-sql_generator.py
-query_service.py
-普通指标 Golden Cases
+交付：
+- app/text_to_sql/answer_generator.py
+- query_service 返回 answer
+- evaluator 支持 expected_answer_points
+- 3-5 个 answer cases
+- evaluator 100% PASS

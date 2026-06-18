@@ -464,5 +464,152 @@ GOLDEN_QUESTIONS = [
                 "京东",
             ],
         },
-    }
+    },
+    {
+        "id": "case_029",
+        "question": "品类退款率Top3",
+        "expected_tables": [
+            "fact_order_items",
+            "fact_orders",
+            "fact_refunds",
+            "dim_product",
+        ],
+        "expected_columns": [
+            "category",
+            "refund_rate_pct",
+        ],
+        "expected_generation_method": "llm",
+        "expected_intent": {
+            "limit": 3,
+            "ranking_type": "topn",
+            "sort_hint": None,
+            "dimension": "category",
+            "final_sort_direction": None,
+            "sort_field": None,
+        },
+        "expected_order": {
+            "field": "category",
+            "values": [
+                "精华",
+                "防晒",
+                "面膜",
+            ],
+        },
+        "expected_rows": [
+            {
+                "category": "精华",
+                "refund_rate_pct": 10.0,
+            },
+            {
+                "category": "防晒",
+                "refund_rate_pct": 4.55,
+            },
+            {
+                "category": "面膜",
+                "refund_rate_pct": 4.48,
+            },
+        ],
+        "should_execute": True,
+    },
+    {
+        "id": "case_030",
+        "question": "品类退款率从低到高排名",
+        "expected_tables": [
+            "fact_order_items",
+            "fact_orders",
+            "fact_refunds",
+            "dim_product",
+        ],
+        "expected_columns": [
+            "category",
+            "refund_rate_pct",
+        ],
+        "expected_generation_method": "llm",
+        "expected_intent": {
+            "limit": None,
+            "ranking_type": "ranking",
+            "sort_hint": "asc",
+            "dimension": "category",
+            "final_sort_direction": "asc",
+            "sort_field": None,
+        },
+        "expected_order": {
+            "field": "category",
+            "values": [
+                "面霜",
+                "洁面",
+                "面膜",
+                "防晒",
+                "精华",
+            ],
+        },
+        "expected_rows": [
+            {
+                "category": "面霜",
+                "refund_rate_pct": 4.37,
+            },
+            {
+                "category": "洁面",
+                "refund_rate_pct": 4.47,
+            },
+            {
+                "category": "面膜",
+                "refund_rate_pct": 4.48,
+            },
+            {
+                "category": "防晒",
+                "refund_rate_pct": 4.55,
+            },
+            {
+                "category": "精华",
+                "refund_rate_pct": 10.0,
+            },
+        ],
+        "should_execute": True,
+    },
+    {
+        "id": "case_031",
+        "question": "销量最低的三个品类",
+        "expected_tables": [
+            "fact_order_items",
+            "fact_orders",
+            "dim_product",
+        ],
+        "expected_columns": [
+            "category",
+            "sales_quantity",
+        ],
+        "expected_generation_method": "llm",
+        "expected_intent": {
+            "limit": 3,
+            "ranking_type": "topn",
+            "sort_hint": "asc",
+            "dimension": "category",
+            "final_sort_direction": "asc",
+            "sort_field": None,
+        },
+        "expected_order": {
+            "field": "category",
+            "values": [
+                "面霜",
+                "面膜",
+                "精华",
+            ],
+        },
+        "expected_rows": [
+            {
+                "category": "面霜",
+                "sales_quantity": 6925,
+            },
+            {
+                "category": "面膜",
+                "sales_quantity": 6994,
+            },
+            {
+                "category": "精华",
+                "sales_quantity": 7039,
+            },
+        ],
+        "should_execute": True,
+    },
 ]
