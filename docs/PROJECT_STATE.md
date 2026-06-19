@@ -75,7 +75,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
 
-当前日期：Day43 / 100
+当前日期：Day44 / 100
 
 ---
 ## 已完成能力
@@ -283,8 +283,10 @@ Pass Rate：100%
 - expected_rows
 - expected_generation_method
 - expected_intent
+- expected_answer_points
 - tolerance 数值误差
 - rows_mismatches 报告
+- answer_point_mismatches 报告
 
 当前测试报告目录：
 docs/evaluation/
@@ -452,6 +454,8 @@ PostgreSQL
 ↓
 Result Formatter
 ↓
+Answer Generator
+↓
 Evaluator
 
 当前主链路特点：
@@ -465,54 +469,39 @@ Evaluator
 
 ## 当前待办（Next Milestone）
 
-### Day44-Day50 规划
+### Day45-Day50 更新规划
+
+说明：
+
+当前已完成：
+
+- Day43：普通指标 Intent Cases 收尾 + Result-level Evaluation V2
+- Day44：Answer Layer V1
+
+后续计划继续推进 Answer 质量评估、Ragas / LLM-as-Judge、Prompt Builder V2、Phase2 Review 和数据真实性设计。
 
 ---
 
-Day44：Answer Layer V1
+Day45：Answer Layer 加固 + Ragas Feasibility Spike
 
 目标：
-- SQL Table → 中文业务回答
-- 让系统不仅返回 table，还能生成业务解释
-- 优先使用规则型 Answer Layer，避免过早引入新的 LLM 不确定性
-
-学习安排：
-1. 设计 answer_generator.py 的输入输出
-2. 实现 Top1 / TopN / Ranking 三类基础回答
-3. query_service 返回 answer
-4. Golden Cases 增加 expected_answer_points
-5. evaluator 增加 answer point 校验
-6. 复盘 Answer Layer 与 SQL Result Evaluator 的关系
-
-交付：
-- app/text_to_sql/answer_generator.py
-- query_service 返回 answer
-- evaluator 支持 expected_answer_points
-- 3-5 个 answer cases
-- evaluator 100% PASS
-
----
-
-Day45：Answer Layer V1 加固 + Ragas Feasibility Spike
-
-目标
-- 加固 Answer Layer
+- 加固 Answer Layer V1
 - 明确 Ragas 在本项目中评估什么、不评估什么
 - 不让 Ragas 替代 deterministic evaluator
 
 学习安排：
-1. 扩展 answer cases
-2. 分析规则型 Answer Layer 的边界
-3. 编写 ragas_eval_design.md
-4. 明确 Ragas 只评估 answer relevance / faithfulness
-5. 明确 SQL、数值、排序仍由自研 evaluator 评估
-6. 设计小规模 Ragas / LLM-as-Judge 输入格式
+1. 复查 answer_generator.py 的模板边界
+2. 扩展 2-3 个 answer cases
+3. 分析 expected_answer_points 的局限
+4. 编写 docs/architecture/ragas_eval_design.md
+5. 明确 Ragas 只评估 answer relevance / faithfulness
+6. 明确 SQL、数值、排序仍由自研 evaluator 评估
 
 交付：
-
 - docs/architecture/ragas_eval_design.md
-- answer cases 扩展
+- Answer Layer V1 边界说明
 - Ragas / LLM-as-Judge 评估边界说明
+- evaluator 保持 100% PASS
 
 ---
 
@@ -524,8 +513,8 @@ Day46：Ragas / LLM-as-Judge Evaluation V1
 
 学习安排：
 1. 新增 answer_eval_cases.py
-2. 实现小规模 LLM-as-Judge 或 Ragas spike
-3. 设计 answer quality rubric
+2. 设计 answer quality rubric
+3. 实现小规模 LLM-as-Judge 或 Ragas spike
 4. 生成 answer_eval 报告
 5. 对比 deterministic evaluator 与 LLM Judge 的分工
 6. 记录 LLM-as-Judge 的风险与偏差
@@ -551,7 +540,7 @@ Day47：Prompt Builder V2 / 模块化收束
 3. 拆分 build_dimension_rules
 4. 拆分 build_metric_rules
 5. prompt_builder_tests 扩展
-6. 复盘 Prompt 规则、Intent、Query Plan 的边界
+6. 复盘 Prompt 规则、Intent、Query Plan、Answer Layer 的边界
 
 交付：
 - prompt_builder.py 模块化
@@ -560,30 +549,32 @@ Day47：Prompt Builder V2 / 模块化收束
 
 ---
 
-Day48：Phase2 Midpoint Review
+Day48：Phase2 Midpoint Review + Semantic Retrieval Review
 
 目标：
 - 整理 Phase2 当前能力
+- 复盘 Embedding 置信度问题
+- 梳理 Alias / Keyword / Embedding / Clarification 分工
 - 形成面试表达材料
-- 梳理技术债和架构演进
 
 学习安排：
 1. 梳理 Phase2 架构图文字版
 2. 梳理主链路模块职责
 3. 梳理 Evaluation 体系演进
-4. 梳理 Query Plan / Template SQL 价值
-5. 梳理普通指标 LLM 路径 tradeoff
-6. 输出面试表达材料
+4. 复盘 Query Plan / Template SQL 价值
+5. 复盘普通指标 LLM 路径 tradeoff
+6. 复盘 Embedding 置信度和 Clarification 边界
 
 交付：
 - docs/architecture/phase2_midpoint_review.md
+- docs/architecture/semantic_retrieval_review.md
 - 架构图文字版
 - 技术债清单
 - 面试表达草稿
 
 ---
 
-Day49：Phase2 Final Review / Phase3 准备
+Day49：Phase2 Final Review + Tool 化设计
 
 目标：
 - 判断是否进入 LangGraph
@@ -593,7 +584,7 @@ Day49：Phase2 Final Review / Phase3 准备
 学习安排：
 1. 设计 sql_agent_tool 输入输出
 2. 明确 Tool 返回结构
-3. 明确 error / clarification / success 三类状态
+3. 明确 success / clarification / error 三类状态
 4. 设计 Phase3 LangGraph State
 5. 编写 phase3_entry_plan.md
 6. README / PROJECT_STATE 全量校准
@@ -606,27 +597,27 @@ Day49：Phase2 Final Review / Phase3 准备
 
 ---
 
-Day50：Phase2 缓冲与阶段复习
+Day50：Beauty Dataset V2 设计 / Phase2 缓冲复习
 
 目标：
-- 如果 Day44-Day49 有未完成内容，用 Day50 补齐
-- 如果已完成，则进行 Phase2 阶段复习和面试表达训练
-- 不再新增大功能，避免 Phase2 失控
+- 不再新增大功能
+- 复盘当前 V1 数据集真实性问题
+- 设计 Beauty Dataset V2
+- 为 Phase3 更真实的 Agent 分析做准备
 
 学习安排：
-1. 回归所有测试
-2. 清理文档状态
-3. 整理 Phase2 技术债
-4. 整理项目亮点
-5. 准备 Phase3 新窗口交接文档
-6. 进行 Phase2 面试问答训练
+1. 复盘当前 V1 数据问题，例如 CAC 偏高、业务分布不够真实
+2. 设计 Beauty Dataset V2 业务假设
+3. 决定 V2 使用独立 schema，而不是覆盖当前 V1
+4. 设计 V2 表结构和数据分布
+5. 规划 V2 seed、metadata、golden cases
+6. 准备 Phase3 新窗口交接文档
 
 交付：
-- 全量测试通过
-- PROJECT_STATE 校准
-- README 校准
-- chatgpt_handover.md 更新
-- Phase3 开始前检查清单
+- docs/architecture/beauty_dataset_v2_design.md
+- Phase3 前检查清单
+- README / PROJECT_STATE 校准
+- chatgpt_handover.md 更新建议
 
 ---
 
@@ -1551,11 +1542,64 @@ Pass Rate: 100.0%
 
 ---
 
-## 当前交接摘要（Day42结束）
+### Day44
+
+完成：
+- 新增 Answer Layer V1
+- 新增 app/text_to_sql/answer_generator.py
+- 实现 generate_answer(question, table, intent)
+- 支持 Top1 中文回答
+- 支持 TopN 中文回答
+- 支持 Ranking 中文回答
+- 支持 ASC / DESC 排名文案
+- 支持百分比字段展示
+- query_service 接入 answer_generator
+- query_service 返回 answer
+- evaluator 新增 check_expected_answer_points
+- evaluator 支持 answer_point_mismatches
+- evaluation report 输出 answer
+- Golden Cases 增加 expected_answer_points
+- evaluator 保持 26/26 PASS
+- 完成 Answer Layer Risk Review
+
+新增 Answer 示例：
+品类退款率Top3
+→ 品类退款率Top3分别是：精华 10.0%，防晒 4.55%，面膜 4.48%。
+
+品类退款率从低到高排名
+→ 品类退款率从低到高依次为：面霜 4.37%，洁面 4.47%，面膜 4.48%，防晒 4.55%，精华 10.0%。
+
+各渠道ROI排名
+→ 渠道ROI从高到低依次为：天猫 1.68，微信小程序 1.51，京东 1.44，抖音 1.12，小红书 0.84。
+
+当前测试结果：
+Total: 26
+Passed: 26
+Failed: 0
+Pass Rate: 100.0%
+
+关键结论：
+1. Answer Layer V1 先采用规则型生成，而不是直接让 LLM 总结，可以避免 SQL 结果正确但中文回答幻觉。
+2. 当前 Answer Layer 只基于 table 中已有事实生成回答，不做额外原因推断。
+3. Result Evaluator 负责校验 table 是否可信，Answer Evaluator 负责校验 answer 是否包含关键事实。
+4. expected_answer_points 是确定性事实点校验，后续 Ragas / LLM-as-Judge 负责回答相关性和忠实度评估。
+5. 系统已经从 Text-to-SQL 初步升级为 AI Data Analyst 的回答链路。
+
+技术债：
+1. Answer Layer V1 主要支持 category / channel_name 聚合结果。
+2. order_id 等明细对象字段暂不支持结构化回答。
+3. 当前 answer 文案偏模板化，自然度有限。
+4. expected_answer_points 只能检查关键点是否出现，不能判断完整语义质量。
+5. 后续需要 Ragas / LLM-as-Judge 评估 answer relevance / faithfulness。
+6. Answer Layer 暂不做业务原因解释，后续可设计 Business Insight Layer。
+
+---
+
+## 当前交接摘要（Day44结束）
 
 当前处于：
 Phase2：Business Semantic Layer & Text-to-SQL
-Day43 / 100
+Day45 / 100
 
 当前系统主线：
 自然语言问题
@@ -1578,6 +1622,8 @@ PostgreSQL
 ↓
 Result Formatter
 ↓
+Answer Generator
+↓
 Evaluator
 
 当前关键模块：
@@ -1588,6 +1634,7 @@ app/text_to_sql/template_sql_generator.py
 app/text_to_sql/query_service.py
 app/text_to_sql/prompt_builder.py
 app/text_to_sql/sql_generator.py
+app/text_to_sql/answer_generator.py
 app/evaluation/evaluator.py
 app/evaluation/golden_questions.py
 

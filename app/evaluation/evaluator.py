@@ -226,6 +226,35 @@ def check_expected_intent(
     return mismatches
 
 
+def check_expected_answer_points(
+    result: dict,
+    expected_answer_points: list[str],
+) -> list[dict]:
+    """
+    检查 answer 是否包含预期关键点。
+
+    不做整句完全匹配，避免中文表达变化导致误判。
+    """
+    if not expected_answer_points:
+        return []
+
+    answer = result.get("answer", "")
+    mismatches = []
+
+    for point in expected_answer_points:
+        if str(point) not in answer:
+            mismatches.append(
+                {
+                    "field": "answer",
+                    "expected": point,
+                    "actual": answer,
+                    "reason": "answer point missing",
+                }
+            )
+
+    return mismatches
+
+
 def evaluate_case(case: dict) -> dict:
     """
     评估单个问题。
@@ -273,6 +302,11 @@ def evaluate_case(case: dict) -> dict:
             expected_intent=case.get("expected_intent"),
         )
 
+        answer_point_mismatches = check_expected_answer_points(
+            result=result,
+            expected_answer_points=case.get("expected_answer_points", []),
+        )
+
         passed = (
             result["success"] is True
             and len(missing_tables) == 0
@@ -283,6 +317,7 @@ def evaluate_case(case: dict) -> dict:
             and len(order_mismatches) == 0
             and len(generation_method_mismatches) == 0
             and len(intent_mismatches) == 0
+            and len(answer_point_mismatches) == 0
         )
 
         return {
@@ -298,6 +333,8 @@ def evaluate_case(case: dict) -> dict:
             "generation_method_mismatches": generation_method_mismatches,
             "intent": result.get("intent"),
             "intent_mismatches": intent_mismatches,
+            "answer": result.get("answer"),
+            "answer_point_mismatches": answer_point_mismatches,
             "sql": sql,
             "row_count": table["row_count"],
             "error": None,
@@ -317,6 +354,8 @@ def evaluate_case(case: dict) -> dict:
             "generation_method_mismatches": [],
             "intent": None,
             "intent_mismatches": [],
+            "answer": None,
+            "answer_point_mismatches": [],
             "sql": None,
             "row_count": 0,
             "error": str(e),
@@ -346,6 +385,7 @@ def run_evaluation() -> list[dict]:
             print(f"Order mismatches: {result.get('order_mismatches', [])}")
             print(f"Generation method mismatches: {result.get('generation_method_mismatches', [])}")
             print(f"Intent mismatches: {result.get('intent_mismatches', [])}")
+            print(f"Answer point mismatches: {result.get('answer_point_mismatches', [])}")
             print(f"Error: {result['error']}")
 
         print("-" * 60)

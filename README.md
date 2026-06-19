@@ -57,7 +57,6 @@ PostgreSQL SQL
 
 用户输入：哪个品类退款率最高？
 
-
 系统自动检索：
 - 退款率定义
 - 商品维度表
@@ -157,12 +156,43 @@ PostgreSQL
 ↓
 Table
 
-
 已验证问题：
 - 哪个品类退款率最高
 - 哪个品类销售额最高
 - 哪个渠道销售额最高
 - 各品类销售额排名
+
+---
+
+## Answer Layer V1
+
+当前系统已支持将 SQL 查询结果转换为中文业务回答。
+
+支持类型：
+
+- Top1 回答
+- TopN 回答
+- Ranking 回答
+- ASC / DESC 排名描述
+- 百分比指标展示
+- 基于 table 的事实型回答
+
+示例：
+
+用户问题：
+
+品类退款率Top3
+
+系统返回：
+
+品类退款率Top3分别是：精华 10.0%，防晒 4.55%，面膜 4.48%。
+
+当前原则：
+
+- 只基于 SQL table 结果生成回答
+- 不编造原因
+- 不做未经验证的业务推断
+- Answer 通过 expected_answer_points 做关键事实校验
 
 ---
 
@@ -314,10 +344,9 @@ Business Semantic Layer + Text-to-SQL
 
 当前能力：自然语言问题 → 业务语义检索 → Query Plan Routing → Template / LLM SQL生成 → SQL校验 → PostgreSQL执行 → 结构化结果返回 → Result-level Evaluation
 
-## Evaluation Framework V3
+## Evaluation Framework V4
 
 当前支持：
-
 - Golden Questions
 - SQL 结构级检查
 - Top1 expected_result 校验
@@ -325,10 +354,10 @@ Business Semantic Layer + Text-to-SQL
 - 多行 expected_rows 校验
 - generation_method 校验
 - expected_intent 校验
+- expected_answer_points 校验
 - Evaluation JSON 报告输出
 
 当前评估结果：
-
 - Golden Questions：26
 - Pass Rate：100%
 - query_plan_tests.py：2/2 PASS
@@ -800,6 +829,27 @@ Evaluator
 
 ---
 
+### Day44
+
+完成内容：
+
+- 新增 Answer Layer V1
+- 新增 app/text_to_sql/answer_generator.py
+- query_service 返回 answer
+- evaluator 新增 expected_answer_points
+- evaluator 新增 answer_point_mismatches
+- Golden Cases 增加 answer 关键点校验
+- 完成 5 个代表问题 Answer Risk Review
+- evaluator 保持 26/26 PASS
+
+关键收获：
+
+- Answer Layer V1 不直接使用 LLM，而是先采用规则型生成，避免“SQL 对但回答幻觉”。
+- Result Evaluator 负责校验数据正确性，Answer Evaluator 负责校验回答是否包含关键事实。
+- expected_answer_points 是确定性校验，后续 Ragas / LLM-as-Judge 用于回答质量和忠实度评估。
+
+---
+
 ## Phase 3
 
 Agent Workflow
@@ -893,7 +943,7 @@ Answer
 
 # 当前版本
 
-Version: v0.17
-完成度：Day43 / 100
-当前实现：自然语言问题 → Intent Parser → 业务语义检索 → Query Plan Routing → Template SQL / LLM SQL with Intent Context → SQL执行 → Result-level Evaluation V2
+Version: v0.18
+完成度：Day44 / 100
+当前实现：自然语言问题 → Intent Parser → 业务语义检索 → Query Plan Routing → Template SQL / LLM SQL with Intent Context → SQL执行 → Result-level Evaluation V2 → Answer Layer V1
 
