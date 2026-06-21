@@ -4,7 +4,7 @@ from app.text_to_sql.sql_generator import generate_sql
 from app.text_to_sql.sql_validator import validate_sql
 from app.text_to_sql.result_formatter import format_result, to_table
 from app.semantic_layer.hybrid_search import search_metric
-from app.text_to_sql.template_sql_generator import generate_template_sql,generate_template_sql_from_intent
+from app.text_to_sql.template_sql_generator import generate_template_sql_from_intent
 from app.text_to_sql.answer_generator import generate_answer
 from app.semantic_layer.intent_parser import parse_intent, enrich_intent_with_query_plan
 from app.semantic_layer.query_plan_loader import get_query_plan_by_metric
@@ -16,7 +16,7 @@ start = time.time()
 
 def ask(question: str):
     """
-    自然语言问题 -> SQL -> 数据库结果
+    自然语言问题 -> 意图解析 -> SQL -> 数据库结果 -> 自然语言回答
     """
 
     try:
@@ -98,11 +98,9 @@ def ask(question: str):
 
 if __name__ == "__main__":
     questions = [
-        "哪个渠道销售额最高",
-        "品类退款率Top3",
-        "品类退款率从低到高排名",
-        "各渠道ROI排名",
-        "渠道ROI从低到高排名",
+        "哪个品类销量最高",
+        "哪个品类订单最多",
+        "哪个订单支付金额最高",
     ]
 
     for question in questions:

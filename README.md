@@ -344,9 +344,10 @@ Business Semantic Layer + Text-to-SQL
 
 当前能力：自然语言问题 → 业务语义检索 → Query Plan Routing → Template / LLM SQL生成 → SQL校验 → PostgreSQL执行 → 结构化结果返回 → Result-level Evaluation
 
-## Evaluation Framework V4
+## Evaluation Framework V5
 
 当前支持：
+
 - Golden Questions
 - SQL 结构级检查
 - Top1 expected_result 校验
@@ -355,17 +356,23 @@ Business Semantic Layer + Text-to-SQL
 - generation_method 校验
 - expected_intent 校验
 - expected_answer_points 校验
+- Answer Quality Evaluation
+- Mock Judge
+- LLM-as-Judge
+- 正例 / 负例 answer eval
 - Evaluation JSON 报告输出
 
 当前评估结果：
+
 - Golden Questions：26
-- Pass Rate：100%
+- deterministic evaluator：26/26 PASS
+- answer_eval_cases：6
+- LLM-as-Judge：6/6 PASS
 - query_plan_tests.py：2/2 PASS
 - intent_parser_tests.py：5/5 PASS
 - intent_resolver_tests.py：5/5 PASS
 - template_sql_tests.py：15/15 PASS
 - prompt_builder_tests.py：2/2 PASS
-- evaluator.py：26/26 PASS
 
 ---
 
@@ -850,6 +857,35 @@ Evaluator
 
 ---
 
+### Day45
+
+完成内容：
+
+- 合并完成原 Day45：Answer Layer 加固 + Ragas Feasibility Spike
+- 合并完成原 Day46：LLM-as-Judge Evaluation V1
+- 完成 Answer Layer V1 边界复查
+- 新增 docs/architecture/ragas_eval_design.md
+- 新增 app/evaluation/answer_eval_cases.py
+- 新增 / 扩展 app/evaluation/answer_judge.py
+- 支持 mock judge
+- 支持真实 LLM-as-Judge
+- 支持 --mode mock / --mode llm
+- 支持 clean_judge_json_text
+- 支持 normalize_judge_payload
+- 支持 expected_judge_passed
+- 支持正例与负例 answer eval
+- 生成 answer_eval_*.json 报告
+
+关键收获：
+
+- Deterministic Evaluator 和 LLM-as-Judge 是双层评估关系，不是替代关系。
+- deterministic evaluator 负责 SQL、数值、排序、intent 和 answer key facts。
+- LLM-as-Judge 负责回答是否忠实、相关、完整、清晰。
+- 负例测试证明 Judge 不只是能把正确答案判对，也能把错误答案判错。
+- Ragas 可作为后续标准化评估框架，但当前 lightweight LLM-as-Judge 已经跑通核心评估闭环。
+
+---
+
 ## Phase 3
 
 Agent Workflow
@@ -943,7 +979,7 @@ Answer
 
 # 当前版本
 
-Version: v0.18
-完成度：Day44 / 100
-当前实现：自然语言问题 → Intent Parser → 业务语义检索 → Query Plan Routing → Template SQL / LLM SQL with Intent Context → SQL执行 → Result-level Evaluation V2 → Answer Layer V1
+Version: v0.19
+完成度：Day45 / 100
+当前实现：自然语言问题 → Intent Parser → 业务语义检索 → Query Plan Routing → Template SQL / LLM SQL with Intent Context → SQL执行 → Result-level Evaluation V2 → Answer Layer V1 → LLM-as-Judge Answer Evaluation
 
