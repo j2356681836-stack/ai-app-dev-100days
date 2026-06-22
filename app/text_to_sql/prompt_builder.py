@@ -1,5 +1,6 @@
 from app.semantic_layer.context_builder import build_context
 
+
 def build_intent_context(intent: dict | None) -> str:
     """
     将结构化 intent 转换为 Prompt 中可读的文本。
@@ -18,37 +19,108 @@ def build_intent_context(intent: dict | None) -> str:
 """.strip()
 
 
-def build_prompt(user_question: str, intent: dict | None = None) -> str:
+def build_global_rules() -> str:
     """
-    Build prompt for Text-to-SQL.
+    构建所有 SQL 都必须遵守的全局规则。
     """
-
-    context = build_context(user_question)
-    intent_context = build_intent_context(intent)
-
-    prompt = f"""
-你是一名 PostgreSQL 数据分析助手。
-
-用户问题：
-{user_question}
-
-业务上下文：
-{context}
-
-结构化意图上下文：
-{intent_context}
-
-任务：
-
-根据业务上下文生成 PostgreSQL SQL。
-
-要求：
-
+    return """
 1. 使用提供的业务定义。
 2. 使用提供的表。
-3. 不要编造字段。
+3. 不要编造字段、表名、状态值或枚举值。不得自行假设 order_status、refund_status、channel_name、category 等字段的取值。
 4. 只返回 SQL。
-5. 必须使用指标中的 filters 作为 WHERE 条件。
+5. 必须使用指标中的 filters 作为 WHERE 条件。只能使用业务上下文中明确给出的 filters，不要自行新增 status 过滤条件。
+6. 如果指标涉及 filters 中的字段，必须 JOIN 包含该字段的表。
+7. 聚合除法必须使用 NULLIF 防止除以 0。
+8. LEFT JOIN 用于可选事实表，例如退款表；不要因为没有退款记录而丢失销售明细。
+9. SQL中的表别名和字段别名统一使用英文。
+10. 不要使用中文字段别名。
+11. 当指标同时涉及两张或多张事实表时，必须先在子查询或 CTE 中分别按共同维度聚合每张事实表，再 JOIN 聚合结果，禁止直接 JOIN 多张事实表后再 SUM，避免多对多行膨胀。
+""".strip()
+
+
+def build_field_alias_rules() -> str:
+    """
+    构建字段别名与输出字段命名规则。
+    """
+    return """
+1. 字段别名必须优先使用指标技术名。
+2. 百分比类指标才乘以 100，并使用 ROUND(..., 2)，字段别名必须使用 指标技术名 + "_pct"。
+3. 例如 refund_rate 输出 refund_rate_pct，channel_refund_rate 输出 channel_refund_rate_pct。
+4. ROI / 投资回报率不是百分比，不要乘以 100，字段别名必须使用 roi。
+5. 如果 dimension 字段已经有标准字段名，例如 channel_name 或 category，SELECT 输出必须使用该标准字段名，不能自行缩写或改名。
+6. 字段别名必须稳定，不要随意缩写业务字段名。例如 dim_channel.channel_name 必须输出为 channel_name，不要输出为 channel。
+""".strip()
+
+
+def build_ranking_rules() -> str:
+    """
+    构建排序、TopN、Ranking 相关规则。
+    """
+    return """
+1. 当用户问题包含“最高”、“最低”、“最大”、“最小”、“最多”、“最少”、“第一”等排序取极值含义时，必须使用 ORDER BY，并添加 LIMIT 1。
+2. 如果提供了结构化意图上下文，必须优先遵守其中的 dimension、ranking_type、limit、final_sort_direction。
+3. 如果 final_sort_direction = "asc"，排序必须使用 ASC；如果 final_sort_direction = "desc"，排序必须使用 DESC。
+4. 如果 limit 为数字，SQL 必须添加对应 LIMIT。
+5. 如果 ranking_type = "ranking"，返回完整排名，不要添加 LIMIT，除非 limit 明确为数字。
+""".strip()
+
+
+def build_dimension_rules() -> str:
+    """
+    构建分析维度相关规则。
+    """
+    return """
+1. 当用户问题没有明确指定分析维度，但指标与商品相关时，默认使用 dim_product.category 作为分析维度，不要默认使用 dim_product.product_name。
+2. 如果 dimension = "channel"，分析维度必须使用 dim_channel.channel_name，输出字段别名必须是 channel_name，禁止使用 channel 作为字段别名。
+3. 如果 dimension = "channel"，必须通过 channel_id 关联 dim_channel，常见 JOIN 为 fact_orders.channel_id = dim_channel.channel_id。
+4. 如果 dimension = "category"，分析维度必须使用 dim_product.category，输出字段别名必须是 category。
+""".strip()
+
+
+def build_legacy_complex_metric_rules() -> str:
+    """
+    构建 ROI / CAC 历史兼容规则。
+
+    注意：
+    ROI / CAC 当前主路径已经是 Query Plan + Template SQL。
+    这里保留这些规则，是为了兼容历史 LLM SQL 路径和降低回归风险。
+    后续不应继续把复杂指标逻辑堆在 Prompt 中。
+    """
+    return """
+1. 计算 ROI 时，必须先按 channel_id 聚合 fact_orders.paid_amount 得到渠道销售额，再按 channel_id 聚合 fact_marketing_spend.spend_amount 得到渠道营销成本，最后 JOIN 两个聚合结果并计算 ROI = sales_amount / spend_amount。
+2. 当 ROI 同时使用 fact_orders.order_date 和 fact_marketing_spend.spend_date，且用户没有指定日期范围时，禁止编造示例日期。必须使用 date_window CTE 计算两张表的重叠时间窗口：
+start_date = GREATEST(MIN(fact_orders.order_date::date), MIN(fact_marketing_spend.spend_date))
+end_date = LEAST(MAX(fact_orders.order_date::date), MAX(fact_marketing_spend.spend_date))
+并分别在 channel_sales 和 channel_spend CTE 中使用该时间窗口过滤数据。
+3. 计算 CAC / 获客成本时，获客客户数必须使用真实首单新客口径：
+先在全量 paid 订单中用 ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date ASC) 找到每个客户的真实首单，
+再判断该真实首单是否落在分析时间窗口内，
+最后按真实首单 channel_id 统计 acquired_customer_count。禁止先按时间窗口过滤订单后再计算 ROW_NUMBER()。
+4. 计算 CAC / 获客成本时，如果未指定日期范围，必须使用 fact_orders 与 fact_marketing_spend 的重叠日期窗口，而不是只使用订单表自身的 MIN(order_date) 和 MAX(order_date)。
+5. 计算 ROI 时，如果使用 CTE，必须使用以下结构：
+channel_sales CTE 只包含 channel_id 和 sales_amount；
+channel_spend CTE 只包含 channel_id 和 spend_amount；
+最终 SELECT 必须同时 JOIN channel_sales cs 和 channel_spend csp；
+ROI 必须写为 ROUND(cs.sales_amount / NULLIF(csp.spend_amount, 0), 2) AS roi；
+禁止使用 cs.spend_amount，因为 spend_amount 不属于 channel_sales。
+""".strip()
+
+
+def build_sql_generation_rules() -> str:
+    """
+    汇总 SQL 生成规则。
+
+    注意：
+    虽然内部已经拆分为多个规则函数，
+    但最终输出仍保持接近 V1 的连续规则形态。
+    这样可以降低 Prompt 表层结构变化对 LLM SQL 生成稳定性的影响。
+    """
+    return """
+1. 使用提供的业务定义。
+2. 使用提供的表。
+3. 不要编造字段、表名、状态值或枚举值。不得自行假设 order_status、refund_status、channel_name、category 等字段的取值。
+4. 只返回 SQL。
+5. 必须使用指标中的 filters 作为 WHERE 条件。只能使用业务上下文中明确给出的 filters，不要自行新增 status 过滤条件。
 6. 如果指标涉及 filters 中的字段，必须 JOIN 包含该字段的表。
 7. 聚合除法必须使用 NULLIF 防止除以 0。
 8. LEFT JOIN 用于可选事实表，例如退款表；不要因为没有退款记录而丢失销售明细。
@@ -84,6 +156,37 @@ ROI 必须写为 ROUND(cs.sales_amount / NULLIF(csp.spend_amount, 0), 2) AS roi�
 26. 如果 dimension 字段已经有标准字段名，例如 channel_name 或 category，SELECT 输出必须使用该标准字段名，不能自行缩写或改名。
 27. 如果 ranking_type = "ranking"，返回完整排名，不要添加 LIMIT，除非 limit 明确为数字。
 28. 字段别名必须稳定，不要随意缩写业务字段名。例如 dim_channel.channel_name 必须输出为 channel_name，不要输出为 channel。
+""".strip()
+
+
+def build_prompt(user_question: str, intent: dict | None = None) -> str:
+    """
+    Build prompt for Text-to-SQL.
+    """
+
+    context = build_context(user_question)
+    intent_context = build_intent_context(intent)
+    sql_generation_rules = build_sql_generation_rules()
+
+    prompt = f"""
+你是一名 PostgreSQL 数据分析助手。
+
+用户问题：
+{user_question}
+
+业务上下文：
+{context}
+
+结构化意图上下文：
+{intent_context}
+
+任务：
+
+根据业务上下文生成 PostgreSQL SQL。
+
+要求：
+
+{sql_generation_rules}
 """
 
     return prompt

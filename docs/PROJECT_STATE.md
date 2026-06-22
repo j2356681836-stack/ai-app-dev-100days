@@ -242,23 +242,27 @@ search_type:
 ### Golden Dataset / Evaluation
 
 当前测试体系：
-query_plan_tests.py          2/2 PASS
-intent_parser_tests.py       5/5 PASS
-intent_resolver_tests.py     5/5 PASS
-template_sql_tests.py       15/15 PASS
-prompt_builder_tests.py      2/2 PASS
-evaluator.py                26/26 PASS
-answer_judge.py mock         5/5 PASS
-answer_judge.py llm          6/6 PASS
+- query_plan_tests.py：2/2 PASS
+- intent_parser_tests.py：5/5 PASS
+- intent_resolver_tests.py：5/5 PASS
+- template_sql_tests.py：15/15 PASS
+- prompt_builder_tests.py：5/5 PASS
+- evaluator.py：26/26 PASS
+- answer_judge.py mock：6/6 PASS
+- answer_judge.py llm：6/6 PASS
 
-当前 Golden Cases：26 Cases
-Pass Rate：100%
+当前 Golden Cases：
+- 26 Cases
+- Pass Rate：100%
 
-当前 Answer Eval Cases：6 Cases
+当前 Answer Eval Cases：
+- 6 Cases
 - 5 正例
 - 1 负例
 
-LLM-as-Judge：6/6 PASS
+当前 Prompt Builder Tests：
+- 5 Cases
+- Pass Rate：100%
 
 当前覆盖指标：
 - item_sales_amount
@@ -287,33 +291,49 @@ LLM-as-Judge：6/6 PASS
 - 普通指标 TopN
 - 普通指标反向排序
 
-当前 Evaluation 能力：
+---
 
-Deterministic Evaluation：
-- expected_tables
-- expected_columns
-- expected_result
-- expected_order
-- expected_rows
-- expected_generation_method
-- expected_intent
-- expected_answer_points
+## 当前 Evaluation 能力
+
+### Deterministic Evaluation
+
+- `expected_tables`
+- `expected_columns`
+- `expected_result`
+- `expected_order`
+- `expected_rows`
+- `expected_generation_method`
+- `expected_intent`
+- `expected_answer_points`
 - tolerance 数值误差
-- rows_mismatches 报告
-- answer_point_mismatches 报告
+- `rows_mismatches` 报告
+- `answer_point_mismatches` 报告
 
-Answer Quality Evaluation：
-- answer_eval_cases
+### Prompt Builder Evaluation
+
+- `prompt_builder_tests`
+- Intent Context 注入检查
+- Dimension 规则检查
+- Ranking 规则检查
+- Field Alias 规则检查
+- ROI / CAC legacy rules 检查
+- 多 case JSON report 输出
+
+### Answer Quality Evaluation
+
+- `answer_eval_cases`
 - mock judge
 - LLM-as-Judge
-- faithfulness
-- relevance
-- completeness
-- clarity
-- expected_judge_passed
+- `faithfulness`
+- `relevance`
+- `completeness`
+- `clarity`
+- `expected_judge_passed`
 - positive / negative answer eval
-- raw_judge_response 保留
+- `raw_judge_response` 保留
 - answer_eval JSON report
+
+---
 
 当前测试报告目录：
 docs/evaluation/
@@ -472,18 +492,22 @@ Hybrid Search / Metric Recognition
 Query Plan Routing
 ├─ ROI / CAC → Template SQL from Intent
 └─ 普通指标 → LLM SQL with Intent Context
-↓
-SQL Cleaner
-↓
-SQL Validator
-↓
-PostgreSQL
-↓
-Result Formatter
-↓
-Answer Generator
-↓
-Evaluator
+↓  
+Prompt Builder V2  
+↓  
+SQL Cleaner  
+↓  
+SQL Validator  
+↓  
+PostgreSQL  
+↓  
+Result Formatter  
+↓  
+Answer Generator  
+↓  
+Deterministic Evaluator  
+↓  
+LLM-as-Judge Answer Evaluation
 
 当前主链路特点：
 - ROI / CAC 复杂指标不再依赖 LLM 自由生成 SQL。
@@ -494,87 +518,77 @@ Evaluator
 
 ---
 
+## 当前 Prompt Builder V2 状态
+
+当前 `prompt_builder.py` 已完成 V2 模块化收束。
+
+核心结构：
+
+build_prompt()
+├─ build_intent_context()
+├─ build_global_rules()
+├─ build_field_alias_rules()
+├─ build_ranking_rules()
+├─ build_dimension_rules()
+├─ build_legacy_complex_metric_rules()
+└─ build_sql_generation_rules()
+
+---
+
 ## 当前待办（Next Milestone）
 
-### Day46-Day50 更新规划
+### Day47-Day50 更新规划
 
 ---
 
-Day46：Prompt Builder V2 / 模块化收束
-
-目标：
-- 解决 prompt_builder.py 规则臃肿
-- 不继续堆规则
-- 为 Phase3 Tool 化做准备
-
-学习安排：
-1. 复查 prompt_builder.py 当前规则结构
-2. 识别 global rules / intent rules / dimension rules / metric rules
-3. 拆分 build_global_rules
-4. 拆分 build_intent_rules
-5. 拆分 build_dimension_rules
-6. 拆分 build_metric_rules
-7. 扩展 prompt_builder_tests
-8. 复盘 Prompt、Intent、Query Plan、Answer Layer 的边界
-
-交付：
-- prompt_builder.py 模块化
-- prompt_builder_tests 扩展
-- docs/architecture/prompt_builder_v2.md
-- evaluator 保持 100% PASS
-
----
-
-Day47：Phase2 Midpoint Review + Semantic Retrieval Review
+## Day47：Phase2 Midpoint Review + Semantic Retrieval Review
 
 目标：
 - 整理 Phase2 当前能力
 - 复盘 Embedding 置信度问题
 - 梳理 Alias / Keyword / Embedding / Clarification 分工
-- 形成面试表达材料
+- 形成可复述的面试表达材料
 
 学习安排：
-1. 梳理 Phase2 架构图文字版
-2. 梳理主链路模块职责
-3. 梳理 Evaluation 体系演进
-4. 复盘 Query Plan / Template SQL 价值
-5. 复盘普通指标 LLM 路径 tradeoff
-6. 复盘 Embedding 置信度和 Clarification 边界
+1. 梳理 Phase2 主链路架构图文字版
+2. 梳理 Intent Parser / Intent Resolver / Hybrid Search / Query Plan / SQL Generator / Answer Layer / Evaluator 的模块职责
+3. 复盘 Evaluation 体系演进
+4. 复盘 Query Plan / Template SQL 的价值
+5. 复盘普通指标 LLM SQL 路径的 tradeoff
+6. 复盘 Embedding confidence、top1 score、gap、clarification 的边界
 7. 输出面试表达草稿
 
 交付：
-- docs/architecture/phase2_midpoint_review.md
-- docs/architecture/semantic_retrieval_review.md
-- 架构图文字版
-- 技术债清单
+- `docs/architecture/phase2_midpoint_review.md`
+- `docs/architecture/semantic_retrieval_review.md`
+- Phase2 架构图文字版
+- Phase2 技术债清单
 - 面试表达材料
 
 ---
 
-Day48：Phase2 Final Review + Tool 化设计
+## Day48：Ragas Spike / Answer Evaluation 对照实验
 
 目标：
-- 判断是否进入 LangGraph
-- 把 Text-to-SQL 能力封装为 Tool
-- 准备 Phase3 Agent Workflow
+- 不替代当前 `answer_judge.py`
+- 小规模验证 Ragas 是否比当前 lightweight LLM-as-Judge 带来额外价值
+- 明确 Ragas 是否值得进入 Phase3
 
 学习安排：
-1. 设计 sql_agent_tool 输入输出
-2. 明确 Tool 返回结构
-3. 明确 success / clarification / error 三类状态
-4. 设计 Phase3 LangGraph State
-5. 编写 phase3_entry_plan.md
-6. README / PROJECT_STATE 全量校准
+1. 选择 3-5 个 `answer_eval_cases`
+2. 明确 Ragas 输入格式：question / answer / context / reference
+3. 对照当前 LLM-as-Judge 的 faithfulness / relevance / completeness / clarity
+4. 记录 Ragas 中文场景适配问题
+5. 判断是否纳入 Phase3 评估体系
 
 交付：
-- docs/architecture/sql_agent_tool_design.md
-- docs/architecture/phase3_entry_plan.md
-- README 更新
-- PROJECT_STATE 全量校准
+- `docs/architecture/ragas_spike_report.md`
+- Ragas 与 lightweight LLM-as-Judge 对比结论
+- 是否进入 Phase3 的决策说明
 
 ---
 
-Day49：Beauty Dataset V2 设计
+## Day49：Beauty Dataset V2 设计
 
 目标：
 - 复盘当前 V1 数据集真实性问题
@@ -591,14 +605,14 @@ Day49：Beauty Dataset V2 设计
 6. 明确哪些表 Phase3 实现
 
 交付：
-- docs/architecture/beauty_dataset_v2_design.md
+- `docs/architecture/beauty_dataset_v2_design.md`
 - V2 schema 草案
 - V2 seed 设计草案
 - V2 metric / metadata 规划
 
 ---
 
-Day50：Phase2 缓冲 / 复习 / Phase3 交接
+## Day50：Phase2 缓冲 / 复习 / Phase3 交接
 
 目标：
 - 不再新增大功能
@@ -608,17 +622,18 @@ Day50：Phase2 缓冲 / 复习 / Phase3 交接
 
 学习安排：
 1. 回归 deterministic evaluator
-2. 回归 answer_judge mock / llm
-3. 清理 PROJECT_STATE / README
-4. 更新 chatgpt_handover.md
-5. 整理 Phase2 技术债
-6. 进行 Phase2 面试问答训练
+2. 回归 prompt_builder_tests
+3. 回归 answer_judge mock / llm
+4. 清理 PROJECT_STATE / README
+5. 更新 `chatgpt_handover.md`
+6. 整理 Phase2 技术债
+7. 进行 Phase2 面试问答训练
 
 交付：
 - 全量测试通过
 - PROJECT_STATE 校准
 - README 校准
-- chatgpt_handover.md 更新建议
+- `chatgpt_handover.md` 更新建议
 - Phase3 开始前检查清单
 
 ---
@@ -1661,106 +1676,208 @@ Pass Rate: 100.0%
 
 ---
 
-## 当前交接摘要（Day45结束）
+## 开发日志追加
+
+### Day46
+
+完成：
+
+- 完成 Prompt Builder V2 模块化重构
+- 拆分 `build_global_rules`
+- 拆分 `build_field_alias_rules`
+- 拆分 `build_ranking_rules`
+- 拆分 `build_dimension_rules`
+- 拆分 `build_legacy_complex_metric_rules`
+- 保持 `build_prompt()` 外部调用方式不变
+- 扩展 `prompt_builder_tests.py`
+- Prompt Builder Tests 从 2 cases 扩展到 5 cases
+- 新增 `docs/architecture/prompt_builder_v2.md`
+- 发现并修复 `case_030` Prompt 回归问题
+- 定位 LLM 编造 `refund_status = 'paid'`
+- 新增“不编造状态值 / 枚举值”约束
+- 同步更新 `build_global_rules()` 和 `build_sql_generation_rules()`
+- 回归 `evaluator.py` 通过
+- 回归 `answer_judge.py --mode mock` 通过
+
+当前测试结果：
+
+```text
+prompt_builder_tests.py：5/5 PASS
+evaluator.py：26/26 PASS
+answer_judge.py mock：6/6 PASS
+```
+
+关键结论：
+
+1. Prompt Builder 的职责是约束 LLM，而不是替代 Intent Parser、Query Plan、Template SQL 或 Answer Layer。
+2. Prompt 重构不是普通字符串重构，Prompt 的标题、分组、编号方式都会影响 LLM 输出。
+3. Prompt Builder V2 的最终策略是“代码内部模块化，最终 Prompt 输出形态保持稳定”。
+4. `prompt_builder_tests.py` 保护 Prompt 静态结构，`evaluator.py` 保护端到端业务结果。
+5. Text-to-SQL 不仅要防止 LLM 编造字段，也要防止 LLM 编造状态值和枚举值。
+6. `case_030` 回归证明 Result-level Evaluation 对 Prompt 回归有实际保护价值。
+
+技术债：
+
+1. `build_global_rules()` 和 `build_sql_generation_rules()` 仍存在部分规则重复维护。
+2. `prompt_builder_tests.py` 已扩展到 5 cases，但还可以补充“不编造状态值 / 枚举值”的专项断言。
+3. ROI / CAC legacy rules 仍保留在 Prompt 中，后续可继续下沉到 Query Plan / Template SQL。
+4. 普通指标仍缺少 query_plan，TopN 默认排序方向仍部分依赖 LLM 语义理解。
+5. Prompt Builder V2 当前主要完成结构收束，还没有进一步抽象为可配置规则系统。
+
+---
+
+## 当前交接摘要（Day46结束）
 
 当前处于：
 Phase2：Business Semantic Layer & Text-to-SQL  
-Day45 / 100
+Day46 / 100
 
 当前系统主线：
-Question
-↓
-Intent Parser
-↓
-Intent Resolver
-↓
-Hybrid Search / Metric Recognition
-├─ Alias Match
-├─ Keyword Group Match
-├─ Embedding Match
-└─ Clarification
-↓
-Query Plan Routing
-├─ ROI / CAC → Template SQL from Intent
-└─ 普通指标 → LLM SQL with Intent Context
-↓
-SQL Cleaner
-↓
-SQL Validator
-↓
-PostgreSQL
-↓
-Result Formatter
-↓
-Answer Generator
-↓
-Deterministic Evaluator
-↓
+
+Question  
+↓  
+Intent Parser  
+↓  
+Intent Resolver  
+↓  
+Hybrid Search / Metric Recognition  
+├─ Alias Match  
+├─ Keyword Group Match  
+├─ Embedding Match  
+└─ Clarification  
+↓  
+Query Plan Routing  
+├─ ROI / CAC → Template SQL from Intent  
+└─ 普通指标 → LLM SQL with Intent Context  
+↓  
+Prompt Builder V2  
+↓  
+SQL Cleaner  
+↓  
+SQL Validator  
+↓  
+PostgreSQL  
+↓  
+Result Formatter  
+↓  
+Answer Generator  
+↓  
+Deterministic Evaluator  
+↓  
 LLM-as-Judge Answer Evaluation
 
-当前关键模块：
-app/semantic_layer/intent_parser.py
-app/semantic_layer/query_plan_loader.py
-app/semantic_layer/hybrid_search.py
-app/text_to_sql/template_sql_generator.py
-app/text_to_sql/query_service.py
-app/text_to_sql/prompt_builder.py
-app/text_to_sql/sql_generator.py
-app/text_to_sql/answer_generator.py
-app/evaluation/evaluator.py
-app/evaluation/golden_questions.py
-app/evaluation/answer_eval_cases.py
-app/evaluation/answer_judge.py
+---
 
-当前新增文档：docs/architecture/ragas_eval_design.md
+## 当前关键模块
 
-当前测试体系：
-query_plan_tests.py          2/2 PASS
-intent_parser_tests.py       5/5 PASS
-intent_resolver_tests.py     5/5 PASS
-template_sql_tests.py       15/15 PASS
-prompt_builder_tests.py      2/2 PASS
-evaluator.py                26/26 PASS
-answer_judge.py mock         5/5 PASS
-answer_judge.py llm          6/6 PASS
+- `app/semantic_layer/intent_parser.py`
+- `app/semantic_layer/query_plan_loader.py`
+- `app/semantic_layer/hybrid_search.py`
+- `app/text_to_sql/template_sql_generator.py`
+- `app/text_to_sql/query_service.py`
+- `app/text_to_sql/prompt_builder.py`
+- `app/text_to_sql/sql_generator.py`
+- `app/text_to_sql/answer_generator.py`
+- `app/evaluation/evaluator.py`
+- `app/evaluation/golden_questions.py`
+- `app/evaluation/prompt_builder_tests.py`
+- `app/evaluation/answer_eval_cases.py`
+- `app/evaluation/answer_judge.py`
 
-当前 Golden Cases：26 Cases  
-Pass Rate：100%
+当前新增 / 更新文档：
+- `docs/architecture/ragas_eval_design.md`
+- `docs/architecture/prompt_builder_v2.md`
+
+---
+
+## 当前测试体系
+
+- query_plan_tests.py：2/2 PASS
+- intent_parser_tests.py：5/5 PASS
+- intent_resolver_tests.py：5/5 PASS
+- template_sql_tests.py：15/15 PASS
+- prompt_builder_tests.py：5/5 PASS
+- evaluator.py：26/26 PASS
+- answer_judge.py mock：6/6 PASS
+- answer_judge.py llm：6/6 PASS
+
+当前 Golden Cases：
+- 26 Cases
+- Pass Rate：100%
+
+当前 Prompt Builder Tests：
+- 5 Cases
+- Pass Rate：100%
 
 当前 Answer Eval Cases：
-
-6 Cases：
-- answer_case_001：哪个渠道销售额最高
-- answer_case_002：品类退款率Top3
-- answer_case_003：品类退款率从低到高排名
-- answer_case_004：各渠道ROI排名
-- answer_case_005：渠道ROI从低到高排名
-- answer_case_006_bad：品类退款率Top3 错误回答负例
+- 6 Cases
+- 5 正例
+- 1 负例
 
 LLM-as-Judge 当前结果：
-Mode: llm  
-Total: 6  
-Passed: 6  
-Failed: 0  
-Pass Rate: 100.0%
+- Mode: llm
+- Total: 6
+- Passed: 6
+- Failed: 0
+- Pass Rate: 100.0%
 
-当前支持指标：
-item_sales_amount
-order_paid_amount
-refund_rate
-order_count
-sales_quantity
-channel_sales_amount
-channel_refund_rate
-roi
-cac
+---
+
+## 当前支持指标
+
+- `item_sales_amount`
+- `order_paid_amount`
+- `refund_rate`
+- `order_count`
+- `sales_quantity`
+- `channel_sales_amount`
+- `channel_refund_rate`
+- `roi`
+- `cac`
 
 当前复杂指标策略：
-roi → Query Plan + Template SQL  
-cac → Query Plan + Template SQL  
-其他普通指标 → Intent Context + LLM SQL
+- `roi` → Query Plan + Template SQL
+- `cac` → Query Plan + Template SQL
+- 其他普通指标 → Intent Context + LLM SQL
 
-当前 Answer Layer 状态：
+---
+
+## 当前 Prompt Builder V2 状态
+
+当前 `prompt_builder.py` 已完成 V2 模块化收束。
+
+当前结构：
+
+build_prompt()
+├─ build_intent_context()
+├─ build_global_rules()
+├─ build_field_alias_rules()
+├─ build_ranking_rules()
+├─ build_dimension_rules()
+├─ build_legacy_complex_metric_rules()
+└─ build_sql_generation_rules()
+
+当前策略：代码内部模块化；最终 Prompt 输出形态尽量保持 V1 的连续规则结构。
+
+Day46 关键发现：第一次模块化后，虽然 `prompt_builder_tests.py` 通过，但 `case_030` 出现回归。LLM 在 SQL 中自行添加了：
+```sql
+AND r.refund_status = 'paid'
+```
+这导致退款金额聚合为空，所有品类退款率变成 0。
+
+最终修复：
+1. 保持 Prompt Builder 内部模块化。
+2. 恢复最终 Prompt 输出为接近 V1 的连续规则结构。
+3. 增加“不编造状态值 / 枚举值”规则。
+4. 同步更新 `build_global_rules()` 和 `build_sql_generation_rules()`。
+
+新增关键规则：
+1. 不要编造字段、表名、状态值或枚举值。不得自行假设 order_status、refund_status、channel_name、category 等字段的取值。
+2. 必须使用指标中的 filters 作为 WHERE 条件。只能使用业务上下文中明确给出的 filters，不要自行新增 status 过滤条件。
+
+---
+
+## 当前 Answer Layer 状态
 
 已实现 Answer Layer V1：
 - 支持 Top1 中文回答
@@ -1772,82 +1889,125 @@ cac → Query Plan + Template SQL
 - 不做未经数据支撑的原因分析和策略建议
 
 当前 Answer Layer V1 支持范围：
-- category + refund_rate_pct
-- category + sales_quantity
-- category + order_count
-- channel_name + channel_sales_amount
-- channel_name + channel_refund_rate_pct
-- channel_name + roi
-- channel_name + cac
+- `category + refund_rate_pct`
+- `category + sales_quantity`
+- `category + order_count`
+- `channel_name + channel_sales_amount`
+- `channel_name + channel_refund_rate_pct`
+- `channel_name + roi`
+- `channel_name + cac`
 
 当前 Answer Layer V1 暂不重点支持：
-- order_id + paid_amount
-- product_id / product_name 明细结果
-- customer_id 明细结果
+- `order_id + paid_amount`
+- `product_id / product_name` 明细结果
+- `customer_id` 明细结果
 - 一行多个指标
 - 原因分析
 - 策略建议
 - 趋势解释
 
-当前 Evaluation 能力：
+---
 
-Deterministic Evaluation：
-- expected_tables
-- expected_columns
-- expected_result
-- expected_order
-- expected_rows
-- expected_generation_method
-- expected_intent
-- expected_answer_points
+## 当前 Evaluation 能力
+
+### Deterministic Evaluation
+
+- `expected_tables`
+- `expected_columns`
+- `expected_result`
+- `expected_order`
+- `expected_rows`
+- `expected_generation_method`
+- `expected_intent`
+- `expected_answer_points`
 - tolerance 数值误差
-- rows_mismatches 报告
-- answer_point_mismatches 报告
+- `rows_mismatches` 报告
+- `answer_point_mismatches` 报告
 
-Answer Quality Evaluation：
-- answer_eval_cases
+### Prompt Builder Evaluation
+
+- `prompt_builder_tests`
+- Intent Context 注入检查
+- Dimension 规则检查
+- Ranking 规则检查
+- Field Alias 规则检查
+- ROI / CAC legacy rules 检查
+- JSON report 输出
+
+### Answer Quality Evaluation
+
+- `answer_eval_cases`
 - mock judge
 - LLM-as-Judge
-- faithfulness
-- relevance
-- completeness
-- clarity
-- expected_judge_passed
+- `faithfulness`
+- `relevance`
+- `completeness`
+- `clarity`
+- `expected_judge_passed`
 - positive / negative answer eval
-- raw_judge_response 保留
+- `raw_judge_response` 保留
 - answer_eval JSON report
 
-当前最重要的设计结论：
+---
+
+## 当前最重要的设计结论
+
 1. ROI / CAC 这类复杂跨事实表指标不应长期依赖 LLM 自由生成 SQL，因此走 Query Plan + Template SQL。
 2. 普通指标仍走 LLM SQL，但通过 Intent Context 约束 dimension、limit、ranking_type、sort_hint 和 final_sort_direction。
 3. Result-level Evaluation 已从首行结果校验升级到 expected_rows 多行结果值校验。
 4. Answer Layer V1 先采用规则型生成，只基于 table 事实回答，避免“SQL 对但回答幻觉”。
-5. expected_answer_points 负责确定性检查 answer 是否包含关键事实点。
-6. LLM-as-Judge 负责评估 answer 是否忠实、相关、完整、清晰。
-7. Deterministic Evaluator 和 LLM-as-Judge 是双层评估关系，不互相替代。
-8. expected_judge_passed 机制支持正例与负例测试，验证 Judge 既能判对正确回答，也能判错错误回答。
+5. Prompt Builder 的职责是约束 LLM，而不是替代 Intent Parser、Query Plan、Template SQL 或 Answer Layer。
+6. Prompt 重构不是普通字符串重构，Prompt 的标题、分组、编号方式都会影响 LLM 输出。
+7. Prompt Builder V2 的正确策略是“代码内部模块化，最终 Prompt 输出形态保持稳定”。
+8. Text-to-SQL 不仅要防止 LLM 编造字段，也要防止 LLM 编造状态值和枚举值。
+9. Deterministic Evaluator 和 LLM-as-Judge 是双层评估关系，不互相替代。
+10. `expected_judge_passed` 机制支持正例与负例测试，验证 Judge 既能判对正确回答，也能判错错误回答。
 
-当前主要技术债：
-1. prompt_builder.py 规则臃肿，需要 Prompt Builder V2。
-2. 普通指标没有 query_plan，因此 sort_field 通常为 None。
-3. 普通指标 TopN 默认排序方向仍部分依赖 LLM 语义理解。
-4. template_sql_generator 中仍保留旧 question 解析逻辑。
-5. evaluation 测试文件中 JSON report 保存逻辑有重复。
-6. Intent Parser V1 仍是规则型，对中文表达覆盖有限。
-7. Answer Layer V1 主要支持聚合型 BI 问题，暂不支持复杂明细型回答。
-8. LLM-as-Judge 当前使用 DeepSeek，与 SQL 生成模型同源，存在 judge bias 风险。
-9. 当前尚未正式接入 Ragas 包。
-10. 当前 answer_eval_cases 样本仍较小，需要后续扩展“编造原因型负例”。
+---
+
+## 当前主要技术债
+
+1. `build_global_rules()` 和 `build_sql_generation_rules()` 仍存在部分规则重复维护。
+2. `prompt_builder_tests.py` 还可以补充“不编造状态值 / 枚举值”的专项断言。
+3. 普通指标没有 query_plan，因此 `sort_field` 通常为 None。
+4. 普通指标 TopN 默认排序方向仍部分依赖 LLM 语义理解。
+5. `template_sql_generator` 中仍保留旧 question 解析逻辑。
+6. evaluation 测试文件中 JSON report 保存逻辑有重复。
+7. Intent Parser V1 仍是规则型，对中文表达覆盖有限。
+8. Answer Layer V1 主要支持聚合型 BI 问题，暂不支持复杂明细型回答。
+9. LLM-as-Judge 当前使用 DeepSeek，与 SQL 生成模型同源，存在 judge bias 风险。
+10. 当前尚未正式接入 Ragas 包。
 11. 当前 V1 数据集业务真实性有限，后续需要 Beauty Dataset V2 设计。
 
-下一步 Day46：Prompt Builder V2 / 模块化收束
+---
+
+## 下一步 Day47
+
+Phase2 Midpoint Review + Semantic Retrieval Review
 
 目标：
-- 解决 prompt_builder.py 规则臃肿
-- 不继续堆 Prompt 规则
-- 为 Phase3 Tool 化做准备
+- 整理 Phase2 当前能力
+- 复盘 Embedding 置信度问题
+- 梳理 Alias / Keyword / Embedding / Clarification 分工
+- 形成面试表达材料
+- 决定 Ragas 是否进入 Day48 / Day50 Spike
 
 优先处理：
-- app/text_to_sql/prompt_builder.py
-- app/evaluation/prompt_builder_tests.py
-- docs/architecture/prompt_builder_v2.md
+- `docs/architecture/phase2_midpoint_review.md`
+- `docs/architecture/semantic_retrieval_review.md`
+- Phase2 架构图文字版
+- 技术债清单
+- 面试表达材料
+
+
+Day47：Ragas / LLM Evaluation 正式接入
+Day48：Phase2 Review + Semantic Retrieval Review
+Day49：Beauty Dataset V2 设计
+Day50：Phase2 总复盘 + Phase3 交接
+
+---
+
+Day47：Ragas Evaluation Integration V1
+Day48：Phase2 Review + Semantic Retrieval Review
+Day49：LangGraph Phase3 Entry Design
+Day50：Phase2 总复盘 + 简历/面试表达 + 交接

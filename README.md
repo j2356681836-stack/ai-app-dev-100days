@@ -347,15 +347,15 @@ Business Semantic Layer + Text-to-SQL
 ## Evaluation Framework V5
 
 当前支持：
-
 - Golden Questions
 - SQL 结构级检查
-- Top1 expected_result 校验
-- Ranking expected_order 校验
-- 多行 expected_rows 校验
-- generation_method 校验
-- expected_intent 校验
-- expected_answer_points 校验
+- Top1 `expected_result` 校验
+- Ranking `expected_order` 校验
+- 多行 `expected_rows` 校验
+- `generation_method` 校验
+- `expected_intent` 校验
+- `expected_answer_points` 校验
+- Prompt Builder Tests
 - Answer Quality Evaluation
 - Mock Judge
 - LLM-as-Judge
@@ -363,16 +363,16 @@ Business Semantic Layer + Text-to-SQL
 - Evaluation JSON 报告输出
 
 当前评估结果：
-
 - Golden Questions：26
 - deterministic evaluator：26/26 PASS
+- prompt_builder_tests：5/5 PASS
 - answer_eval_cases：6
+- answer_judge mock：6/6 PASS
 - LLM-as-Judge：6/6 PASS
 - query_plan_tests.py：2/2 PASS
 - intent_parser_tests.py：5/5 PASS
 - intent_resolver_tests.py：5/5 PASS
 - template_sql_tests.py：15/15 PASS
-- prompt_builder_tests.py：2/2 PASS
 
 ---
 
@@ -886,6 +886,42 @@ Evaluator
 
 ---
 
+### Day46
+
+完成内容：
+
+- 完成 Prompt Builder V2 模块化重构
+- 将 `prompt_builder.py` 拆分为多个规则函数
+- 新增 / 保留 `build_global_rules`
+- 新增 / 保留 `build_field_alias_rules`
+- 新增 / 保留 `build_ranking_rules`
+- 新增 / 保留 `build_dimension_rules`
+- 新增 / 保留 `build_legacy_complex_metric_rules`
+- 保持 `build_prompt()` 函数签名不变
+- 扩展 `prompt_builder_tests.py`，从 2 cases 增加到 5 cases
+- 发现并修复 `case_030` Prompt 回归问题
+- 识别 LLM 编造 `refund_status = 'paid'` 的问题
+- 增加“不编造状态值 / 枚举值”的 SQL 生成约束
+- 同步更新 `build_global_rules()` 和 `build_sql_generation_rules()`
+- 更新 `docs/architecture/prompt_builder_v2.md`
+- 记录 Prompt 输出形态也是行为的一部分
+
+当前测试结果：
+
+- `prompt_builder_tests.py`：5/5 PASS
+- `evaluator.py`：26/26 PASS
+- `answer_judge.py --mode mock`：6/6 PASS
+
+关键收获：
+
+- Prompt Builder 的职责是约束 LLM，而不是替代 Intent Parser、Query Plan、Template SQL 或 Answer Layer。
+- Prompt 重构不是普通字符串重构，Prompt 的标题、分组、编号方式都会影响 LLM 输出。
+- Prompt Builder V2 的最终策略是“代码内部模块化，最终 Prompt 输出形态保持稳定”。
+- `prompt_builder_tests.py` 保护 Prompt 静态结构，`evaluator.py` 保护端到端业务结果。
+- Text-to-SQL 不仅要防止 LLM 编造字段，也要防止 LLM 编造状态值和枚举值。
+
+---
+
 ## Phase 3
 
 Agent Workflow
@@ -979,7 +1015,7 @@ Answer
 
 # 当前版本
 
-Version: v0.19
-完成度：Day45 / 100
-当前实现：自然语言问题 → Intent Parser → 业务语义检索 → Query Plan Routing → Template SQL / LLM SQL with Intent Context → SQL执行 → Result-level Evaluation V2 → Answer Layer V1 → LLM-as-Judge Answer Evaluation
+Version: v0.20
+完成度：Day46 / 100
+当前实现：自然语言问题 → Intent Parser → 业务语义检索 → Query Plan Routing → Prompt Builder V2 → Template SQL / LLM SQL with Intent Context → SQL执行 → Result-level Evaluation V2 → Answer Layer V1 → LLM-as-Judge Answer Evaluation
 
