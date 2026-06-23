@@ -75,7 +75,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
 
-当前日期：Day45 / 100
+当前日期：Day47 / 100
 
 ---
 ## 已完成能力
@@ -250,9 +250,14 @@ search_type:
 - evaluator.py：26/26 PASS
 - answer_judge.py mock：6/6 PASS
 - answer_judge.py llm：6/6 PASS
+- ragas_eval.py --include-negative：6/6 expectation passed
 
 当前 Golden Cases：
 - 26 Cases
+- Pass Rate：100%
+
+当前 Prompt Builder Tests：
+- 5 Cases
 - Pass Rate：100%
 
 当前 Answer Eval Cases：
@@ -260,9 +265,16 @@ search_type:
 - 5 正例
 - 1 负例
 
-当前 Prompt Builder Tests：
-- 5 Cases
-- Pass Rate：100%
+LLM-as-Judge 当前结果：
+- Mode: llm
+- Total: 6
+- Passed: 6
+- Failed: 0
+- Pass Rate: 100.0%
+
+Ragas 当前结果：
+- Total: 6
+- Ragas expectation passed: 6/6
 
 当前覆盖指标：
 - item_sales_amount
@@ -332,6 +344,26 @@ search_type:
 - positive / negative answer eval
 - `raw_judge_response` 保留
 - answer_eval JSON report
+
+### Ragas Evaluation
+
+- `ragas_eval.py`
+- Ragas `faithfulness`
+- Ragas-style dataset
+- SQL result rows → `retrieved_contexts`
+- query semantics context enhancement
+- `--include-negative`
+- threshold-based expectation check
+- `ragas_passed`
+- `expected_passed`
+- `expectation_passed`
+- ragas_eval JSON report
+
+当前定位：
+- Ragas 不替代 deterministic evaluator
+- Ragas 不替代 answer_judge
+- Ragas 作为标准化 LLM Evaluation 对照
+- Ragas 用于阶段性评估、质量验证和面试展示
 
 ---
 
@@ -537,103 +569,91 @@ build_prompt()
 
 ## 当前待办（Next Milestone）
 
-### Day47-Day50 更新规划
-
----
-
-## Day47：Phase2 Midpoint Review + Semantic Retrieval Review
+### Day48：Phase2 Evaluation & Architecture Review
 
 目标：
-- 整理 Phase2 当前能力
-- 复盘 Embedding 置信度问题
-- 梳理 Alias / Keyword / Embedding / Clarification 分工
+- 整理 Phase2 当前系统架构
+- 梳理 Text-to-SQL 主链路
+- 梳理 Evaluation Workflow V1
+- 对比 deterministic evaluator / answer_judge / Ragas
 - 形成可复述的面试表达材料
 
 学习安排：
 1. 梳理 Phase2 主链路架构图文字版
-2. 梳理 Intent Parser / Intent Resolver / Hybrid Search / Query Plan / SQL Generator / Answer Layer / Evaluator 的模块职责
+2. 梳理 Intent Parser / Intent Resolver / Hybrid Search / Query Plan / Prompt Builder / SQL Generator / Answer Layer / Evaluator 的模块职责
 3. 复盘 Evaluation 体系演进
 4. 复盘 Query Plan / Template SQL 的价值
-5. 复盘普通指标 LLM SQL 路径的 tradeoff
-6. 复盘 Embedding confidence、top1 score、gap、clarification 的边界
+5. 复盘 Ragas 在 Text-to-SQL 场景中的适配方式
+6. 整理 Phase2 技术债清单
 7. 输出面试表达草稿
 
 交付：
-- `docs/architecture/phase2_midpoint_review.md`
-- `docs/architecture/semantic_retrieval_review.md`
+- `docs/architecture/phase2_architecture_review.md`
+- `docs/architecture/evaluation_workflow_v1.md`
 - Phase2 架构图文字版
 - Phase2 技术债清单
 - 面试表达材料
 
 ---
 
-## Day48：Ragas Spike / Answer Evaluation 对照实验
+### Day49：LangGraph Phase3 Entry Design
 
 目标：
-- 不替代当前 `answer_judge.py`
-- 小规模验证 Ragas 是否比当前 lightweight LLM-as-Judge 带来额外价值
-- 明确 Ragas 是否值得进入 Phase3
+- 从当前线性 `query_service.py` 流程过渡到 workflow / graph 思维
+- 设计 Phase3 LangGraph 最小入口
+- 不急于大规模重构当前主链路
 
 学习安排：
-1. 选择 3-5 个 `answer_eval_cases`
-2. 明确 Ragas 输入格式：question / answer / context / reference
-3. 对照当前 LLM-as-Judge 的 faithfulness / relevance / completeness / clarity
-4. 记录 Ragas 中文场景适配问题
-5. 判断是否纳入 Phase3 评估体系
+1. 梳理当前 `query_service.py` 的线性执行流程
+2. 将主链路拆解为 graph nodes
+3. 设计 LangGraph state
+4. 设计节点：
+   - parse_intent
+   - resolve_metric
+   - build_query_plan
+   - generate_sql
+   - validate_sql
+   - run_sql
+   - generate_answer
+   - evaluate_answer
+5. 设计错误处理与 retry / repair loop 的位置
+6. 输出 Phase3 LangGraph 设计文档
 
 交付：
-- `docs/architecture/ragas_spike_report.md`
-- Ragas 与 lightweight LLM-as-Judge 对比结论
-- 是否进入 Phase3 的决策说明
+- `docs/architecture/langgraph_phase3_design.md`
+- Phase3 最小 workflow 设计
+- 是否重构 `query_service.py` 的决策说明
 
 ---
 
-## Day49：Beauty Dataset V2 设计
-
-目标：
-- 复盘当前 V1 数据集真实性问题
-- 设计 Beauty Dataset V2
-- 不直接覆盖当前 V1
-- 为 Phase3 更真实的 Agent 分析做准备
-
-学习安排：
-1. 复盘当前 V1 数据问题，例如 CAC 偏高、业务分布不够真实
-2. 设计 Beauty Dataset V2 业务假设
-3. 决定 V2 使用独立 schema，而不是覆盖当前 V1
-4. 设计 V2 表结构和数据分布
-5. 规划 V2 seed、metadata、golden cases
-6. 明确哪些表 Phase3 实现
-
-交付：
-- `docs/architecture/beauty_dataset_v2_design.md`
-- V2 schema 草案
-- V2 seed 设计草案
-- V2 metric / metadata 规划
-
----
-
-## Day50：Phase2 缓冲 / 复习 / Phase3 交接
+### Day50：Phase2 Closing / Resume Story / Phase3 Handover
 
 目标：
 - 不再新增大功能
-- 回归所有测试
-- 校准文档状态
-- 准备 Phase3 新窗口交接
+- 完成 Phase2 阶段性收尾
+- 将项目成果转化为简历和面试表达
+- 准备 Phase3 交接
 
 学习安排：
 1. 回归 deterministic evaluator
 2. 回归 prompt_builder_tests
 3. 回归 answer_judge mock / llm
-4. 清理 PROJECT_STATE / README
-5. 更新 `chatgpt_handover.md`
-6. 整理 Phase2 技术债
-7. 进行 Phase2 面试问答训练
+4. 回归 ragas_eval
+5. 校准 PROJECT_STATE / README
+6. 更新 `chatgpt_handover.md`
+7. 整理 Phase2 技术债
+8. 整理简历 bullet points
+9. 整理 3 分钟项目介绍
+10. 整理 Phase2 面试问答
 
 交付：
 - 全量测试通过
 - PROJECT_STATE 校准
 - README 校准
 - `chatgpt_handover.md` 更新建议
+- `docs/interview/phase2_project_story.md`
+- `docs/interview/resume_bullets.md`
+- `docs/interview/interview_qa_phase2.md`
 - Phase3 开始前检查清单
 
 ---
@@ -1676,12 +1696,9 @@ Pass Rate: 100.0%
 
 ---
 
-## 开发日志追加
-
 ### Day46
 
 完成：
-
 - 完成 Prompt Builder V2 模块化重构
 - 拆分 `build_global_rules`
 - 拆分 `build_field_alias_rules`
@@ -1700,15 +1717,11 @@ Pass Rate: 100.0%
 - 回归 `answer_judge.py --mode mock` 通过
 
 当前测试结果：
-
-```text
 prompt_builder_tests.py：5/5 PASS
 evaluator.py：26/26 PASS
 answer_judge.py mock：6/6 PASS
-```
 
 关键结论：
-
 1. Prompt Builder 的职责是约束 LLM，而不是替代 Intent Parser、Query Plan、Template SQL 或 Answer Layer。
 2. Prompt 重构不是普通字符串重构，Prompt 的标题、分组、编号方式都会影响 LLM 输出。
 3. Prompt Builder V2 的最终策略是“代码内部模块化，最终 Prompt 输出形态保持稳定”。
@@ -1717,7 +1730,6 @@ answer_judge.py mock：6/6 PASS
 6. `case_030` 回归证明 Result-level Evaluation 对 Prompt 回归有实际保护价值。
 
 技术债：
-
 1. `build_global_rules()` 和 `build_sql_generation_rules()` 仍存在部分规则重复维护。
 2. `prompt_builder_tests.py` 已扩展到 5 cases，但还可以补充“不编造状态值 / 枚举值”的专项断言。
 3. ROI / CAC legacy rules 仍保留在 Prompt 中，后续可继续下沉到 Query Plan / Template SQL。
@@ -1726,11 +1738,75 @@ answer_judge.py mock：6/6 PASS
 
 ---
 
-## 当前交接摘要（Day46结束）
+### Day47
+
+完成：
+- 完成 Ragas Evaluation Integration V1
+- 新增 `app/evaluation/ragas_eval.py`
+- 接入 Ragas `faithfulness`
+- 将 `answer_eval_cases.py` 映射为 Ragas-style dataset
+- 将 SQL 查询结果 `context.rows` 转换为 `retrieved_contexts`
+- 解决 Ragas / LangChain 依赖兼容问题
+- 验证 `ragas==0.4.3` 可正常运行
+- 生成 `ragas_input_preview_*.json`
+- 生成 `ragas_eval_*.json`
+- 新增 `--include-negative` 参数
+- 支持正例 / 负例 Ragas 评估
+- 发现默认 Ragas 对 Top1 / TopN / Ranking 场景评分偏低
+- 新增 `infer_query_semantics()`
+- 为 Ragas context 补充 SQL 查询语义
+- 增强 `retrieved_contexts`，让 Ragas 理解：
+  - context 来自 SQL 查询结果表
+  - 回答应只基于查询结果字段和值
+  - TopN rows 表示 SQL 排序后返回的前 N 行
+  - 排名类问题中行顺序代表排名顺序
+- 新增 Ragas threshold-based expectation check
+- 使用 `faithfulness >= 0.8` 作为当前项目内 Ragas 通过阈值
+- 输出 `ragas_passed`
+- 输出 `expected_passed`
+- 输出 `expectation_passed`
+- 验证负例 `answer_case_006_bad` 仍保持低分
+- 新增 / 更新 `docs/architecture/ragas_spike_report.md`
+- 梳理 Ragas 与 `answer_judge.py` 的区别和分工
+- 完成三层 Evaluation 回归
+
+当前 Ragas 评估结果：
+answer_case_001：faithfulness 1.0
+answer_case_002：faithfulness 1.0
+answer_case_003：faithfulness 1.0
+answer_case_004：faithfulness 1.0
+answer_case_005：faithfulness 1.0
+answer_case_006_bad：faithfulness 0.25
+
+当前测试结果：
+evaluator.py：26/26 PASS
+answer_judge.py --mode mock：6/6 PASS
+ragas_eval.py --include-negative：6/6 expectation passed
+
+关键结论：
+1. Ragas 的 `faithfulness` 不是业务正确性评分，而是判断 answer 中的 claim 是否能被 `retrieved_contexts` 支撑。
+2. 当前项目是 Text-to-SQL，不是传统文档 RAG，因此不能简单把 SQL rows 当作普通文档片段传给 Ragas。
+3. 对 Top1 / TopN / Ranking 类问题，Ragas 默认不知道 SQL 已经通过 `ORDER BY` / `LIMIT` 得到结果，因此可能低估回答质量。
+4. 通过在 `retrieved_contexts` 中加入 query semantics，可以让 Ragas 更好理解 SQL 查询结果语义。
+5. context enhancement 后，Top1 / TopN 正例 faithfulness 提升到 1.0，负例仍保持 0.25，说明增强有效且没有导致误判。
+6. Ragas 不替代 deterministic evaluator，而是作为标准化 LLM Evaluation 对照。
+7. 当前 Evaluation Workflow 已形成三层结构：deterministic evaluator、answer_judge、ragas_eval。
+
+技术债：
+1. Ragas 当前仅接入 `faithfulness`，尚未接入 `answer_relevancy` 等更多指标。
+2. 当前 Ragas 样本只有 6 条，样本规模较小。
+3. Ragas 运行较慢且需要调用 LLM，不适合作为日常快速回归。
+4. Ragas 对 Text-to-SQL 的适配依赖 context 构造，后续需要继续沉淀 context 设计规范。
+5. 当前 Ragas threshold 使用固定值 0.8，后续可根据更多样本校准。
+6. Ragas 与 answer_judge 的判断标准不同，后续文档中需要持续强调二者互补而非替代。
+
+---
+
+## 当前交接摘要（Day47结束）
 
 当前处于：
 Phase2：Business Semantic Layer & Text-to-SQL  
-Day46 / 100
+Day47 / 100
 
 当前系统主线：
 
@@ -1783,10 +1859,12 @@ LLM-as-Judge Answer Evaluation
 - `app/evaluation/prompt_builder_tests.py`
 - `app/evaluation/answer_eval_cases.py`
 - `app/evaluation/answer_judge.py`
+- `app/evaluation/ragas_eval.py`
 
 当前新增 / 更新文档：
 - `docs/architecture/ragas_eval_design.md`
 - `docs/architecture/prompt_builder_v2.md`
+- `docs/architecture/ragas_spike_report.md`
 
 ---
 
@@ -1800,6 +1878,7 @@ LLM-as-Judge Answer Evaluation
 - evaluator.py：26/26 PASS
 - answer_judge.py mock：6/6 PASS
 - answer_judge.py llm：6/6 PASS
+- ragas_eval.py --include-negative：6/6 expectation passed
 
 当前 Golden Cases：
 - 26 Cases
@@ -1820,6 +1899,10 @@ LLM-as-Judge 当前结果：
 - Passed: 6
 - Failed: 0
 - Pass Rate: 100.0%
+
+Ragas 当前结果：
+- Total: 6
+- Ragas expectation passed: 6/6
 
 ---
 
@@ -1962,6 +2045,9 @@ AND r.refund_status = 'paid'
 8. Text-to-SQL 不仅要防止 LLM 编造字段，也要防止 LLM 编造状态值和枚举值。
 9. Deterministic Evaluator 和 LLM-as-Judge 是双层评估关系，不互相替代。
 10. `expected_judge_passed` 机制支持正例与负例测试，验证 Judge 既能判对正确回答，也能判错错误回答。
+11. Ragas 的 `faithfulness` 评估 answer claim 是否被 `retrieved_contexts` 支撑，不等于业务正确性评分。
+12. 在 Text-to-SQL 场景中，SQL result rows 需要补充 query semantics，才能让 Ragas 正确理解 TopN / Ranking 语义。
+13. 当前 Evaluation Workflow 已形成三层结构：deterministic evaluator 负责 SQL / 数值 / 排序，answer_judge 负责 answer quality，ragas_eval 负责标准化 groundedness 对照。
 
 ---
 
@@ -1976,38 +2062,29 @@ AND r.refund_status = 'paid'
 7. Intent Parser V1 仍是规则型，对中文表达覆盖有限。
 8. Answer Layer V1 主要支持聚合型 BI 问题，暂不支持复杂明细型回答。
 9. LLM-as-Judge 当前使用 DeepSeek，与 SQL 生成模型同源，存在 judge bias 风险。
-10. 当前尚未正式接入 Ragas 包。
-11. 当前 V1 数据集业务真实性有限，后续需要 Beauty Dataset V2 设计。
+10. Ragas 当前仅接入 `faithfulness`，尚未接入 `answer_relevancy` 等更多指标。
+11. Ragas 运行较慢且需要调用 LLM，不适合作为日常快速回归。
+12. 当前 V1 数据集业务真实性有限，后续需要 Beauty Dataset V2 设计。
 
 ---
 
-## 下一步 Day47
+## 下一步 Day48
 
-Phase2 Midpoint Review + Semantic Retrieval Review
+Phase2 Evaluation & Architecture Review
 
 目标：
-- 整理 Phase2 当前能力
-- 复盘 Embedding 置信度问题
-- 梳理 Alias / Keyword / Embedding / Clarification 分工
-- 形成面试表达材料
-- 决定 Ragas 是否进入 Day48 / Day50 Spike
+- 整理 Phase2 当前系统架构
+- 复盘 Evaluation Workflow V1
+- 梳理 deterministic evaluator / answer_judge / Ragas 的分工
+- 将当前项目能力转化为可复述的面试表达
+- 为 Day49 LangGraph Phase3 Entry Design 做准备
 
 优先处理：
-- `docs/architecture/phase2_midpoint_review.md`
-- `docs/architecture/semantic_retrieval_review.md`
+- `docs/architecture/phase2_architecture_review.md`
+- `docs/architecture/evaluation_workflow_v1.md`
 - Phase2 架构图文字版
+- Evaluation Workflow V1 说明
 - 技术债清单
 - 面试表达材料
 
 
-Day47：Ragas / LLM Evaluation 正式接入
-Day48：Phase2 Review + Semantic Retrieval Review
-Day49：Beauty Dataset V2 设计
-Day50：Phase2 总复盘 + Phase3 交接
-
----
-
-Day47：Ragas Evaluation Integration V1
-Day48：Phase2 Review + Semantic Retrieval Review
-Day49：LangGraph Phase3 Entry Design
-Day50：Phase2 总复盘 + 简历/面试表达 + 交接

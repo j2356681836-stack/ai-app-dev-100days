@@ -886,39 +886,35 @@ Evaluator
 
 ---
 
-### Day46
+### Day47
 
 完成内容：
-
-- 完成 Prompt Builder V2 模块化重构
-- 将 `prompt_builder.py` 拆分为多个规则函数
-- 新增 / 保留 `build_global_rules`
-- 新增 / 保留 `build_field_alias_rules`
-- 新增 / 保留 `build_ranking_rules`
-- 新增 / 保留 `build_dimension_rules`
-- 新增 / 保留 `build_legacy_complex_metric_rules`
-- 保持 `build_prompt()` 函数签名不变
-- 扩展 `prompt_builder_tests.py`，从 2 cases 增加到 5 cases
-- 发现并修复 `case_030` Prompt 回归问题
-- 识别 LLM 编造 `refund_status = 'paid'` 的问题
-- 增加“不编造状态值 / 枚举值”的 SQL 生成约束
-- 同步更新 `build_global_rules()` 和 `build_sql_generation_rules()`
-- 更新 `docs/architecture/prompt_builder_v2.md`
-- 记录 Prompt 输出形态也是行为的一部分
+- 完成 Ragas Evaluation Integration V1
+- 新增 `app/evaluation/ragas_eval.py`
+- 接入 Ragas `faithfulness`
+- 将 `answer_eval_cases.py` 转换为 Ragas-style dataset
+- 将 SQL 查询结果 `context.rows` 映射为 Ragas 的 `retrieved_contexts`
+- 新增 `--include-negative` 参数，支持正例 / 负例评估
+- 增加 Ragas threshold-based expectation check
+- 增强 Ragas context，使其理解 Text-to-SQL 查询语义
+- 在 `retrieved_contexts` 中补充 query semantics
+- 新增 / 更新 `docs/architecture/ragas_spike_report.md`
+- 回归 `evaluator.py` 通过
+- 回归 `answer_judge.py --mode mock` 通过
+- 回归 `ragas_eval.py --include-negative` 通过
 
 当前测试结果：
-
-- `prompt_builder_tests.py`：5/5 PASS
-- `evaluator.py`：26/26 PASS
-- `answer_judge.py --mode mock`：6/6 PASS
+evaluator.py：26/26 PASS
+answer_judge.py --mode mock：6/6 PASS
+ragas_eval.py --include-negative：6/6 expectation passed
 
 关键收获：
-
-- Prompt Builder 的职责是约束 LLM，而不是替代 Intent Parser、Query Plan、Template SQL 或 Answer Layer。
-- Prompt 重构不是普通字符串重构，Prompt 的标题、分组、编号方式都会影响 LLM 输出。
-- Prompt Builder V2 的最终策略是“代码内部模块化，最终 Prompt 输出形态保持稳定”。
-- `prompt_builder_tests.py` 保护 Prompt 静态结构，`evaluator.py` 保护端到端业务结果。
-- Text-to-SQL 不仅要防止 LLM 编造字段，也要防止 LLM 编造状态值和枚举值。
+- Ragas 的 `faithfulness` 不是业务正确性评分，而是判断 answer 中的 claim 是否能被 `retrieved_contexts` 支撑。
+- 在 Text-to-SQL 场景中，不能简单把 SQL rows 当作普通文档片段传给 Ragas。
+- 对 Top1 / TopN / Ranking 类问题，Ragas 默认不知道 SQL 已经通过 `ORDER BY` / `LIMIT` 得到结果，因此可能低估回答质量。
+- 通过在 `retrieved_contexts` 中加入 query semantics，可以让 Ragas 更好理解 SQL 查询结果语义。
+- context enhancement 后，正例 faithfulness 提升到 1.0，负例 `answer_case_006_bad` 仍保持 0.25。
+- Ragas 不替代 deterministic evaluator，而是作为标准化 LLM Evaluation 对照，用于阶段性评估、质量验证和面试展示。
 
 ---
 
@@ -1015,7 +1011,7 @@ Answer
 
 # 当前版本
 
-Version: v0.20
-完成度：Day46 / 100
-当前实现：自然语言问题 → Intent Parser → 业务语义检索 → Query Plan Routing → Prompt Builder V2 → Template SQL / LLM SQL with Intent Context → SQL执行 → Result-level Evaluation V2 → Answer Layer V1 → LLM-as-Judge Answer Evaluation
+Version: v0.21
+完成度：Day47 / 100
+当前实现：自然语言问题 → Intent Parser → Intent Resolver → Hybrid Search → Query Plan Routing → Prompt Builder V2 → Template SQL / LLM SQL with Intent Context → SQL执行 → Result-level Evaluation V2 → Answer Layer V1 → LLM-as-Judge Answer Evaluation → Ragas Evaluation
 

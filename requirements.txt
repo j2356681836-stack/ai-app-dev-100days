@@ -1,12 +1,27 @@
+```text
+# LLM / API
 openai==2.35.1
 anthropic==0.100.0
+
+# Config / Validation
 pydantic==2.13.4
 python-dotenv==1.2.2
 tenacity==8.2.3
+
+# Database
 SQLAlchemy>=2.0,<2.1
 psycopg[binary]>=3.1,<4.0
-python-dotenv>=1.0,<2.0
+
+# Data
 faker
 pandas
 numpy
 tqdm
+
+# LLM Evaluation / Ragas
+ragas==0.4.3
+datasets
+langchain-openai
+langchain-community
+langchain-google-vertexai
+```
