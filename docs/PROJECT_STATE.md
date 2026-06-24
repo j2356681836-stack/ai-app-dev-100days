@@ -3,7 +3,6 @@
 ## 项目目标
 
 构建企业级 AI BI Agent：
-
 用户自然语言
 → Business Semantic Layer
 → Text-to-SQL
@@ -11,11 +10,13 @@
 → Business Analysis
 → Agent Workflow
 
-目标岗位：
+第一目标：转岗AI Data Analyst / AI Engineer / AI Architect / GenAI Engineer / AI Agent Engineer / AI Data Engineer
 
-- GenAI Engineer
-- AI Agent Engineer
-- AI Data Engineer
+第二目标：项目能形成作品集和简历亮点
+
+第三目标：工程链路合理、可解释、可演示
+
+第四目标：工具本身尽量稳定，但不追求产品级完美
 
 ---
 ## 学习计划
@@ -75,7 +76,7 @@ Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
 
-当前日期：Day47 / 100
+当前日期：Day48 / 100
 
 ---
 ## 已完成能力
@@ -569,38 +570,12 @@ build_prompt()
 
 ## 当前待办（Next Milestone）
 
-### Day48：Phase2 Evaluation & Architecture Review
-
-目标：
-- 整理 Phase2 当前系统架构
-- 梳理 Text-to-SQL 主链路
-- 梳理 Evaluation Workflow V1
-- 对比 deterministic evaluator / answer_judge / Ragas
-- 形成可复述的面试表达材料
-
-学习安排：
-1. 梳理 Phase2 主链路架构图文字版
-2. 梳理 Intent Parser / Intent Resolver / Hybrid Search / Query Plan / Prompt Builder / SQL Generator / Answer Layer / Evaluator 的模块职责
-3. 复盘 Evaluation 体系演进
-4. 复盘 Query Plan / Template SQL 的价值
-5. 复盘 Ragas 在 Text-to-SQL 场景中的适配方式
-6. 整理 Phase2 技术债清单
-7. 输出面试表达草稿
-
-交付：
-- `docs/architecture/phase2_architecture_review.md`
-- `docs/architecture/evaluation_workflow_v1.md`
-- Phase2 架构图文字版
-- Phase2 技术债清单
-- 面试表达材料
-
----
-
 ### Day49：LangGraph Phase3 Entry Design
 
 目标：
 - 从当前线性 `query_service.py` 流程过渡到 workflow / graph 思维
 - 设计 Phase3 LangGraph 最小入口
+- 明确 LangGraph 如何承接 Phase2 遗留技术债
 - 不急于大规模重构当前主链路
 
 学习安排：
@@ -609,20 +584,30 @@ build_prompt()
 3. 设计 LangGraph state
 4. 设计节点：
    - parse_intent
-   - resolve_metric
+   - resolve_intent
+   - search_metric
+   - clarify_if_needed
    - build_query_plan
    - generate_sql
    - validate_sql
+   - repair_sql_if_needed
    - run_sql
+   - format_result
    - generate_answer
    - evaluate_answer
-5. 设计错误处理与 retry / repair loop 的位置
-6. 输出 Phase3 LangGraph 设计文档
+   - retry_or_finish
+5. 明确 retrieval / clarification 如何成为独立节点
+6. 明确 SQL validation / repair loop 放在哪里
+7. 明确 Evaluation Workflow 如何进入 eval-driven retry
+8. 输出 Phase3 LangGraph 设计文档
 
-交付：
-- `docs/architecture/langgraph_phase3_design.md`
-- Phase3 最小 workflow 设计
-- 是否重构 `query_service.py` 的决策说明
+交付： `docs/architecture/langgraph_phase3_design.md`
+
+原则：
+- Phase3 不推翻 Phase2
+- LangGraph 应复用 Phase2 已完成模块
+- 先设计，再做最小 prototype
+- 不在 Day49 大规模重构 `query_service.py`
 
 ---
 
@@ -645,6 +630,7 @@ build_prompt()
 8. 整理简历 bullet points
 9. 整理 3 分钟项目介绍
 10. 整理 Phase2 面试问答
+11. 整理 Phase3 开始前检查清单
 
 交付：
 - 全量测试通过
@@ -1802,11 +1788,65 @@ ragas_eval.py --include-negative：6/6 expectation passed
 
 ---
 
-## 当前交接摘要（Day47结束）
+### Day48
+
+完成：
+- 完成 Phase2 Architecture Review
+- 新增 `docs/architecture/phase2_architecture_review.md`
+- 梳理当前 AI Data Analyst / Text-to-SQL 主链路
+- 梳理 Intent Parser / Intent Resolver / Hybrid Search / Query Plan Routing / Prompt Builder / SQL Generator / Answer Generator / Evaluation 的职责
+- 完成 Evaluation Workflow V1 复盘
+- 新增 `docs/architecture/evaluation_workflow_v1.md`
+- 梳理 deterministic evaluator / prompt_builder_tests / answer_judge / Ragas Evaluation 的分工
+- 明确 Evaluation Workflow V1 的分层职责
+- 完成 Phase2 技术债统一登记
+- 新增 `docs/architecture/phase2_technical_debt_and_phase3_plan.md`
+- 将 Semantic Retrieval / Embedding Calibration 问题纳入技术债
+- 将 Dataset & Business Realism 问题纳入技术债
+- 将 Metric System 扩展问题纳入技术债
+- 将 Query Plan / SQL Generation 问题纳入技术债
+- 将 Intent Parser / Intent Resolver 问题纳入技术债
+- 将 Prompt Builder V2 问题纳入技术债
+- 将 Answer Layer / Business Insight Layer 问题纳入技术债
+- 将 Evaluation System / Ragas Evaluation 问题纳入技术债
+- 明确 LangGraph / Agent Workflow 对 Phase2 技术债的承接方向
+- 进行 Phase2 架构复述训练
+- 复盘为什么不能直接让 LLM 生成 SQL
+- 复盘为什么 ROI / CAC 走 Template SQL，普通指标保留 LLM SQL
+- 回归核心评估命令，结果正常
+
+当前新增文档：
+docs/architecture/phase2_architecture_review.md
+docs/architecture/evaluation_workflow_v1.md
+docs/architecture/phase2_technical_debt_and_phase3_plan.md
+
+当前回归结果：
+evaluator.py：通过
+answer_judge.py --mode mock：通过
+ragas_eval.py --include-negative：通过
+
+关键结论：
+1. Phase2 已经证明业务语义层、Text-to-SQL、Answer Layer 和 Evaluation Workflow 主链路可行。
+2. Phase2 仍存在多类技术债，不能只靠对话记忆保留。
+3. Semantic Search V2 中 embedding score 偏低、top1/top2 gap 偏小的问题应纳入 Semantic Retrieval Calibration Debt。
+4. 当前 V1 美妆数据集和指标体系不足以支撑完整可落地 AI Data Analyst 产品，后续需要 Beauty Dataset V2 和更完整 BI 指标体系。
+5. 当前系统更接近 AI 查数助手，后续需要 Business Insight Layer 才能进一步接近 AI Data Analyst。
+6. Phase3 不应推翻 Phase2，而应使用 LangGraph workflow 承接现有模块，并逐步增强 clarification、SQL repair、eval-driven retry 和多步分析能力。
+7. 阶段内没有解决的问题，必须进入技术债或后续计划，不能只留在对话中。
+
+技术债处理原则：
+1. 当日能低风险解决的问题，可以当日解决。
+2. 暂时不解决但重要的问题，必须写入技术债。
+3. 跨阶段解决的问题，必须进入后续计划。
+4. 不再依赖对话记忆保存项目问题。
+
+---
+
+## 当前交接摘要（Day48结束）
 
 当前处于：
 Phase2：Business Semantic Layer & Text-to-SQL  
-Day47 / 100
+Day48 / 100
 
 当前系统主线：
 
@@ -1865,6 +1905,9 @@ LLM-as-Judge Answer Evaluation
 - `docs/architecture/ragas_eval_design.md`
 - `docs/architecture/prompt_builder_v2.md`
 - `docs/architecture/ragas_spike_report.md`
+- `docs/architecture/phase2_architecture_review.md`
+- `docs/architecture/evaluation_workflow_v1.md`
+- `docs/architecture/phase2_technical_debt_and_phase3_plan.md`
 
 ---
 
@@ -2053,38 +2096,85 @@ AND r.refund_status = 'paid'
 
 ## 当前主要技术债
 
-1. `build_global_rules()` 和 `build_sql_generation_rules()` 仍存在部分规则重复维护。
-2. `prompt_builder_tests.py` 还可以补充“不编造状态值 / 枚举值”的专项断言。
-3. 普通指标没有 query_plan，因此 `sort_field` 通常为 None。
-4. 普通指标 TopN 默认排序方向仍部分依赖 LLM 语义理解。
-5. `template_sql_generator` 中仍保留旧 question 解析逻辑。
-6. evaluation 测试文件中 JSON report 保存逻辑有重复。
-7. Intent Parser V1 仍是规则型，对中文表达覆盖有限。
-8. Answer Layer V1 主要支持聚合型 BI 问题，暂不支持复杂明细型回答。
-9. LLM-as-Judge 当前使用 DeepSeek，与 SQL 生成模型同源，存在 judge bias 风险。
-10. Ragas 当前仅接入 `faithfulness`，尚未接入 `answer_relevancy` 等更多指标。
-11. Ragas 运行较慢且需要调用 LLM，不适合作为日常快速回归。
-12. 当前 V1 数据集业务真实性有限，后续需要 Beauty Dataset V2 设计。
+详细技术债与 Phase3 承接计划已记录在：docs/architecture/phase2_technical_debt_and_phase3_plan.md
+
+当前主要技术债摘要：
+1. Semantic Search V2 仍存在 embedding score 偏低、top1/top2 gap 偏小的问题。当前通过 rule layer 优先、threshold 判断和 clarification 规避误判风险，但尚未建立独立 retrieval eval dataset 对 TOP1_THRESHOLD / GAP_THRESHOLD 进行系统校准。
+2. 当前 V1 美妆数据集可以支撑 Text-to-SQL 主链路验证，但不足以支撑完整可落地的 AI Data Analyst 产品。后续需要设计 Beauty Dataset V2，增强会员历史、复购、留存、LTV、商品生命周期、渠道漏斗、毛利和库存等数据。
+3. 当前指标体系覆盖销售额、退款率、订单数、销量、ROI、CAC 等核心指标，但仍缺少 GMV、客单价、转化率、复购率、留存率、LTV、ARPU、新老客占比、会员等级分布、商品毛利率、库存周转等更完整 BI 指标。
+4. 当前 Query Plan 主要覆盖 ROI / CAC，普通指标尚未纳入 lightweight query_plan，因此普通指标的 sort_field、default_sort、allowed_dimensions、allowed_filters 等仍部分依赖 Prompt 和 LLM。
+5. Intent Parser V1 仍是规则型，对时间范围、过滤条件、趋势类问题、对比类问题、多意图问题的覆盖有限。
+6. Prompt Builder V2 已完成模块化，但 `build_global_rules()` 和 `build_sql_generation_rules()` 仍存在部分规则重复维护，`prompt_builder_tests.py` 还可以补充“不编造状态值 / 枚举值”的专项断言。
+7. Answer Layer V1 主要支持规则型事实回答，还不支持原因分析、趋势解释、策略建议、多指标综合分析和经营诊断。
+8. Evaluation Workflow V1 已形成 deterministic evaluator / answer_judge / Ragas 三层结构，但 Golden Cases、Answer Eval Cases 和负例类型仍偏少，尚未建立 retrieval evaluator。
+9. Ragas 当前仅接入 `faithfulness`，尚未接入 `answer_relevancy` 等更多指标。Ragas 运行较慢且需要调用 LLM，适合阶段性评估，不适合作为日常快速回归。
+10. 当前主链路仍是线性 `query_service.py` pipeline，尚未形成 LangGraph workflow，缺少 workflow state、conditional edges、clarification loop、SQL repair loop 和 eval-driven retry。
 
 ---
 
-## 下一步 Day48
+## Phase2 技术债与 Phase3 承接
 
-Phase2 Evaluation & Architecture Review
+Day48 已新增：docs/architecture/phase2_technical_debt_and_phase3_plan.md
+
+该文档统一登记 Phase2 未解决但不能丢弃的问题，包括：
+Semantic Retrieval / Embedding Calibration
+Dataset & Business Realism
+Metric System 扩展
+Query Plan / SQL Generation
+Intent Parser / Intent Resolver
+Prompt Builder V2
+Answer Layer / Business Insight Layer
+Evaluation System
+Ragas Evaluation
+LangGraph / Agent Workflow 承接
+
+后续原则：
+阶段内没有解决的问题，不能只留在对话记忆中。
+要么当日解决，要么写入技术债，要么放入后续计划。
+
+Phase3 的核心不是推翻 Phase2，而是用 LangGraph workflow 承接 Phase2 已有模块，并逐步处理 clarification loop、retrieval calibration、SQL validation/repair、eval-driven retry、multi-step analysis、
+Business Insight Layer 和更复杂的分析流程。
+
+---
+
+## 下一步 Day49
+
+LangGraph Phase3 Entry Design
 
 目标：
-- 整理 Phase2 当前系统架构
-- 复盘 Evaluation Workflow V1
-- 梳理 deterministic evaluator / answer_judge / Ragas 的分工
-- 将当前项目能力转化为可复述的面试表达
-- 为 Day49 LangGraph Phase3 Entry Design 做准备
+- 从当前线性 `query_service.py` 流程过渡到 workflow / graph 思维
+- 设计 Phase3 LangGraph 最小入口
+- 明确 LangGraph 如何承接 Phase2 遗留技术债
+- 不急于大规模重构当前主链路
 
-优先处理：
-- `docs/architecture/phase2_architecture_review.md`
-- `docs/architecture/evaluation_workflow_v1.md`
-- Phase2 架构图文字版
-- Evaluation Workflow V1 说明
-- 技术债清单
-- 面试表达材料
+重点考虑：
+- 当前 `query_service.py` 如何拆成 graph nodes
+- LangGraph state 如何设计
+- retrieval / clarification 如何成为独立节点
+- SQL validation / repair loop 放在哪里
+- Evaluation Workflow 如何进入 eval-driven retry
+- 当前 deterministic evaluator / answer_judge / ragas_eval 如何在 Phase3 继续复用
+
+建议节点：
+parse_intent
+resolve_intent
+search_metric
+clarify_if_needed
+build_query_plan
+generate_sql
+validate_sql
+repair_sql_if_needed
+run_sql
+format_result
+generate_answer
+evaluate_answer
+retry_or_finish
+
+Day49 产出：docs/architecture/langgraph_phase3_design.md
+
+Day49 原则：
+Phase3 不推翻 Phase2。
+LangGraph 应该复用 Phase2 已完成模块，而不是重写主链路。
+
 
 

@@ -918,6 +918,34 @@ ragas_eval.py --include-negative：6/6 expectation passed
 
 ---
 
+### Day48
+
+完成 Phase2 Evaluation & Architecture Review，并统一整理 Phase2 技术债与 Phase3 承接计划。
+
+完成内容：
+- 新增 `docs/architecture/phase2_architecture_review.md`
+- 新增 `docs/architecture/evaluation_workflow_v1.md`
+- 新增 `docs/architecture/phase2_technical_debt_and_phase3_plan.md`
+- 梳理 Phase2 当前 AI Data Analyst / Text-to-SQL 主链路
+- 梳理 Evaluation Workflow V1
+- 梳理 deterministic evaluator / answer_judge / Ragas 的分工
+- 复盘 Ragas 在 Text-to-SQL 场景中的适配方式
+- 统一登记 Phase2 技术债
+- 明确 Phase3 LangGraph 需要承接 retrieval、clarification、SQL repair、eval-driven retry 等问题
+
+当前 Day48 形成的核心文档：
+docs/architecture/phase2_architecture_review.md
+docs/architecture/evaluation_workflow_v1.md
+docs/architecture/phase2_technical_debt_and_phase3_plan.md
+
+当前关键结论：
+- Phase2 已经证明业务语义层、Text-to-SQL、Answer Layer 和 Evaluation Workflow 主链路可行。
+- 当前系统仍有 Semantic Retrieval Calibration、数据真实性、指标体系扩展、普通指标 query_plan、Answer Insight Layer 等技术债。
+- 阶段内没有解决的问题不能只留在对话记忆中，必须进入技术债或后续计划。
+- Phase3 不应推翻 Phase2，而应通过 LangGraph workflow 复用 Phase2 模块，并逐步增强 clarification、retry、repair 和 evaluation-driven workflow。
+
+---
+
 ## Phase 3
 
 Agent Workflow
@@ -1011,7 +1039,8 @@ Answer
 
 # 当前版本
 
-Version: v0.21
-完成度：Day47 / 100
-当前实现：自然语言问题 → Intent Parser → Intent Resolver → Hybrid Search → Query Plan Routing → Prompt Builder V2 → Template SQL / LLM SQL with Intent Context → SQL执行 → Result-level Evaluation V2 → Answer Layer V1 → LLM-as-Judge Answer Evaluation → Ragas Evaluation
+Version: v0.23
+完成度：Day48 / 100
+当前实现：自然语言问题 → Intent Parser → Intent Resolver → Hybrid Search → Query Plan Routing → Prompt Builder V2 → Template SQL / LLM SQL with Intent Context → SQL执行 → Result-level Evaluation V2 → Answer Layer V1 → LLM-as-Judge Answer Evaluation → Ragas Evaluation → Phase2 Architecture Review / Technical Debt Register
+
 
