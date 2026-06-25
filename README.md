@@ -946,6 +946,48 @@ docs/architecture/phase2_technical_debt_and_phase3_plan.md
 
 ---
 
+### Day49
+
+完成 Phase3 LangGraph Entry Design，并实现 LangGraph 方案 B 最小 prototype。
+
+完成内容：
+- 新增 `docs/architecture/langgraph_phase3_design.md`
+- 梳理当前 `query_service.py` 线性主链路
+- 将主链路拆解为 LangGraph nodes / state / conditional edges
+- 重构 `query_service.py`，新增 `ask_with_resolved_metric()`
+- 新增 `app/agents/analyst_graph.py`
+- 新增 `app/agents/analyst_graph_tests.py`
+- 实现 LangGraph clarification branch
+- 将 `metric_result.status` 从普通 if 判断升级为 LangGraph conditional edge
+- 完成普通指标路径、Template SQL 路径、clarification 路径测试
+- 发现并记录 LangGraph / LangChain / Ragas 依赖冲突问题
+- 发现并记录 clarification suggestions 候选排序问题
+
+当前 LangGraph prototype 流程：
+parse_intent
+↓
+search_metric
+↓
+route_metric_status
+├─ matched → continue_pipeline
+├─ needs_clarification → clarification
+└─ error → fail
+
+当前测试结果：
+evaluator.py：26/26 PASS
+answer_judge.py --mode mock：6/6 PASS
+ragas_eval.py --include-negative：6/6 expectation passed
+analyst_graph_tests.py：3/3 PASS
+
+关键结论：
+- Phase3 不推翻 Phase2，而是用 LangGraph workflow 复用 Phase2 已完成模块。
+- 当前方案 B 已验证：普通指标走 LLM SQL，复杂指标走 Template SQL，歧义问题进入 clarification branch。
+- LangGraph 当前只完成最小 prototype，不继续扩展 SQL repair / eval-driven retry。
+- 依赖冲突已记录为 Dependency Management Debt，后续需要统一 LangGraph / LangChain / Ragas 版本。
+- “最赚钱”候选排序问题已记录为 Clarification Candidate Ranking Debt，后续需要通过 retrieval evaluator 和 metric_text_builder 优化。
+
+---
+
 ## Phase 3
 
 Agent Workflow
@@ -1039,8 +1081,8 @@ Answer
 
 # 当前版本
 
-Version: v0.23
-完成度：Day48 / 100
-当前实现：自然语言问题 → Intent Parser → Intent Resolver → Hybrid Search → Query Plan Routing → Prompt Builder V2 → Template SQL / LLM SQL with Intent Context → SQL执行 → Result-level Evaluation V2 → Answer Layer V1 → LLM-as-Judge Answer Evaluation → Ragas Evaluation → Phase2 Architecture Review / Technical Debt Register
+Version: v0.24
+完成度：Day49 / 100
+当前实现：自然语言问题 → Intent Parser → Intent Resolver → Hybrid Search → Query Plan Routing → Prompt Builder V2 → Template SQL / LLM SQL with Intent Context → SQL执行 → Result-level Evaluation V2 → Answer Layer V1 → LLM-as-Judge Answer Evaluation → Ragas Evaluation → Phase2 Architecture Review / Technical Debt Register → LangGraph Clarification Branch Prototype
 
 

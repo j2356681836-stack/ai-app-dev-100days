@@ -75,10 +75,10 @@
 Phase 2：Business Semantic Layer & Text-to-SQL
 
 进度：Day21 ~ Day50
-
-当前日期：Day48 / 100
+当前日期：Day49 / 100
 
 ---
+
 ## 已完成能力
 
 ### Phase1：LLM Reliability
@@ -252,6 +252,7 @@ search_type:
 - answer_judge.py mock：6/6 PASS
 - answer_judge.py llm：6/6 PASS
 - ragas_eval.py --include-negative：6/6 expectation passed
+- analyst_graph_tests.py：3/3 PASS
 
 当前 Golden Cases：
 - 26 Cases
@@ -551,6 +552,39 @@ LLM-as-Judge Answer Evaluation
 
 ---
 
+## 当前 LangGraph Prototype
+
+当前新增 LangGraph prototype：
+app/agents/analyst_graph.py
+app/agents/analyst_graph_tests.py
+
+当前 Phase3 LangGraph 方案 B 已完成最小验证：
+parse_intent
+↓
+search_metric
+↓
+route_metric_status
+├─ matched → continue_pipeline
+├─ needs_clarification → clarification
+└─ error → fail
+
+当前验证路径：
+普通指标：哪个渠道销售额最高 → completed → llm
+复杂指标：各渠道ROI排名 → completed → template
+歧义问题：最赚钱 → needs_clarification → suggestions
+
+当前定位：
+LangGraph prototype 不是替代 Phase2 主链路，
+而是在 Phase2 已有模块基础上，先验证 clarification branch 的 workflow 化。
+
+当前边界：
+尚未实现 SQL repair loop
+尚未实现 eval-driven retry
+尚未处理依赖冲突
+尚未解决 clarification suggestions 排序问题
+
+---
+
 ## 当前 Prompt Builder V2 状态
 
 当前 `prompt_builder.py` 已完成 V2 模块化收束。
@@ -570,77 +604,71 @@ build_prompt()
 
 ## 当前待办（Next Milestone）
 
-### Day49：LangGraph Phase3 Entry Design
-
-目标：
-- 从当前线性 `query_service.py` 流程过渡到 workflow / graph 思维
-- 设计 Phase3 LangGraph 最小入口
-- 明确 LangGraph 如何承接 Phase2 遗留技术债
-- 不急于大规模重构当前主链路
-
-学习安排：
-1. 梳理当前 `query_service.py` 的线性执行流程
-2. 将主链路拆解为 graph nodes
-3. 设计 LangGraph state
-4. 设计节点：
-   - parse_intent
-   - resolve_intent
-   - search_metric
-   - clarify_if_needed
-   - build_query_plan
-   - generate_sql
-   - validate_sql
-   - repair_sql_if_needed
-   - run_sql
-   - format_result
-   - generate_answer
-   - evaluate_answer
-   - retry_or_finish
-5. 明确 retrieval / clarification 如何成为独立节点
-6. 明确 SQL validation / repair loop 放在哪里
-7. 明确 Evaluation Workflow 如何进入 eval-driven retry
-8. 输出 Phase3 LangGraph 设计文档
-
-交付： `docs/architecture/langgraph_phase3_design.md`
-
-原则：
-- Phase3 不推翻 Phase2
-- LangGraph 应复用 Phase2 已完成模块
-- 先设计，再做最小 prototype
-- 不在 Day49 大规模重构 `query_service.py`
-
----
-
-### Day50：Phase2 Closing / Resume Story / Phase3 Handover
+## Day50：Phase2 Closing / Phase3 Handover / Dependency Check
 
 目标：
 - 不再新增大功能
 - 完成 Phase2 阶段性收尾
+- 完成 Phase3 LangGraph prototype 交接
+- 明确依赖冲突处理方案
 - 将项目成果转化为简历和面试表达
-- 准备 Phase3 交接
 
 学习安排：
-1. 回归 deterministic evaluator
-2. 回归 prompt_builder_tests
-3. 回归 answer_judge mock / llm
-4. 回归 ragas_eval
-5. 校准 PROJECT_STATE / README
-6. 更新 `chatgpt_handover.md`
-7. 整理 Phase2 技术债
-8. 整理简历 bullet points
-9. 整理 3 分钟项目介绍
-10. 整理 Phase2 面试问答
-11. 整理 Phase3 开始前检查清单
+1. 回归当前核心测试
+   - `python -m app.evaluation.evaluator`
+   - `python -m app.evaluation.answer_judge --mode mock`
+   - `python -m app.agents.analyst_graph_tests`
 
-交付：
-- 全量测试通过
-- PROJECT_STATE 校准
-- README 校准
-- `chatgpt_handover.md` 更新建议
-- `docs/interview/phase2_project_story.md`
-- `docs/interview/resume_bullets.md`
-- `docs/interview/interview_qa_phase2.md`
-- Phase3 开始前检查清单
+2. 检查当前依赖状态
+   - `pip check`
+   - 记录当前冲突
+   - 不在 Day50 盲目升级依赖
+
+3. 整理 Phase2 / Day49 当前成果
+   - Text-to-SQL 主链路
+   - Answer Layer V1
+   - Evaluation Workflow V1
+   - Ragas Evaluation
+   - Phase2 Technical Debt Register
+   - LangGraph Clarification Branch Prototype
+
+4. 整理 Phase2 技术债
+   - Semantic Retrieval Calibration
+   - Clarification Candidate Ranking
+   - Dependency Management
+   - Dataset & Business Realism
+   - Metric System 扩展
+   - Ordinary Metric Query Plan
+   - Answer / Insight Layer
+   - Evaluation Coverage
+
+5. 更新项目文档
+   - README
+   - PROJECT_STATE
+   - chatgpt_handover.md
+
+6. 整理面试材料
+   - Phase2 项目介绍
+   - 为什么不能直接让 LLM 生成 SQL
+   - 为什么 ROI / CAC 走 Template SQL
+   - 为什么需要 Evaluation Workflow
+   - 为什么 Ragas 不能替代 deterministic evaluator
+   - 为什么 Phase3 引入 LangGraph
+   - LangGraph 当前 prototype 做了什么
+   - 当前技术债如何管理
+
+Day50 交付：
+docs/interview/phase2_project_story.md
+docs/interview/resume_bullets.md
+docs/interview/interview_qa_phase2.md
+chatgpt_handover.md 更新建议
+Phase2 closing checklist
+
+Day50 原则：
+不新增复杂功能。
+不继续扩展 LangGraph repair loop。
+不盲目修依赖。
+先完成 Phase2 收尾、复盘、交接和表达。
 
 ---
 
@@ -1842,339 +1870,125 @@ ragas_eval.py --include-negative：通过
 
 ---
 
-## 当前交接摘要（Day48结束）
+### Day49
 
-当前处于：
-Phase2：Business Semantic Layer & Text-to-SQL  
-Day48 / 100
+完成：
+- 开始 Phase3 LangGraph Entry Design
+- 新增 `docs/architecture/langgraph_phase3_design.md`
+- 梳理当前 `query_service.py` 线性主链路
+- 将当前主链路拆解为 LangGraph nodes
+- 设计 LangGraph state
+- 设计 LangGraph conditional edges
+- 明确 Phase3 不推翻 Phase2，而是复用 Phase2 已完成模块
+- 确定 Phase3 第一版 prototype 采用方案 B：在 LangGraph 外壳基础上拆出 clarification 分支
+- 重构 `query_service.py`
+- 新增 `ask_with_resolved_metric(question, intent, metric_result)`
+- 保留原 `ask(question)` 入口
+- 新增 `app/agents/analyst_graph.py`
+- 实现 LangGraph 最小 prototype
+- 新增 `app/agents/analyst_graph_tests.py`
+- 固化普通指标路径、Template SQL 路径、clarification 路径三类回归测试
+- 修复 clarification branch 中 `options` / `suggestions` 字段不一致问题
+- Graph 层对外统一返回 `suggestions`
+- 完成最小总回归
+- 发现 LangGraph 安装后造成 `langchain-core` 版本冲突
+- 将依赖冲突记录为 Dependency Management Debt
+- 发现“最赚钱”进入 clarification 后 suggestions 排序不理想
+- 将该问题记录为 Clarification Candidate Ranking Debt
 
-当前系统主线：
+当前新增 / 修改文件：
+app/agents/analyst_graph.py
+app/agents/analyst_graph_tests.py
+app/text_to_sql/query_service.py
+docs/architecture/langgraph_phase3_design.md
+docs/architecture/phase2_technical_debt_and_phase3_plan.md
 
-Question  
-↓  
-Intent Parser  
-↓  
-Intent Resolver  
-↓  
-Hybrid Search / Metric Recognition  
-├─ Alias Match  
-├─ Keyword Group Match  
-├─ Embedding Match  
-└─ Clarification  
-↓  
-Query Plan Routing  
-├─ ROI / CAC → Template SQL from Intent  
-└─ 普通指标 → LLM SQL with Intent Context  
-↓  
-Prompt Builder V2  
-↓  
-SQL Cleaner  
-↓  
-SQL Validator  
-↓  
-PostgreSQL  
-↓  
-Result Formatter  
-↓  
-Answer Generator  
-↓  
-Deterministic Evaluator  
-↓  
-LLM-as-Judge Answer Evaluation
-
----
-
-## 当前关键模块
-
-- `app/semantic_layer/intent_parser.py`
-- `app/semantic_layer/query_plan_loader.py`
-- `app/semantic_layer/hybrid_search.py`
-- `app/text_to_sql/template_sql_generator.py`
-- `app/text_to_sql/query_service.py`
-- `app/text_to_sql/prompt_builder.py`
-- `app/text_to_sql/sql_generator.py`
-- `app/text_to_sql/answer_generator.py`
-- `app/evaluation/evaluator.py`
-- `app/evaluation/golden_questions.py`
-- `app/evaluation/prompt_builder_tests.py`
-- `app/evaluation/answer_eval_cases.py`
-- `app/evaluation/answer_judge.py`
-- `app/evaluation/ragas_eval.py`
-
-当前新增 / 更新文档：
-- `docs/architecture/ragas_eval_design.md`
-- `docs/architecture/prompt_builder_v2.md`
-- `docs/architecture/ragas_spike_report.md`
-- `docs/architecture/phase2_architecture_review.md`
-- `docs/architecture/evaluation_workflow_v1.md`
-- `docs/architecture/phase2_technical_debt_and_phase3_plan.md`
-
----
-
-## 当前测试体系
-
-- query_plan_tests.py：2/2 PASS
-- intent_parser_tests.py：5/5 PASS
-- intent_resolver_tests.py：5/5 PASS
-- template_sql_tests.py：15/15 PASS
-- prompt_builder_tests.py：5/5 PASS
-- evaluator.py：26/26 PASS
-- answer_judge.py mock：6/6 PASS
-- answer_judge.py llm：6/6 PASS
-- ragas_eval.py --include-negative：6/6 expectation passed
-
-当前 Golden Cases：
-- 26 Cases
-- Pass Rate：100%
-
-当前 Prompt Builder Tests：
-- 5 Cases
-- Pass Rate：100%
-
-当前 Answer Eval Cases：
-- 6 Cases
-- 5 正例
-- 1 负例
-
-LLM-as-Judge 当前结果：
-- Mode: llm
-- Total: 6
-- Passed: 6
-- Failed: 0
-- Pass Rate: 100.0%
-
-Ragas 当前结果：
-- Total: 6
-- Ragas expectation passed: 6/6
-
----
-
-## 当前支持指标
-
-- `item_sales_amount`
-- `order_paid_amount`
-- `refund_rate`
-- `order_count`
-- `sales_quantity`
-- `channel_sales_amount`
-- `channel_refund_rate`
-- `roi`
-- `cac`
-
-当前复杂指标策略：
-- `roi` → Query Plan + Template SQL
-- `cac` → Query Plan + Template SQL
-- 其他普通指标 → Intent Context + LLM SQL
-
----
-
-## 当前 Prompt Builder V2 状态
-
-当前 `prompt_builder.py` 已完成 V2 模块化收束。
-
-当前结构：
-
-build_prompt()
-├─ build_intent_context()
-├─ build_global_rules()
-├─ build_field_alias_rules()
-├─ build_ranking_rules()
-├─ build_dimension_rules()
-├─ build_legacy_complex_metric_rules()
-└─ build_sql_generation_rules()
-
-当前策略：代码内部模块化；最终 Prompt 输出形态尽量保持 V1 的连续规则结构。
-
-Day46 关键发现：第一次模块化后，虽然 `prompt_builder_tests.py` 通过，但 `case_030` 出现回归。LLM 在 SQL 中自行添加了：
-```sql
-AND r.refund_status = 'paid'
-```
-这导致退款金额聚合为空，所有品类退款率变成 0。
-
-最终修复：
-1. 保持 Prompt Builder 内部模块化。
-2. 恢复最终 Prompt 输出为接近 V1 的连续规则结构。
-3. 增加“不编造状态值 / 枚举值”规则。
-4. 同步更新 `build_global_rules()` 和 `build_sql_generation_rules()`。
-
-新增关键规则：
-1. 不要编造字段、表名、状态值或枚举值。不得自行假设 order_status、refund_status、channel_name、category 等字段的取值。
-2. 必须使用指标中的 filters 作为 WHERE 条件。只能使用业务上下文中明确给出的 filters，不要自行新增 status 过滤条件。
-
----
-
-## 当前 Answer Layer 状态
-
-已实现 Answer Layer V1：
-- 支持 Top1 中文回答
-- 支持 TopN 中文回答
-- 支持 Ranking 中文回答
-- 支持 ASC / DESC 排名文案
-- 支持百分比字段展示
-- 只基于 table 中已有事实生成回答
-- 不做未经数据支撑的原因分析和策略建议
-
-当前 Answer Layer V1 支持范围：
-- `category + refund_rate_pct`
-- `category + sales_quantity`
-- `category + order_count`
-- `channel_name + channel_sales_amount`
-- `channel_name + channel_refund_rate_pct`
-- `channel_name + roi`
-- `channel_name + cac`
-
-当前 Answer Layer V1 暂不重点支持：
-- `order_id + paid_amount`
-- `product_id / product_name` 明细结果
-- `customer_id` 明细结果
-- 一行多个指标
-- 原因分析
-- 策略建议
-- 趋势解释
-
----
-
-## 当前 Evaluation 能力
-
-### Deterministic Evaluation
-
-- `expected_tables`
-- `expected_columns`
-- `expected_result`
-- `expected_order`
-- `expected_rows`
-- `expected_generation_method`
-- `expected_intent`
-- `expected_answer_points`
-- tolerance 数值误差
-- `rows_mismatches` 报告
-- `answer_point_mismatches` 报告
-
-### Prompt Builder Evaluation
-
-- `prompt_builder_tests`
-- Intent Context 注入检查
-- Dimension 规则检查
-- Ranking 规则检查
-- Field Alias 规则检查
-- ROI / CAC legacy rules 检查
-- JSON report 输出
-
-### Answer Quality Evaluation
-
-- `answer_eval_cases`
-- mock judge
-- LLM-as-Judge
-- `faithfulness`
-- `relevance`
-- `completeness`
-- `clarity`
-- `expected_judge_passed`
-- positive / negative answer eval
-- `raw_judge_response` 保留
-- answer_eval JSON report
-
----
-
-## 当前最重要的设计结论
-
-1. ROI / CAC 这类复杂跨事实表指标不应长期依赖 LLM 自由生成 SQL，因此走 Query Plan + Template SQL。
-2. 普通指标仍走 LLM SQL，但通过 Intent Context 约束 dimension、limit、ranking_type、sort_hint 和 final_sort_direction。
-3. Result-level Evaluation 已从首行结果校验升级到 expected_rows 多行结果值校验。
-4. Answer Layer V1 先采用规则型生成，只基于 table 事实回答，避免“SQL 对但回答幻觉”。
-5. Prompt Builder 的职责是约束 LLM，而不是替代 Intent Parser、Query Plan、Template SQL 或 Answer Layer。
-6. Prompt 重构不是普通字符串重构，Prompt 的标题、分组、编号方式都会影响 LLM 输出。
-7. Prompt Builder V2 的正确策略是“代码内部模块化，最终 Prompt 输出形态保持稳定”。
-8. Text-to-SQL 不仅要防止 LLM 编造字段，也要防止 LLM 编造状态值和枚举值。
-9. Deterministic Evaluator 和 LLM-as-Judge 是双层评估关系，不互相替代。
-10. `expected_judge_passed` 机制支持正例与负例测试，验证 Judge 既能判对正确回答，也能判错错误回答。
-11. Ragas 的 `faithfulness` 评估 answer claim 是否被 `retrieved_contexts` 支撑，不等于业务正确性评分。
-12. 在 Text-to-SQL 场景中，SQL result rows 需要补充 query semantics，才能让 Ragas 正确理解 TopN / Ranking 语义。
-13. 当前 Evaluation Workflow 已形成三层结构：deterministic evaluator 负责 SQL / 数值 / 排序，answer_judge 负责 answer quality，ragas_eval 负责标准化 groundedness 对照。
-
----
-
-## 当前主要技术债
-
-详细技术债与 Phase3 承接计划已记录在：docs/architecture/phase2_technical_debt_and_phase3_plan.md
-
-当前主要技术债摘要：
-1. Semantic Search V2 仍存在 embedding score 偏低、top1/top2 gap 偏小的问题。当前通过 rule layer 优先、threshold 判断和 clarification 规避误判风险，但尚未建立独立 retrieval eval dataset 对 TOP1_THRESHOLD / GAP_THRESHOLD 进行系统校准。
-2. 当前 V1 美妆数据集可以支撑 Text-to-SQL 主链路验证，但不足以支撑完整可落地的 AI Data Analyst 产品。后续需要设计 Beauty Dataset V2，增强会员历史、复购、留存、LTV、商品生命周期、渠道漏斗、毛利和库存等数据。
-3. 当前指标体系覆盖销售额、退款率、订单数、销量、ROI、CAC 等核心指标，但仍缺少 GMV、客单价、转化率、复购率、留存率、LTV、ARPU、新老客占比、会员等级分布、商品毛利率、库存周转等更完整 BI 指标。
-4. 当前 Query Plan 主要覆盖 ROI / CAC，普通指标尚未纳入 lightweight query_plan，因此普通指标的 sort_field、default_sort、allowed_dimensions、allowed_filters 等仍部分依赖 Prompt 和 LLM。
-5. Intent Parser V1 仍是规则型，对时间范围、过滤条件、趋势类问题、对比类问题、多意图问题的覆盖有限。
-6. Prompt Builder V2 已完成模块化，但 `build_global_rules()` 和 `build_sql_generation_rules()` 仍存在部分规则重复维护，`prompt_builder_tests.py` 还可以补充“不编造状态值 / 枚举值”的专项断言。
-7. Answer Layer V1 主要支持规则型事实回答，还不支持原因分析、趋势解释、策略建议、多指标综合分析和经营诊断。
-8. Evaluation Workflow V1 已形成 deterministic evaluator / answer_judge / Ragas 三层结构，但 Golden Cases、Answer Eval Cases 和负例类型仍偏少，尚未建立 retrieval evaluator。
-9. Ragas 当前仅接入 `faithfulness`，尚未接入 `answer_relevancy` 等更多指标。Ragas 运行较慢且需要调用 LLM，适合阶段性评估，不适合作为日常快速回归。
-10. 当前主链路仍是线性 `query_service.py` pipeline，尚未形成 LangGraph workflow，缺少 workflow state、conditional edges、clarification loop、SQL repair loop 和 eval-driven retry。
-
----
-
-## Phase2 技术债与 Phase3 承接
-
-Day48 已新增：docs/architecture/phase2_technical_debt_and_phase3_plan.md
-
-该文档统一登记 Phase2 未解决但不能丢弃的问题，包括：
-Semantic Retrieval / Embedding Calibration
-Dataset & Business Realism
-Metric System 扩展
-Query Plan / SQL Generation
-Intent Parser / Intent Resolver
-Prompt Builder V2
-Answer Layer / Business Insight Layer
-Evaluation System
-Ragas Evaluation
-LangGraph / Agent Workflow 承接
-
-后续原则：
-阶段内没有解决的问题，不能只留在对话记忆中。
-要么当日解决，要么写入技术债，要么放入后续计划。
-
-Phase3 的核心不是推翻 Phase2，而是用 LangGraph workflow 承接 Phase2 已有模块，并逐步处理 clarification loop、retrieval calibration、SQL validation/repair、eval-driven retry、multi-step analysis、
-Business Insight Layer 和更复杂的分析流程。
-
----
-
-## 下一步 Day49
-
-LangGraph Phase3 Entry Design
-
-目标：
-- 从当前线性 `query_service.py` 流程过渡到 workflow / graph 思维
-- 设计 Phase3 LangGraph 最小入口
-- 明确 LangGraph 如何承接 Phase2 遗留技术债
-- 不急于大规模重构当前主链路
-
-重点考虑：
-- 当前 `query_service.py` 如何拆成 graph nodes
-- LangGraph state 如何设计
-- retrieval / clarification 如何成为独立节点
-- SQL validation / repair loop 放在哪里
-- Evaluation Workflow 如何进入 eval-driven retry
-- 当前 deterministic evaluator / answer_judge / ragas_eval 如何在 Phase3 继续复用
-
-建议节点：
+当前 LangGraph prototype：
 parse_intent
-resolve_intent
+↓
 search_metric
-clarify_if_needed
-build_query_plan
-generate_sql
-validate_sql
-repair_sql_if_needed
-run_sql
-format_result
-generate_answer
-evaluate_answer
-retry_or_finish
+↓
+route_metric_status
+├─ matched → continue_pipeline
+├─ needs_clarification → clarification
+└─ error → fail
 
-Day49 产出：docs/architecture/langgraph_phase3_design.md
+当前测试结果：
+evaluator.py：26/26 PASS
+answer_judge.py --mode mock：6/6 PASS
+ragas_eval.py --include-negative：6/6 expectation passed
+analyst_graph_tests.py：3/3 PASS
 
-Day49 原则：
-Phase3 不推翻 Phase2。
-LangGraph 应该复用 Phase2 已完成模块，而不是重写主链路。
+当前发现的技术债：
+
+1. Dependency Management Debt
+
+安装 LangGraph 后，当前环境出现依赖冲突：
+langchain 0.3.30 requires langchain-core < 1.0.0
+langchain-openai 0.3.35 requires langchain-core < 1.0.0
+current langchain-core = 1.4.8
+
+虽然当前核心评估仍能运行，但该环境不能视为健康环境。后续需要统一 LangGraph / LangChain / Ragas / langchain-openai 版本，并通过 `pip check`。
+
+2. Clarification Candidate Ranking Debt
+
+“最赚钱”已正确进入 needs_clarification，但 suggestions 中 CAC / 获客成本排序偏高。
+
+该问题说明 Hybrid Search 候选排序仍需校准。后续应通过 retrieval evaluator、metric_text_builder 优化和 preferred_options 测试进行处理。
+
+关键结论：
+1. LangGraph 方案 B 已验证通过。
+2. 当前 prototype 已将 `metric_result.status` 从普通 if 判断升级为 LangGraph conditional edge。
+3. Graph 层开始承担 workflow 输出规范化职责。
+4. Phase3 不应推翻 Phase2，而应复用 Phase2 已完成模块。
+5. 当前不继续扩展 SQL repair / eval-driven retry，先记录依赖冲突并保持系统稳定。
+6. Semantic Retrieval 的问题已经从 embedding score / gap 扩展到 clarification candidate ranking，需要后续系统校准。
+
+---
+
+## Day49 LangGraph Prototype 交接
+
+Day49 已完成 Phase3 LangGraph 方案 B 最小 prototype。
+
+新增文件：
+app/agents/analyst_graph.py
+app/agents/analyst_graph_tests.py
+docs/architecture/langgraph_phase3_design.md
+
+核心流程：
+parse_intent
+↓
+search_metric
+↓
+route_metric_status
+├─ matched → continue_pipeline
+├─ needs_clarification → clarification
+└─ error → fail
+
+当前测试结果：analyst_graph_tests.py：3/3 PASS
+
+测试覆盖：
+普通指标路径：哪个渠道销售额最高 → llm
+复杂指标路径：各渠道ROI排名 → template
+歧义问题路径：最赚钱 → needs_clarification
+
+重要实现：query_service.py 新增 ask_with_resolved_metric(question, intent, metric_result)
+
+该函数用于在 metric 已经识别完成后继续执行 SQL 生成、数据库查询和回答生成，避免 LangGraph 已经执行 `parse_intent` / `search_metric` 后重复执行原主链路前半段。
+
+当前注意事项：
+1. 当前 LangGraph 仅完成 clarification branch prototype。
+2. 尚未实现 SQL repair loop。
+3. 尚未实现 eval-driven retry。
+4. 当前环境存在 LangGraph / LangChain 依赖冲突。
+5. “最赚钱” suggestions 排序不理想，已记录为 retrieval candidate ranking 技术债。
+
+后续处理：
+Day50 不继续新增复杂功能。
+先完成 Phase2 closing、依赖风险记录、项目交接和面试材料整理。
+
+---
+
 
 
 

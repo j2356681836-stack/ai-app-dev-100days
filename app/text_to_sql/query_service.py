@@ -9,75 +9,61 @@ from app.text_to_sql.answer_generator import generate_answer
 from app.semantic_layer.intent_parser import parse_intent, enrich_intent_with_query_plan
 from app.semantic_layer.query_plan_loader import get_query_plan_by_metric
 
-
 import time
+
 
 start = time.time()
 
-def ask(question: str):
+def ask_with_resolved_metric(
+    question: str,
+    intent: dict,
+    metric_result: dict,
+) -> dict:
     """
-    自然语言问题 -> 意图解析 -> SQL -> 数据库结果 -> 自然语言回答
+    在 metric 已经识别完成后，继续执行 SQL 生成、数据库查询和回答生成。
+
+    这个函数用于：
+    1. 保持原 query_service.ask 的能力
+    2. 给 Phase3 LangGraph prototype 复用
+    3. 避免 LangGraph 已经 search_metric 后再次重复 search
     """
+    metrics = metric_result.get("metrics", [])
 
-    try:
-        intent = parse_intent(question)
-        metric_result = search_metric(question)
-
-        if metric_result.get("status") != "matched":
-            return {
-                "success": False,
-                **metric_result,
-            }
-
-        metrics = metric_result.get("metrics", [])
-
-        if not metrics:
-            return {
-                "success": False,
-                "status": "error",
-                "message": "未识别到业务指标",
-            }
-
-        metric_name = metrics[0]["name"]
-        query_plan = get_query_plan_by_metric(metric_name)
-        
-        intent = enrich_intent_with_query_plan(
-            intent=intent,
-            query_plan=query_plan,
-        )
-
-        template_sql = generate_template_sql_from_intent(
-            metric_name=metric_name,
-            intent=intent,
-        )
-
-        if template_sql:
-            raw_sql = template_sql
-            generation_method = "template"
-        else:
-            raw_sql = generate_sql(question, intent=intent)
-            generation_method = "llm"
-
-        sql = clean_sql(raw_sql)
-
-    except ValueError as e:
-        payload = e.args[0]
-        if isinstance(payload, dict):
-            return {
-                "success": False,
-                **payload,
-            }
+    if not metrics:
         return {
             "success": False,
             "status": "error",
-            "message": str(e),
+            "message": "未识别到业务指标",
         }
+
+    metric_name = metrics[0]["name"]
+    query_plan = get_query_plan_by_metric(metric_name)
+
+    intent = enrich_intent_with_query_plan(
+        intent=intent,
+        query_plan=query_plan,
+    )
+
+    template_sql = generate_template_sql_from_intent(
+        metric_name=metric_name,
+        intent=intent,
+    )
+
+    if template_sql:
+        raw_sql = template_sql
+        generation_method = "template"
+    else:
+        raw_sql = generate_sql(question, intent=intent)
+        generation_method = "llm"
+
+    sql = clean_sql(raw_sql)
 
     if not validate_sql(sql):
         raise ValueError("SQL 校验失败，拒绝执行。")
 
     rows = format_result(run_sql(sql))
-    table = to_table(rows)  # 转成表格
+    table = to_table(rows)
+
     answer = generate_answer(
         question=question,
         table=table,
@@ -94,6 +80,43 @@ def ask(question: str):
         "table": table,
         "answer": answer,
     }
+
+
+def ask(question: str):
+    """
+    自然语言问题 -> 意图解析 -> SQL -> 数据库结果 -> 自然语言回答
+    """
+
+    try:
+        intent = parse_intent(question)
+        metric_result = search_metric(question)
+
+        if metric_result.get("status") != "matched":
+            return {
+                "success": False,
+                **metric_result,
+            }
+
+        return ask_with_resolved_metric(
+            question=question,
+            intent=intent,
+            metric_result=metric_result,
+        )
+
+    except ValueError as e:
+        payload = e.args[0]
+
+        if isinstance(payload, dict):
+            return {
+                "success": False,
+                **payload,
+            }
+
+        return {
+            "success": False,
+            "status": "error",
+            "message": str(e),
+        }
 
 
 if __name__ == "__main__":

@@ -24,4 +24,5 @@ datasets
 langchain-openai
 langchain-community
 langchain-google-vertexai
+langchain-core-1.4.8
 ```

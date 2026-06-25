@@ -195,6 +195,39 @@ matched_metric
 
 ---
 
+### Clarification Candidate Ranking Debt
+
+Day49 在 LangGraph clarification branch 测试中发现：
+问题：“最赚钱”
+结果：正确进入 needs_clarification
+但候选指标 suggestions 的排序仍不理想
+
+当前返回候选中包含：
+渠道销售额
+获客成本
+商品明细实付销售额
+
+其中 `获客成本 / CAC` 与“最赚钱”的业务语义关联较弱，不应在该问题下靠前。相比之下，ROI、销售额、净销售额、利润、毛利等指标更接近“赚钱”语义。
+
+当前判断：
+LangGraph routing 正确
+Clarification branch 正确
+问题出在 Hybrid Search 的候选指标召回与排序质量
+
+后续计划：
+1. 在 retrieval_eval_cases.py 中增加 ambiguity / clarification 类型用例
+2. 为“最赚钱”这类问题定义 expected_clarification = True
+3. 增加 expected_options 或 preferred_options，用于评估候选项质量
+4. 优化 metric_text_builder，增强“赚钱 / 回报 / 成本 / 效率 / 销售额”之间的语义区分
+5. 必要时增加 query phrase rule，让“赚钱”优先召回销售额 / ROI / 利润类指标，而不是 CAC
+
+当前不在 Day49 直接修复，原因是：
+1. 当前 LangGraph prototype 已验证通过
+2. 强行调整 embedding 排序可能影响已有 metric search 行为
+3. 该问题更适合通过 retrieval evaluator 系统校准
+
+---
+
 # 2. Dataset & Business Realism Debt
 
 ## 当前问题
@@ -735,6 +768,55 @@ retry_if_needed
 
 LangGraph 的价值是：
 让系统从单次线性调用升级为可分支、可回退、可重试、可解释的工作流。
+
+---
+
+# 11. Dependency Management Debt
+
+## 当前问题
+
+Day49 安装 LangGraph 后，当前 Python 环境出现依赖冲突。
+
+`pip check` 显示：
+langchain 0.3.30 requires langchain-core < 1.0.0
+langchain-openai 0.3.35 requires langchain-core < 1.0.0
+current langchain-core = 1.4.8
+
+虽然当前核心评估仍然通过：
+evaluator.py：26/26 PASS
+answer_judge.py --mode mock：6/6 PASS
+ragas_eval.py --include-negative：6/6 expectation passed
+
+但该环境不能视为健康环境。
+
+## 当前影响
+
+可能影响：
+1. 后续 Ragas metric 扩展
+2. LangChain / LangGraph 相关 import
+3. langchain-openai 调用
+4. 后续 dependency install
+5. 项目复现性
+
+## 当前处理策略
+
+Day49 不继续扩展复杂 LangGraph 功能。
+当前只保留最小 prototype 验证结果，并将依赖冲突记录为 Phase3 技术债。
+
+## 后续计划
+
+Phase3 开始前需要完成：
+1. 检查当前 requirements / pyproject
+2. 统一 LangGraph、LangChain、Ragas、langchain-openai 版本
+3. 新增或更新 requirements.txt
+4. 固定可复现依赖
+5. 跑通 pip check
+6. 跑通 evaluator / answer_judge / ragas_eval / analyst_graph
+
+验收标准：
+pip check 通过
+核心评估通过
+LangGraph prototype 通过
 
 ---
 
