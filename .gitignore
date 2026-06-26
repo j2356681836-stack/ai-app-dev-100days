@@ -50,12 +50,5 @@ docs/evaluation/*.json
 *.npy
 *.pkl
 
-# chatgpt_prompt
-docs/chatgpt_handover.md
-
-# study knowledge
-docs/study/
-docs/daily_logs/
-
 # Private learning notes / AI-assisted drafts
 _private/
