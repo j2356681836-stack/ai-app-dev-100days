@@ -72,10 +72,11 @@
 ---
 ## 当前阶段
 
-Phase 2：Business Semantic Layer & Text-to-SQL
+Phase 2：Business Semantic Layer & Text-to-SQL（已完成）
+Phase 3：LangGraph / Agent Workflow（即将开始）
 
-进度：Day21 ~ Day50
-当前日期：Day49 / 100
+当前日期：Day50 / 100
+下一步：Day51 / 100
 
 ---
 
@@ -604,71 +605,124 @@ build_prompt()
 
 ## 当前待办（Next Milestone）
 
-## Day50：Phase2 Closing / Phase3 Handover / Dependency Check
+### Phase3 Day51：Dependency Lock / Phase3 Environment Stabilization
 
 目标：
-- 不再新增大功能
-- 完成 Phase2 阶段性收尾
-- 完成 Phase3 LangGraph prototype 交接
-- 明确依赖冲突处理方案
-- 将项目成果转化为简历和面试表达
+- 正式进入 Phase3
+- 不急于继续扩展 LangGraph 功能
+- 先解决 Day49 发现的依赖冲突
+- 统一 LangGraph / LangChain / Ragas / langchain-openai 版本
+- 确保环境可复现、可测试、可继续迭代
 
-学习安排：
-1. 回归当前核心测试
+背景：
+Day49 安装 LangGraph 后，当前环境出现依赖冲突：
+langchain 0.3.30 requires langchain-core < 1.0.0, >= 0.3.85
+langchain-openai 0.3.35 requires langchain-core < 1.0.0, >= 0.3.78
+current langchain-core = 1.4.8
+
+虽然当前核心回归仍然通过：
+evaluator.py：26/26 PASS
+answer_judge.py --mode mock：6/6 PASS
+analyst_graph_tests.py：3/3 PASS
+ragas_eval.py --include-negative：6/6 expectation passed
+
+但该环境不能视为健康环境。
+
+Day51 学习安排：
+1. 检查当前依赖
+   - `pip freeze`
+   - `pip check`
+   - 当前 requirements / pyproject 状态
+2. 明确当前依赖冲突来源
+   - LangGraph
+   - LangChain
+   - langchain-core
+   - langchain-openai
+   - Ragas
+3. 选择依赖处理策略
+   - 不盲目升级
+   - 不盲目降级
+   - 优先选择能同时跑通 Ragas 与 LangGraph 的版本组合
+4. 建立依赖锁定文件
+   - `requirements.txt`
+   - 或 `requirements-lock.txt`
+5. 回归核心测试
    - `python -m app.evaluation.evaluator`
    - `python -m app.evaluation.answer_judge --mode mock`
+   - `python -m app.evaluation.ragas_eval --include-negative`
    - `python -m app.agents.analyst_graph_tests`
-
-2. 检查当前依赖状态
    - `pip check`
-   - 记录当前冲突
-   - 不在 Day50 盲目升级依赖
 
-3. 整理 Phase2 / Day49 当前成果
-   - Text-to-SQL 主链路
-   - Answer Layer V1
-   - Evaluation Workflow V1
-   - Ragas Evaluation
-   - Phase2 Technical Debt Register
-   - LangGraph Clarification Branch Prototype
+Day51 验收标准：
+pip check 通过
+evaluator.py 通过
+answer_judge.py --mode mock 通过
+ragas_eval.py --include-negative 通过
+analyst_graph_tests.py 通过
 
-4. 整理 Phase2 技术债
-   - Semantic Retrieval Calibration
-   - Clarification Candidate Ranking
-   - Dependency Management
-   - Dataset & Business Realism
-   - Metric System 扩展
-   - Ordinary Metric Query Plan
-   - Answer / Insight Layer
-   - Evaluation Coverage
+Day51 原则：
+Phase3 第一件事不是继续写 Agent 功能，而是先把环境依赖稳定下来。
+依赖不健康时，不继续叠加 SQL repair / eval-driven retry 等复杂功能。
 
-5. 更新项目文档
-   - README
-   - PROJECT_STATE
-   - chatgpt_handover.md
+---
 
-6. 整理面试材料
-   - Phase2 项目介绍
-   - 为什么不能直接让 LLM 生成 SQL
-   - 为什么 ROI / CAC 走 Template SQL
-   - 为什么需要 Evaluation Workflow
-   - 为什么 Ragas 不能替代 deterministic evaluator
-   - 为什么 Phase3 引入 LangGraph
-   - LangGraph 当前 prototype 做了什么
-   - 当前技术债如何管理
+### Phase3 后续计划
 
-Day50 交付：
-docs/interview/phase2_project_story.md
-docs/interview/resume_bullets.md
-docs/interview/interview_qa_phase2.md
-chatgpt_handover.md 更新建议
-Phase2 closing checklist
+#### Day52：Retrieval Evaluator / Clarification Candidate Ranking
 
-Day50 原则：
-不新增复杂功能。
-不继续扩展 LangGraph repair loop。
-不盲目修依赖。
-先完成 Phase2 收尾、复盘、交接和表达。
+目标：
+- 承接 Semantic Retrieval Calibration Debt
+- 将 embedding score、gap、clarification options 从人工观察变成可测试对象
+- 解决“最赚钱” suggestions 中 CAC 排序偏高的问题
+
+计划：
+- 新增 `app/evaluation/retrieval_eval_cases.py`
+- 新增 `app/evaluation/retrieval_evaluator.py`
+- 增加 expected_metric / expected_clarification / preferred_options
+- 为“最赚钱”“哪个渠道最划算”“拉新效率最高”等模糊问题建立 retrieval eval cases
+- 校准 TOP1_THRESHOLD / GAP_THRESHOLD
+- 评估 metric_text_builder 是否需要增强
+
+#### Day53：LangGraph SQL Validation / Repair Design
+
+目标：
+- 设计 SQL validation failed → repair_sql 的 graph 分支
+- 不急于完整实现复杂 repair
+- 先明确 state、error、retry_count、max_retry 的结构
+
+计划：
+- 扩展 `docs/architecture/langgraph_phase3_design.md`
+- 设计 repair_sql_node
+- 设计 retry_or_fail 条件边
+- 评估如何复用 sql_validator / sql_cleaner / sql_generator
+
+#### Day54-Day55：LangGraph SQL Repair Prototype
+
+目标：
+- 在 Day53 设计基础上，实现最小 SQL repair prototype
+- 保持原 `query_service.py` 主链路稳定
+- 不破坏 Day49 clarification branch
+
+计划：
+- 新增或扩展 graph nodes
+- 增加 SQL validation failure 测试
+- 增加 graph repair branch tests
+- 回归 evaluator / analyst_graph_tests
+
+#### Day56-Day57：Eval-driven Retry Design
+
+目标：
+- 设计 evaluation_result 如何进入 graph state
+- 明确哪些 evaluator 适合在线判断，哪些只适合离线评估
+- 避免把耗时 Ragas 放进日常 graph 主链路
+
+#### Day58-Day60：Phase3 First Milestone Review
+
+目标：
+- 完成 Phase3 第一轮 workflow 化
+- 回顾 dependency / retrieval / clarification / repair / retry 进展
+- 更新 PROJECT_STATE / README / handover
+- 判断是否进入多步分析与 Business Insight Layer
 
 ---
 
@@ -1843,16 +1897,6 @@ ragas_eval.py --include-negative：6/6 expectation passed
 - 复盘为什么 ROI / CAC 走 Template SQL，普通指标保留 LLM SQL
 - 回归核心评估命令，结果正常
 
-当前新增文档：
-docs/architecture/phase2_architecture_review.md
-docs/architecture/evaluation_workflow_v1.md
-docs/architecture/phase2_technical_debt_and_phase3_plan.md
-
-当前回归结果：
-evaluator.py：通过
-answer_judge.py --mode mock：通过
-ragas_eval.py --include-negative：通过
-
 关键结论：
 1. Phase2 已经证明业务语义层、Text-to-SQL、Answer Layer 和 Evaluation Workflow 主链路可行。
 2. Phase2 仍存在多类技术债，不能只靠对话记忆保留。
@@ -1896,29 +1940,6 @@ ragas_eval.py --include-negative：通过
 - 发现“最赚钱”进入 clarification 后 suggestions 排序不理想
 - 将该问题记录为 Clarification Candidate Ranking Debt
 
-当前新增 / 修改文件：
-app/agents/analyst_graph.py
-app/agents/analyst_graph_tests.py
-app/text_to_sql/query_service.py
-docs/architecture/langgraph_phase3_design.md
-docs/architecture/phase2_technical_debt_and_phase3_plan.md
-
-当前 LangGraph prototype：
-parse_intent
-↓
-search_metric
-↓
-route_metric_status
-├─ matched → continue_pipeline
-├─ needs_clarification → clarification
-└─ error → fail
-
-当前测试结果：
-evaluator.py：26/26 PASS
-answer_judge.py --mode mock：6/6 PASS
-ragas_eval.py --include-negative：6/6 expectation passed
-analyst_graph_tests.py：3/3 PASS
-
 当前发现的技术债：
 
 1. Dependency Management Debt
@@ -1946,49 +1967,69 @@ current langchain-core = 1.4.8
 
 ---
 
-## Day49 LangGraph Prototype 交接
+### Day50
 
-Day49 已完成 Phase3 LangGraph 方案 B 最小 prototype。
+完成：
+- 完成 Phase2 closing，新增 `docs/architecture/phase2_closing_checklist.md`
+- 校准 `chatgpt_handover.md`，明确其只作为新窗口协作规则，不作为项目进度事实源
+- 回归 Day50 最小核心测试：
+  - `evaluator.py`：26/26 PASS
+  - `answer_judge.py --mode mock`：6/6 PASS
+  - `analyst_graph_tests.py`：3/3 PASS
+- 确认 `pip check` 仍存在 LangGraph / LangChain 依赖冲突
+- 明确 Phase3 Day51 第一优先级是 dependency lock，而不是继续叠加复杂 LangGraph 功能
 
-新增文件：
-app/agents/analyst_graph.py
-app/agents/analyst_graph_tests.py
-docs/architecture/langgraph_phase3_design.md
+当前判断：
+- Phase2 功能闭环已完成
+- 功能回归健康
+- 依赖环境不健康
+- Day50 不盲目修依赖
+- Phase3 Day51 优先处理 dependency lock
 
-核心流程：
-parse_intent
-↓
-search_metric
-↓
-route_metric_status
-├─ matched → continue_pipeline
-├─ needs_clarification → clarification
-└─ error → fail
-
-当前测试结果：analyst_graph_tests.py：3/3 PASS
-
-测试覆盖：
-普通指标路径：哪个渠道销售额最高 → llm
-复杂指标路径：各渠道ROI排名 → template
-歧义问题路径：最赚钱 → needs_clarification
-
-重要实现：query_service.py 新增 ask_with_resolved_metric(question, intent, metric_result)
-
-该函数用于在 metric 已经识别完成后继续执行 SQL 生成、数据库查询和回答生成，避免 LangGraph 已经执行 `parse_intent` / `search_metric` 后重复执行原主链路前半段。
-
-当前注意事项：
-1. 当前 LangGraph 仅完成 clarification branch prototype。
-2. 尚未实现 SQL repair loop。
-3. 尚未实现 eval-driven retry。
-4. 当前环境存在 LangGraph / LangChain 依赖冲突。
-5. “最赚钱” suggestions 排序不理想，已记录为 retrieval candidate ranking 技术债。
-
-后续处理：
-Day50 不继续新增复杂功能。
-先完成 Phase2 closing、依赖风险记录、项目交接和面试材料整理。
+关键结论：
+1. Phase2 已完成 Business Semantic Layer、Text-to-SQL、Answer Layer、Evaluation Workflow、Ragas Evaluation 和 LangGraph clarification branch prototype 的核心闭环。
+2. 当前系统是可演示、可解释、可评估的 AI Data Analyst / Text-to-SQL 原型，不是完整企业级产品。
+3. 未解决问题已进入 `phase2_technical_debt_and_phase3_plan.md`。
+4. Phase3 不推翻 Phase2，而是在现有模块基础上处理 dependency lock、retrieval evaluator、SQL repair loop 和 eval-driven retry。
 
 ---
 
+## 当前交接摘要
+
+当前 `PROJECT_STATE.md` 是项目状态唯一事实源。
+Phase2 已在 Day50 完成 closing，当前项目即将进入 Phase3。
+
+新窗口开始时应先阅读：
+PROJECT_STATE.md
+README.md
+chatgpt_handover.md
+
+文档职责：
+PROJECT_STATE.md：当前项目状态、架构、测试体系、技术债、后续计划
+README.md：对外展示与阶段成果
+chatgpt_handover.md：新窗口协作规则与回答约束
 
 
+当前下一步：Phase3 Day51：Dependency Lock / Phase3 Environment Stabilization
+Day51 第一优先级不是继续扩展 LangGraph 功能，而是先处理 Day49 安装 LangGraph 后出现的依赖冲突，统一 LangGraph / LangChain / Ragas / langchain-openai 版本，并保证核心测试与 `pip check` 通过。
 
+Day51 启动时优先运行或检查：
+```bash
+pip freeze
+pip check
+python -m app.evaluation.evaluator
+python -m app.evaluation.answer_judge --mode mock
+python -m app.evaluation.ragas_eval --include-negative
+python -m app.agents.analyst_graph_tests
+```
+
+当前不要做：
+不要直接重写 query_service.py
+不要继续扩展 SQL repair loop
+不要盲目升级或降级依赖
+不要重建 Beauty Dataset V2
+不要做 dashboard
+
+后续原则：
+阶段内没有解决的问题，不能只留在对话记忆中。
+要么当日解决，要么写入技术债，要么进入后续计划。
