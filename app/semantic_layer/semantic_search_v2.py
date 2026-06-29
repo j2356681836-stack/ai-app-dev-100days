@@ -59,7 +59,7 @@ def search_metric_by_embedding(question: str,):
         "method": "embedding",
         "question": question,
         "top_metric": results[0] if results else None,
-        "candidates": results[:3],
+        "candidates": results[:6],
         "is_confident": confident,
     }
 

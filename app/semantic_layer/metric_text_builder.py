@@ -18,9 +18,9 @@ def build_metric_text(metric: dict) -> str:
     examples = metric.get("examples", [])
     examples_text = "\n".join([f"- {item}" for item in examples])
 
-    negative_examples = metric.get("negative_examples", [])
-    negative_examples_text = "\n".join([f"- {item}" for item in negative_examples])
-
+    # negative_examples 不进入 embedding 文本。
+    # 原因：向量模型可能无法稳定理解“不适用”语义，
+    # 反而会因为出现相似词而拉近不相关指标。
     return f"""
 指标名称：
 {metric.get("chinese_name", "")}
@@ -34,8 +34,6 @@ def build_metric_text(metric: dict) -> str:
 {aliases_text}
 适用问题：
 {examples_text}
-不适用问题：
-{negative_examples_text}
 相关数据表：
 {tables_text}
 过滤条件：

@@ -276,6 +276,7 @@ Answer
 | intent_resolver_tests.py | 5/5 PASS |
 | template_sql_tests.py | 15/15 PASS |
 | prompt_builder_tests.py | 5/5 PASS |
+| retrieval_evaluator.py --strict | 6/6 PASS |
 | evaluator.py | 26/26 PASS |
 | answer_judge.py --mode mock | 6/6 PASS |
 | answer_judge.py --mode llm | 6/6 PASS |
@@ -533,6 +534,7 @@ Phase2 完成了 Business Semantic Layer、Text-to-SQL、Answer Layer、Evaluati
 - 尚未实现 eval-driven retry。
 - 尚未实现完整 Business Insight Layer。
 - Phase3 Day51 已完成 dependency lock，当前依赖环境已通过 `pip check` 与核心回归测试。
+-当前 retrieval / clarification 能力已经可以评估模糊问题的候选质量，但 reranker 仍是轻量规则型实现。后续随着指标体系扩展，需要继续扩大 retrieval eval cases，并评估是否引入更系统的 rerank 策略。
 
 ---
 
@@ -548,6 +550,10 @@ Phase3 当前进展：
 - 已生成 `requirements-lock.txt`
 - 已保留旧问题环境快照 `requirements-lock-current-broken.txt`
 - 当前健康环境通过 `pip check` 与核心回归测试
+- Day52 完成 Retrieval Evaluator / Clarification Candidate Ranking
+- 已新增 retrieval eval cases 与 retrieval evaluator
+- 已接入 clarification candidate reranker
+- 已将 embedding confidence trace 与 rerank suggestion trace 拆分
 
 当前稳定依赖基线：
 - `langchain==0.3.30`
@@ -662,8 +668,8 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.26
-完成度：Day51 / 100
+Version: v0.27
+完成度：Day52 / 100
 当前实现：
 
 自然语言问题
@@ -685,6 +691,6 @@ Version: v0.26
 当前阶段：
 Phase2 已完成
 Phase3 进行中
-下一步：Retrieval Evaluator / Clarification Candidate Ranking
+下一步：LangGraph SQL Validation / Repair Design
 
 

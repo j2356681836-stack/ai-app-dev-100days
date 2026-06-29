@@ -2,6 +2,7 @@ from app.semantic_layer.metric_loader import (search_metrics,)
 from app.semantic_layer.semantic_search_v2 import (search_metric_by_embedding,)
 from app.semantic_layer.clarification import (build_clarification,)
 
+from app.semantic_layer.clarification_reranker import rerank_candidates_for_clarification
 
 def search_metric(query: str) -> dict:
     """
@@ -74,7 +75,30 @@ def search_metric(query: str) -> dict:
             }
         }
 
-    clarification_result =  build_clarification(embedding_result)
+    reranked_candidates = rerank_candidates_for_clarification(
+        query=query,
+        candidates=candidates,
+        top_k=3,
+    )
+
+    reranked_embedding_result = {
+        **embedding_result,
+        "candidates": reranked_candidates,
+    }
+
+    rerank_top1 = reranked_candidates[0] if len(reranked_candidates) > 0 else None
+    rerank_top2 = reranked_candidates[1] if len(reranked_candidates) > 1 else None
+
+    rerank_gap = None
+    if rerank_top1 and rerank_top2:
+        rerank_gap = (
+            rerank_top1.get("rerank_score", rerank_top1.get("score", 0))
+            -
+            rerank_top2.get("rerank_score", rerank_top2.get("score", 0))
+        )
+
+    clarification_result = build_clarification(reranked_embedding_result)
+    
     status = clarification_result["status"]
     message = clarification_result["message"]
     options = clarification_result["suggestions"]
@@ -82,16 +106,53 @@ def search_metric(query: str) -> dict:
         "status": status,
         "message": message,
         "options": options,
-        "trace":{
+        "trace": {
             "search_type": "embedding",
-            "top1": top1["chinese_name"],
-            "top1_score": round(top1["score"],4),
-            "top2": top2["chinese_name"],
-            "top2_score": round(top2["score"],4),
-            "gap": round(gap,4),
-            "reason": reason
-        }
+            "confidence_source": "embedding_score",
+            "suggestion_source": "rerank_score",
 
+            "embedding": {
+                "top1": top1["chinese_name"],
+                "top1_score": round(top1["score"], 4),
+                "top2": top2["chinese_name"],
+                "top2_score": round(top2["score"], 4),
+                "gap": round(gap, 4),
+                "reason": reason,
+                "threshold": {
+                    "top1": 0.50,
+                    "gap": 0.08,
+                },
+            },
+
+            "rerank": {
+                "top1": rerank_top1["chinese_name"] if rerank_top1 else None,
+                "top1_score": round(
+                    rerank_top1.get("rerank_score", rerank_top1.get("score", 0)),
+                    4,
+                ) if rerank_top1 else None,
+                "top2": rerank_top2["chinese_name"] if rerank_top2 else None,
+                "top2_score": round(
+                    rerank_top2.get("rerank_score", rerank_top2.get("score", 0)),
+                    4,
+                ) if rerank_top2 else None,
+                "gap": round(rerank_gap, 4) if rerank_gap is not None else None,
+                "candidates": [
+                    {
+                        "name": item["name"],
+                        "chinese_name": item["chinese_name"],
+                        "embedding_score": round(
+                            item.get("original_score", item.get("score", 0)),
+                            4,
+                        ),
+                        "rerank_score": round(
+                            item.get("rerank_score", item.get("score", 0)),
+                            4,
+                        ),
+                    }
+                    for item in reranked_candidates
+                ],
+            },
+        }
     }
 
 if __name__ == "__main__":
