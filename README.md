@@ -532,7 +532,7 @@ Phase2 完成了 Business Semantic Layer、Text-to-SQL、Answer Layer、Evaluati
 - 尚未实现 SQL repair loop。
 - 尚未实现 eval-driven retry。
 - 尚未实现完整 Business Insight Layer。
-- 当前依赖环境存在 LangGraph / LangChain 版本冲突，Phase3 Day51 优先处理 dependency lock。
+- Phase3 Day51 已完成 dependency lock，当前依赖环境已通过 `pip check` 与核心回归测试。
 
 ---
 
@@ -540,10 +540,25 @@ Phase2 完成了 Business Semantic Layer、Text-to-SQL、Answer Layer、Evaluati
 
 Agent Workflow
 
-状态：🟡 即将开始
+状态：🟡 进行中
 
-Phase3 起点：
-- Dependency Lock / Phase3 Environment Stabilization
+Phase3 当前进展：
+- Day51 完成 Dependency Lock / Phase3 Environment Stabilization
+- 已统一 LangChain / LangGraph / Ragas 兼容依赖组合
+- 已生成 `requirements-lock.txt`
+- 已保留旧问题环境快照 `requirements-lock-current-broken.txt`
+- 当前健康环境通过 `pip check` 与核心回归测试
+
+当前稳定依赖基线：
+- `langchain==0.3.30`
+- `langchain-core==0.3.86`
+- `langchain-openai==0.3.35`
+- `langchain-community==0.3.31`
+- `langgraph==0.6.11`
+- `ragas==0.4.3`
+- `sentence-transformers==5.5.1`
+
+Phase3 后续重点：
 - Retrieval Evaluator
 - Clarification Candidate Ranking
 - LangGraph SQL Validation / Repair Design
@@ -647,8 +662,8 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.25
-完成度：Day50 / 100
+Version: v0.26
+完成度：Day51 / 100
 当前实现：
 
 自然语言问题
@@ -669,7 +684,7 @@ Version: v0.25
 
 当前阶段：
 Phase2 已完成
-Phase3 即将开始
-下一步：Dependency Lock / Phase3 Environment Stabilization
+Phase3 进行中
+下一步：Retrieval Evaluator / Clarification Candidate Ranking
 
 
