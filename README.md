@@ -546,14 +546,8 @@ Agent Workflow
 
 Phase3 当前进展：
 - Day51 完成 Dependency Lock / Phase3 Environment Stabilization
-- 已统一 LangChain / LangGraph / Ragas 兼容依赖组合
-- 已生成 `requirements-lock.txt`
-- 已保留旧问题环境快照 `requirements-lock-current-broken.txt`
-- 当前健康环境通过 `pip check` 与核心回归测试
 - Day52 完成 Retrieval Evaluator / Clarification Candidate Ranking
-- 已新增 retrieval eval cases 与 retrieval evaluator
-- 已接入 clarification candidate reranker
-- 已将 embedding confidence trace 与 rerank suggestion trace 拆分
+- Day53 完成 LangGraph SQL Validation / Repair Design
 
 当前稳定依赖基线：
 - `langchain==0.3.30`
@@ -615,7 +609,7 @@ Answer Layer
 ↓
 Evaluation Workflow
 
-## 下一阶段：Phase3
+## 正在进行：Phase3
 
 Question
 ↓
@@ -668,8 +662,8 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.27
-完成度：Day52 / 100
+Version: v0.28
+完成度：Day53 / 100
 当前实现：
 
 自然语言问题
@@ -691,6 +685,6 @@ Version: v0.27
 当前阶段：
 Phase2 已完成
 Phase3 进行中
-下一步：LangGraph SQL Validation / Repair Design
+下一步：SQL Repair Node Minimal Prototype
 
 
