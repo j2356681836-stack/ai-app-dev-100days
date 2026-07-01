@@ -548,6 +548,7 @@ Phase3 当前进展：
 - Day51 完成 Dependency Lock / Phase3 Environment Stabilization
 - Day52 完成 Retrieval Evaluator / Clarification Candidate Ranking
 - Day53 完成 LangGraph SQL Validation / Repair Design
+- Day54 完成 SQL Repair Node Minimal Prototype
 
 当前稳定依赖基线：
 - `langchain==0.3.30`
@@ -559,10 +560,9 @@ Phase3 当前进展：
 - `sentence-transformers==5.5.1`
 
 Phase3 后续重点：
-- Retrieval Evaluator
-- Clarification Candidate Ranking
-- LangGraph SQL Validation / Repair Design
+- SQL Repair Graph Prototype / Test Harness
 - Eval-driven Retry Design
+- Multi-step Analysis / Business Insight Layer
 
 当前原则：
 - 不推翻 Phase2 主链路
@@ -662,8 +662,8 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.28
-完成度：Day53 / 100
+Version: v0.29
+完成度：Day54 / 100
 当前实现：
 
 自然语言问题
@@ -685,6 +685,6 @@ Version: v0.28
 当前阶段：
 Phase2 已完成
 Phase3 进行中
-下一步：SQL Repair Node Minimal Prototype
+下一步：SQL Repair Graph Prototype / Test Harness
 
 
