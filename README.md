@@ -282,6 +282,7 @@ Answer
 | answer_judge.py --mode llm | 6/6 PASS |
 | ragas_eval.py --include-negative | 6/6 expectation passed |
 | analyst_graph_tests.py | 3/3 PASS |
+| sql_repair_graph_tests.py | 4/4 PASS |
 
 当前定位：
 - deterministic evaluator 负责业务结果正确性
@@ -549,6 +550,7 @@ Phase3 当前进展：
 - Day52 完成 Retrieval Evaluator / Clarification Candidate Ranking
 - Day53 完成 LangGraph SQL Validation / Repair Design
 - Day54 完成 SQL Repair Node Minimal Prototype
+- Day55 完成 SQL Repair Graph Test Harness
 
 当前稳定依赖基线：
 - `langchain==0.3.30`
@@ -560,9 +562,9 @@ Phase3 当前进展：
 - `sentence-transformers==5.5.1`
 
 Phase3 后续重点：
-- SQL Repair Graph Prototype / Test Harness
 - Eval-driven Retry Design
 - Multi-step Analysis / Business Insight Layer
+- Phase3 First Milestone Review
 
 当前原则：
 - 不推翻 Phase2 主链路
@@ -662,8 +664,8 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.29
-完成度：Day54 / 100
+Version: v0.30
+完成度：Day55 / 100
 当前实现：
 
 自然语言问题
@@ -681,10 +683,11 @@ Version: v0.29
 → LLM-as-Judge Answer Evaluation
 → Ragas Evaluation
 → LangGraph Clarification Branch Prototype
+→ SQL Repair Graph Test Harness
 
 当前阶段：
 Phase2 已完成
 Phase3 进行中
-下一步：SQL Repair Graph Prototype / Test Harness
+下一步：Eval-driven Retry Design
 
 
