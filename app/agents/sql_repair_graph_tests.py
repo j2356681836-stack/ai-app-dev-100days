@@ -229,12 +229,185 @@ def test_max_retries_exceeded() -> None:
     )
 
 
+def test_evaluation_result_validation_error_non_retryable() -> None:
+    state = {
+        "sql_error_type": "validation_error",
+        "generation_method": "llm",
+        "retry_count": 0,
+        "max_retries": 1,
+    }
+
+    state.update(nodes.evaluate_runtime_result_node(state))
+
+    evaluation_result = state.get("evaluation_result", {})
+
+    assert_equal(
+        evaluation_result.get("passed"),
+        False,
+        "validation_error 的 evaluation_result.passed 应为 False。",
+    )
+
+    assert_equal(
+        evaluation_result.get("retryable"),
+        False,
+        "validation_error 不应 retry。",
+    )
+
+    assert_equal(
+        nodes.route_evaluation_result(state),
+        "fail",
+        "validation_error 应路由到 fail。",
+    )
+
+
+def test_evaluation_result_llm_execution_error_retryable() -> None:
+    state = {
+        "sql_error_type": "execution_error",
+        "generation_method": "llm",
+        "retry_count": 0,
+        "max_retries": 1,
+    }
+
+    state.update(nodes.evaluate_runtime_result_node(state))
+
+    evaluation_result = state.get("evaluation_result", {})
+
+    assert_equal(
+        evaluation_result.get("passed"),
+        False,
+        "execution_error 的 evaluation_result.passed 应为 False。",
+    )
+
+    assert_equal(
+        evaluation_result.get("retryable"),
+        True,
+        "LLM SQL execution_error 且 retry_count 未超限时应允许 retry。",
+    )
+
+    assert_equal(
+        nodes.route_evaluation_result(state),
+        "repair_sql",
+        "可 retry 的 execution_error 应路由到 repair_sql。",
+    )
+
+
+def test_evaluation_result_template_execution_error_non_retryable() -> None:
+    state = {
+        "sql_error_type": "execution_error",
+        "generation_method": "template",
+        "retry_count": 0,
+        "max_retries": 1,
+    }
+
+    state.update(nodes.evaluate_runtime_result_node(state))
+
+    evaluation_result = state.get("evaluation_result", {})
+
+    assert_equal(
+        evaluation_result.get("passed"),
+        False,
+        "template execution_error 的 evaluation_result.passed 应为 False。",
+    )
+
+    assert_equal(
+        evaluation_result.get("retryable"),
+        False,
+        "template SQL execution_error 不应 retry。",
+    )
+
+    assert_equal(
+        nodes.route_evaluation_result(state),
+        "fail",
+        "template SQL execution_error 应路由到 fail。",
+    )
+
+
+def test_evaluation_result_empty_rows_non_retryable() -> None:
+    state = {
+        "rows": [],
+        "sql_error_type": None,
+        "generation_method": "llm",
+        "retry_count": 0,
+        "max_retries": 1,
+    }
+
+    state.update(nodes.evaluate_runtime_result_node(state))
+
+    evaluation_result = state.get("evaluation_result", {})
+
+    assert_equal(
+        evaluation_result.get("passed"),
+        False,
+        "empty rows 的 evaluation_result.passed 应为 False。",
+    )
+
+    assert_equal(
+        evaluation_result.get("error_type"),
+        "empty_result",
+        "empty rows 应映射为 empty_result。",
+    )
+
+    assert_equal(
+        evaluation_result.get("retryable"),
+        False,
+        "empty_result 暂不自动 retry。",
+    )
+
+    assert_equal(
+        nodes.route_evaluation_result(state),
+        "fail",
+        "empty_result 应路由到 fail。",
+    )
+
+
+def test_evaluation_result_rows_exists_passed() -> None:
+    state = {
+        "rows": [
+            {
+                "category": "防晒",
+                "order_count": 5157,
+            }
+        ],
+        "sql_error_type": None,
+        "generation_method": "llm",
+        "retry_count": 0,
+        "max_retries": 1,
+    }
+
+    state.update(nodes.evaluate_runtime_result_node(state))
+
+    evaluation_result = state.get("evaluation_result", {})
+
+    assert_equal(
+        evaluation_result.get("passed"),
+        True,
+        "rows 存在时 evaluation_result.passed 应为 True。",
+    )
+
+    assert_equal(
+        evaluation_result.get("retryable"),
+        False,
+        "成功结果不需要 retry。",
+    )
+
+    assert_equal(
+        nodes.route_evaluation_result(state),
+        "format_result",
+        "rows 存在时应路由到 format_result。",
+    )
+
+
 def main() -> None:
     tests = [
         test_llm_execution_error_can_repair,
         test_validation_error_cannot_repair,
         test_template_sql_execution_error_cannot_repair,
         test_max_retries_exceeded,
+        test_evaluation_result_validation_error_non_retryable,
+        test_evaluation_result_llm_execution_error_retryable,
+        test_evaluation_result_template_execution_error_non_retryable,
+        test_evaluation_result_empty_rows_non_retryable,
+        test_evaluation_result_rows_exists_passed,
     ]
 
     passed = 0

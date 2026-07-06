@@ -110,6 +110,139 @@ def retry_or_fail(state: dict[str, Any]) -> str:
     return "fail"
 
 
+def evaluate_runtime_result_node(state: dict[str, Any]) -> dict[str, Any]:
+    """
+    Runtime evaluation node V1。
+
+    V1 只做确定性 runtime checks，不调用 LLM，不依赖 Golden Dataset。
+
+    目标：
+    - 将分散在 state 中的 SQL runtime 状态统一映射为 evaluation_result
+    - 为后续 route_evaluation_result 提供结构化判断依据
+    """
+
+    sql_error_type = state.get("sql_error_type")
+    generation_method = state.get("generation_method", "llm")
+    retry_count = state.get("retry_count", 0)
+    max_retries = state.get("max_retries", 1)
+
+    if sql_error_type == "validation_error":
+        return {
+            "evaluation_result": {
+                "passed": False,
+                "source": "sql_validation",
+                "error_type": "validation_error",
+                "retryable": False,
+                "reason": "SQL validation failed. Forbidden operation is not retryable.",
+            }
+        }
+
+    if sql_error_type == "empty_sql":
+        return {
+            "evaluation_result": {
+                "passed": False,
+                "source": "sql_cleaning",
+                "error_type": "empty_sql",
+                "retryable": False,
+                "reason": "SQL is empty after cleaning.",
+            }
+        }
+
+    if sql_error_type == "max_retries_exceeded":
+        return {
+            "evaluation_result": {
+                "passed": False,
+                "source": "retry_guard",
+                "error_type": "max_retries_exceeded",
+                "retryable": False,
+                "reason": "SQL repair retry count has reached max_retries.",
+            }
+        }
+
+    if sql_error_type == "template_sql_execution_error":
+        return {
+            "evaluation_result": {
+                "passed": False,
+                "source": "sql_execution",
+                "error_type": "template_sql_execution_error",
+                "retryable": False,
+                "reason": "Template SQL execution failed. It should be fixed in template or query_plan.",
+            }
+        }
+
+    if sql_error_type == "execution_error":
+        retryable = (
+            generation_method == "llm"
+            and retry_count < max_retries
+        )
+
+        return {
+            "evaluation_result": {
+                "passed": False,
+                "source": "sql_execution",
+                "error_type": "execution_error",
+                "retryable": retryable,
+                "reason": (
+                    "LLM SQL execution failed and can enter SQL repair."
+                    if retryable
+                    else "SQL execution failed but is not retryable."
+                ),
+            }
+        }
+
+    if "rows" in state:
+        rows = state.get("rows") or []
+
+        if len(rows) == 0:
+            return {
+                "evaluation_result": {
+                    "passed": False,
+                    "source": "result_check",
+                    "error_type": "empty_result",
+                    "retryable": False,
+                    "reason": "SQL executed successfully but returned no rows.",
+                }
+            }
+
+        return {
+            "evaluation_result": {
+                "passed": True,
+                "source": "result_check",
+                "error_type": None,
+                "retryable": False,
+                "reason": None,
+            }
+        }
+
+    return {
+        "evaluation_result": {
+            "passed": False,
+            "source": "runtime_state",
+            "error_type": "unknown_runtime_state",
+            "retryable": False,
+            "reason": "Runtime state has no sql_error_type and no rows.",
+        }
+    }
+
+
+def route_evaluation_result(state: dict[str, Any]) -> str:
+    evaluation_result = state.get("evaluation_result", {})
+
+    if evaluation_result.get("passed") is True:
+        return "format_result"
+
+    if (
+        evaluation_result.get("retryable") is True
+        and evaluation_result.get("error_type") == "execution_error"
+    ):
+        return "repair_sql"
+
+    if evaluation_result.get("error_type") == "needs_clarification":
+        return "clarification"
+
+    return "fail"
+
+
 def repair_sql_node(state: dict[str, Any]) -> dict[str, Any]:
     """
     SQL repair node V1。
