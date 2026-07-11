@@ -553,6 +553,7 @@ Phase3 当前进展：
 - Day55 完成 SQL Repair Graph Test Harness
 - Day56 完成 Eval-driven Retry Design V1
 - Day57 完成 Eval Result Node Skeleton
+- Day58 完成 Phase3 First Milestone Review / Graph Integration Design
 
 当前稳定依赖基线：
 - `langchain==0.3.30`
@@ -564,10 +565,11 @@ Phase3 当前进展：
 - `sentence-transformers==5.5.1`
 
 Phase3 后续重点：
-- Phase3 First Milestone Review + Graph Integration Design
-- SQL Runtime Evaluation Graph Integration
-- End-to-End Graph Regression
-- Multi-step Analysis / Business Insight Layer
+- SQL Runtime Evaluation Graph Integration 
+- End-to-End Graph Regression 
+- Beauty BI Dataset V2 / Data Foundation Upgrade 
+- Governed Analytics / Permission / Audit 
+- Tool Calling Decision / Multi-step Analysis
 
 当前原则：
 - 不推翻 Phase2 主链路
@@ -668,7 +670,7 @@ Dashboard / Answer
 # 当前版本
 
 Version: v0.32
-完成度：Day57 / 100
+完成度：Day58 / 100
 当前实现：
 
 自然语言问题
@@ -692,6 +694,6 @@ Version: v0.32
 当前阶段：
 Phase2 已完成
 Phase3 进行中
-下一步：Phase3 First Milestone Review + Graph Integration Design
+下一步：SQL Runtime Evaluation Graph Integration
 
 
