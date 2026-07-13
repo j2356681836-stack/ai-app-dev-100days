@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from app.db.sql_runner import run_sql
 from app.text_to_sql.sql_cleaner import clean_sql
@@ -171,6 +171,23 @@ def evaluate_runtime_result_node(state: dict[str, Any]) -> dict[str, Any]:
         }
 
     if sql_error_type == "execution_error":
+        if (
+            generation_method == "llm"
+            and retry_count >= max_retries
+        ):
+            return {
+                "evaluation_result": {
+                    "passed": False,
+                    "source": "retry_guard",
+                    "error_type": "max_retries_exceeded",
+                    "retryable": False,
+                    "reason": (
+                        "SQL execution still failed after the "
+                        "maximum repair attempts."
+                    ),
+                }
+            }
+
         retryable = (
             generation_method == "llm"
             and retry_count < max_retries
@@ -225,7 +242,9 @@ def evaluate_runtime_result_node(state: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def route_evaluation_result(state: dict[str, Any]) -> str:
+def route_evaluation_result(
+    state: dict[str, Any],
+) -> Literal["format_result", "repair_sql", "fail"]:
     evaluation_result = state.get("evaluation_result", {})
 
     if evaluation_result.get("passed") is True:
@@ -236,9 +255,6 @@ def route_evaluation_result(state: dict[str, Any]) -> str:
         and evaluation_result.get("error_type") == "execution_error"
     ):
         return "repair_sql"
-
-    if evaluation_result.get("error_type") == "needs_clarification":
-        return "clarification"
 
     return "fail"
 

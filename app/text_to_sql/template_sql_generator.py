@@ -244,7 +244,7 @@ JOIN channel_spend csp
 JOIN dim_channel dc
     ON cs.channel_id = dc.channel_id
 {order_by_clause}
-{limit_clause};;
+{limit_clause};
 """
 
     return sql.strip()

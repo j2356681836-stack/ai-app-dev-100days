@@ -43,51 +43,61 @@
 
 # 当前系统架构
 
-当前系统已从早期的单次 Text-to-SQL 链路，升级为业务语义层驱动的双路径 SQL 生成架构。
+当前系统已从 Phase2 的线性 Text-to-SQL 链路，升级为由 LangGraph 控制 SQL 运行时状态、失败路由和受控修复的工作流。
 
+```text
 用户问题
 ↓
 Intent Parser
 ↓
-Intent Resolver
-↓
 Hybrid Search / Metric Recognition
-├── Alias Match
-├── Keyword Group Match
-├── Embedding Match
-└── Clarification
-↓
-Query Plan Routing
-├── ROI / CAC → Template SQL
-└── 普通指标 → LLM SQL with Intent Context
-↓
-SQL Cleaner
-↓
-SQL Validator
-↓
-PostgreSQL
-↓
-Result Formatter
-↓
-Answer Layer
-↓
-Evaluation Workflow
+├── needs_clarification → Clarification → END
+├── error → Fail → END
+└── matched
+    ↓
+    Metric Selection
+    ↓
+    Query Plan Loading
+    ↓
+    Intent Resolution
+    ↓
+    SQL Generation
+    ├── ROI / CAC → Template SQL
+    └── 普通指标 → LLM SQL with Intent Context
+    ↓
+    SQL Cleaner
+    ↓
+    SQL Validator
+    ├── validation_error → Runtime Evaluation → SQL Fail
+    └── valid
+        ↓
+        PostgreSQL Execution
+        ↓
+        Runtime Evaluation
+        ├── passed → Result Formatter → Answer Layer → Finish
+        ├── retryable LLM execution_error → SQL Repair → SQL Cleaner
+        └── non-retryable → SQL Fail
+```
 
+当前在线 Graph 负责：
+- clarification 分支
+- Template / LLM SQL 双路径
+- SQL cleaning、validation 和 execution
+- 统一 `evaluation_result`
+- LLM SQL execution error 的一次受控修复
+- validation error、Template execution error、empty result 和 max retries 的失败路由
 
-Phase3 已完成 LangGraph clarification branch 最小 prototype：
-parse_intent
-↓
-search_metric
-↓
-route_metric_status
-├── matched → continue_pipeline
-├── needs_clarification → clarification
-└── error → fail
+离线 Evaluation Workflow 继续负责：
+- deterministic evaluator
+- retrieval evaluator
+- prompt builder tests
+- answer judge
+- Ragas evaluation
 
-当前 LangGraph 仅作为 workflow prototype，不替代 Phase2 主链路。
-
----
-
+兼容边界：
+- LangGraph 正式入口为 `ask_with_graph()`
+- `query_service.ask()` 继续保留 Phase2 线性兼容路径
+- Ragas、answer judge 和完整 evaluator 不进入在线 Graph
 # Demo
 
 用户输入：哪个品类退款率最高？
@@ -231,6 +241,30 @@ Answer
 
 ---
 
+## LangGraph SQL Runtime Workflow
+
+Phase3 Day59 已将 SQL Runtime Evaluation 与受控修复正式接入 `analyst_graph.py`。
+
+当前能力：
+- matched 路径不再依赖 `continue_pipeline_node`
+- Query Plan loading、Intent resolution 和 SQL generation 已拆为独立 nodes
+- SQL cleaning、validation、execution 和 result formatting 已接入正式 Graph
+- `evaluate_runtime_result_node` 统一生成 `evaluation_result`
+- LLM SQL execution error 可进入一次受控 repair
+- repair 后必须重新经过 clean、validate 和 run
+- validation error 不进入 repair
+- Template SQL execution error 不进入 LLM repair
+- empty result 当前不自动 retry
+- 达到修复上限后返回 `max_retries_exceeded`
+- compiled Graph 已覆盖 8 条端到端路径
+
+当前边界：
+- 最多自动 repair 一次
+- 真实 LLM repair 准确率尚未进行大规模评估
+- Business Insight Layer、权限和审计尚未实现
+
+---
+
 ## Answer Layer V1
 
 当前系统已支持将 SQL 查询结果转换为中文业务回答。
@@ -281,7 +315,7 @@ Answer
 | answer_judge.py --mode mock | 6/6 PASS |
 | answer_judge.py --mode llm | 6/6 PASS |
 | ragas_eval.py --include-negative | 6/6 expectation passed |
-| analyst_graph_tests.py | 3/3 PASS |
+| analyst_graph_tests.py | 8/8 PASS |
 | sql_repair_graph_tests.py | 9/9 PASS |
 
 当前定位：
@@ -442,7 +476,7 @@ Business Semantic Layer + Text-to-SQL
 - Ragas Evaluation
 - LangGraph Clarification Branch Prototype
 
-当前能力：
+Phase2 关闭时能力：
 自然语言问题
 → Intent Parser
 → Intent Resolver
@@ -455,20 +489,20 @@ Business Semantic Layer + Text-to-SQL
 → Answer Layer
 → Evaluation Workflow
 
-Phase2 当前定位：可演示、可解释、可评估的 AI Data Analyst / Text-to-SQL 原型
+Phase2 关闭时定位：可演示、可解释、可评估的 AI Data Analyst / Text-to-SQL 原型
 
-当前边界：
+Phase2 关闭时边界：
 不是完整企业级 BI Copilot
 尚未实现 SQL repair loop
 尚未实现 eval-driven retry
 尚未实现完整 Business Insight Layer
-当前 LangGraph 仅完成 clarification branch prototype
+LangGraph 仅完成 clarification branch prototype
 
 ---
 
 ### Evaluation Framework V5
 
-当前支持：
+Phase2 关闭时支持：
 - Golden Questions
 - SQL 结构级检查
 - Top1 `expected_result` 校验
@@ -486,7 +520,7 @@ Phase2 当前定位：可演示、可解释、可评估的 AI Data Analyst / Tex
 - 正例 / 负例 answer eval
 - Evaluation JSON 报告输出
 
-当前评估结果：
+Phase2 关闭时评估结果：
 - Golden Questions：26
 - deterministic evaluator：26/26 PASS
 - query_plan_tests.py：2/2 PASS
@@ -554,6 +588,7 @@ Phase3 当前进展：
 - Day56 完成 Eval-driven Retry Design V1
 - Day57 完成 Eval Result Node Skeleton
 - Day58 完成 Phase3 First Milestone Review / Graph Integration Design
+- Day59 完成 SQL Runtime Evaluation Graph Integration
 
 当前稳定依赖基线：
 - `langchain==0.3.30`
@@ -565,16 +600,16 @@ Phase3 当前进展：
 - `sentence-transformers==5.5.1`
 
 Phase3 后续重点：
-- SQL Runtime Evaluation Graph Integration 
-- End-to-End Graph Regression 
-- Beauty BI Dataset V2 / Data Foundation Upgrade 
-- Governed Analytics / Permission / Audit 
+- End-to-End Graph Regression / First Milestone Close
+- Beauty BI Dataset V2 / Data Foundation Upgrade
+- Governed Analytics / Permission / Audit
 - Tool Calling Decision / Multi-step Analysis
 
 当前原则：
 - 不推翻 Phase2 主链路
 - 复用 Phase2 已完成模块
-- 先稳定依赖环境，再继续扩展 LangGraph 功能
+- 让失败、评估和重试通过显式 State 与 Conditional Edge 管理
+- 在线 runtime checks 与离线 Evaluation 保持分层
 
 ---
 
@@ -669,31 +704,38 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.32
-完成度：Day58 / 100
+Version: v0.33
+完成度：Day59 / 100
+
 当前实现：
 
+```text
 自然语言问题
+→ LangGraph Workflow
 → Intent Parser
-→ Intent Resolver
-→ Hybrid Search
-→ Query Plan Routing
+→ Hybrid Search / Metric Recognition
+→ Clarification / Metric Selection
+→ Query Plan Loading
+→ Intent Resolution
 → Template SQL / LLM SQL with Intent Context
 → SQL Cleaner
 → SQL Validator
-→ PostgreSQL
-→ Result Formatter
-→ Answer Layer V1
-→ Deterministic Evaluation
-→ LLM-as-Judge Answer Evaluation
-→ Ragas Evaluation
-→ LangGraph Clarification Branch Prototype
-→ SQL Repair Graph Test Harness
-→ Eval Result Node Skeleton
+→ PostgreSQL Execution
+→ Runtime Evaluation
+├─ Passed → Result Formatter → Answer Layer → Finish
+├─ Retryable LLM Error → SQL Repair → SQL Cleaner
+└─ Non-retryable → SQL Fail
+```
+
+当前测试基线：
+- `analyst_graph_tests.py`：8/8 PASS
+- `sql_repair_graph_tests.py`：9/9 PASS
+- `retrieval_evaluator.py --strict`：6/6 PASS
+- `evaluator.py`：26/26 PASS
+- `pip check`：No broken requirements found
 
 当前阶段：
-Phase2 已完成
-Phase3 进行中
-下一步：SQL Runtime Evaluation Graph Integration
+- Phase2 已完成
+- Phase3 进行中
 
-
+下一步：End-to-End Graph Regression & Phase3 First Milestone Close
