@@ -56,31 +56,35 @@ Hybrid Search / Metric Recognition
 └── matched
     ↓
     Metric Selection
-    ↓
-    Query Plan Loading
-    ↓
-    Intent Resolution
-    ↓
-    SQL Generation
-    ├── ROI / CAC → Template SQL
-    └── 普通指标 → LLM SQL with Intent Context
-    ↓
-    SQL Cleaner
-    ↓
-    SQL Validator
-    ├── validation_error → Runtime Evaluation → SQL Fail
-    └── valid
+    ├── metrics 为空 → Metric Fail → END
+    └── metric selected
         ↓
-        PostgreSQL Execution
+        Query Plan Loading
         ↓
-        Runtime Evaluation
-        ├── passed → Result Formatter → Answer Layer → Finish
-        ├── retryable LLM execution_error → SQL Repair → SQL Cleaner
-        └── non-retryable → SQL Fail
+        Intent Resolution
+        ↓
+        SQL Generation
+        ├── ROI / CAC → Template SQL
+        └── 普通指标 → LLM SQL with Intent Context
+        ↓
+        SQL Cleaner
+        ├── empty SQL → Runtime Evaluation
+        └── cleaned SQL
+            ↓
+            SQL Validator
+            ├── validation error → Runtime Evaluation
+            └── valid
+                ↓
+                PostgreSQL Execution
+                ↓
+                Runtime Evaluation
+                ├── passed → Result Formatter → Answer Layer → Finish
+                ├── retryable LLM execution error → SQL Repair → SQL Cleaner
+                └── non-retryable → SQL Fail
 ```
 
 当前在线 Graph 负责：
-- clarification 分支
+- clarification 与 metric failure 分支
 - Template / LLM SQL 双路径
 - SQL cleaning、validation 和 execution
 - 统一 `evaluation_result`
@@ -98,6 +102,7 @@ Hybrid Search / Metric Recognition
 - LangGraph 正式入口为 `ask_with_graph()`
 - `query_service.ask()` 继续保留 Phase2 线性兼容路径
 - Ragas、answer judge 和完整 evaluator 不进入在线 Graph
+
 # Demo
 
 用户输入：哪个品类退款率最高？
@@ -140,13 +145,13 @@ ORDER BY refund_rate_pct DESC;
 - 表关系检索
 
 元数据管理：
-
+```text
 metadata/
 ├── business_metrics.yaml
 ├── query_plans.yaml
 ├── table_dictionary.yaml
 ├── table_relationships.yaml
-
+```
 ---
 
 ## Context Builder
@@ -180,6 +185,7 @@ fact_refunds.order_item_id = fact_order_items.order_item_id
 
 ## Text-to-SQL
 
+```text
 当前系统支持：
 Question
 ↓
@@ -202,6 +208,7 @@ PostgreSQL
 Table
 ↓
 Answer
+```
 
 当前覆盖指标：
 - item_sales_amount
@@ -243,20 +250,29 @@ Answer
 
 ## LangGraph SQL Runtime Workflow
 
-Phase3 Day59 已将 SQL Runtime Evaluation 与受控修复正式接入 `analyst_graph.py`。
+Phase3 Day59 完成 SQL Runtime Integration，Day60 完成代码清理、正式测试迁移和第一里程碑回归。
 
 当前能力：
 - matched 路径不再依赖 `continue_pipeline_node`
 - Query Plan loading、Intent resolution 和 SQL generation 已拆为独立 nodes
 - SQL cleaning、validation、execution 和 result formatting 已接入正式 Graph
 - `evaluate_runtime_result_node` 统一生成 `evaluation_result`
+- `route_evaluation_result` 只读取评估结果并返回下一条路径
 - LLM SQL execution error 可进入一次受控 repair
 - repair 后必须重新经过 clean、validate 和 run
 - validation error 不进入 repair
 - Template SQL execution error 不进入 LLM repair
 - empty result 当前不自动 retry
 - 达到修复上限后返回 `max_retries_exceeded`
-- compiled Graph 已覆盖 8 条端到端路径
+- matched 但 metrics 为空时进入 `metric_fail`
+- compiled Graph 已覆盖 9 条端到端路径
+
+Day60 清理结果：
+- 删除不可达的 `continue_pipeline_node`
+- 删除未使用的 `ask_with_resolved_metric` import
+- 删除旧 `route_execution / retry_or_fail`
+- 删除临时 `day59_node_smoke_test.py`
+- 将 SQL Cleaner normalization 固化为正式测试
 
 当前边界：
 - 最多自动 repair 一次
@@ -296,33 +312,45 @@ Phase3 Day59 已将 SQL Runtime Evaluation 与受控修复正式接入 `analyst_
 
 当前评估体系：
 - deterministic evaluator：校验 SQL 结果、字段、数值、排序、intent、generation_method 和 answer key facts
-- prompt_builder_tests：校验 Prompt 关键规则是否保留
-- answer_judge：通过 mock / LLM-as-Judge 评估回答质量
+- retrieval evaluator：校验 metric retrieval、clarification 和候选质量
+- SQL Cleaner tests：校验 SQL 结尾分号与 normalization
+- SQL repair contract tests：校验 runtime evaluation、retry guard 和 repair state transition
+- compiled Graph tests：校验正式 LangGraph 路径
+- answer judge：通过 mock / LLM-as-Judge 评估回答质量
 - Ragas evaluation：评估回答是否被 SQL 查询结果上下文支撑
-- analyst_graph_tests：验证 LangGraph workflow 分支是否正确
 
-当前测试结果：
+### Day60 已验证基线
 
 | 测试模块 | 结果 |
+|---|---:|
+| sql_cleaner_tests.py | 6/6 PASS |
+| sql_repair_graph_tests.py | 9/9 PASS |
+| analyst_graph_tests.py | 9/9 PASS |
+| retrieval_evaluator.py --strict | 6/6 PASS |
+| evaluator.py | 26/26 PASS |
+| answer_judge.py --mode mock | 6/6 PASS |
+| answer_judge.py --mode llm | 6/6 PASS |
+| ragas_eval.py --include-negative | 6/6 expectation passed |
+| pip check | No broken requirements found |
+
+### 最近专项测试记录
+
+以下测试用于保护 Query Plan、Intent 和 Prompt 的局部实现；它们不是 Day60 完整回归中单独重跑的结果。
+
+| 测试模块 | 最近记录 |
 |---|---:|
 | query_plan_tests.py | 2/2 PASS |
 | intent_parser_tests.py | 5/5 PASS |
 | intent_resolver_tests.py | 5/5 PASS |
 | template_sql_tests.py | 15/15 PASS |
 | prompt_builder_tests.py | 5/5 PASS |
-| retrieval_evaluator.py --strict | 6/6 PASS |
-| evaluator.py | 26/26 PASS |
-| answer_judge.py --mode mock | 6/6 PASS |
-| answer_judge.py --mode llm | 6/6 PASS |
-| ragas_eval.py --include-negative | 6/6 expectation passed |
-| analyst_graph_tests.py | 8/8 PASS |
-| sql_repair_graph_tests.py | 9/9 PASS |
 
 当前定位：
 - deterministic evaluator 负责业务结果正确性
 - answer_judge 负责回答质量
 - Ragas 负责上下文忠实度
 - graph tests 负责 workflow 分支稳定性
+- 专项测试负责快速定位 Metadata、Intent、Template 和 Prompt 问题
 
 ---
 
@@ -385,7 +413,7 @@ fact_reviews
 
 ## Backend
 
-- Python 3.12
+- Python 3.10.3
 - FastAPI（规划中）
 
 ## Database
@@ -412,6 +440,7 @@ fact_reviews
 
 # 项目结构
 
+```text
 app/
 ├── api/
 ├── agents/
@@ -425,7 +454,7 @@ metadata/
 ├── table_dictionary.yaml
 ├── table_relationships.yaml
 docs/
-
+```
 ---
 
 # 当前进度
@@ -589,8 +618,10 @@ Phase3 当前进展：
 - Day57 完成 Eval Result Node Skeleton
 - Day58 完成 Phase3 First Milestone Review / Graph Integration Design
 - Day59 完成 SQL Runtime Evaluation Graph Integration
+- Day60 完成 End-to-End Graph Regression / Phase3 First Milestone Close
 
 当前稳定依赖基线：
+- Python `3.10.3`
 - `langchain==0.3.30`
 - `langchain-core==0.3.86`
 - `langchain-openai==0.3.35`
@@ -598,18 +629,20 @@ Phase3 当前进展：
 - `langgraph==0.6.11`
 - `ragas==0.4.3`
 - `sentence-transformers==5.5.1`
+- 完整锁文件：`requirements-lock.txt`
 
 Phase3 后续重点：
-- End-to-End Graph Regression / First Milestone Close
 - Beauty BI Dataset V2 / Data Foundation Upgrade
 - Governed Analytics / Permission / Audit
 - Tool Calling Decision / Multi-step Analysis
+- Phase3 端到端关闭
 
 当前原则：
 - 不推翻 Phase2 主链路
 - 复用 Phase2 已完成模块
 - 让失败、评估和重试通过显式 State 与 Conditional Edge 管理
 - 在线 runtime checks 与离线 Evaluation 保持分层
+- 不为展示 Multi-Agent 而机械拆分
 
 ---
 
@@ -631,6 +664,7 @@ Production AI BI Agent
 
 ## 当前已完成：Phase2
 
+```text
 Question
 ↓
 Intent Parser
@@ -650,9 +684,11 @@ PostgreSQL
 Answer Layer
 ↓
 Evaluation Workflow
+```
 
 ## 正在进行：Phase3
 
+```text
 Question
 ↓
 LangGraph Workflow
@@ -670,9 +706,11 @@ Execution
 Evaluation-driven Retry
 ↓
 Answer
+```
 
 ## 最终目标
 
+```text
 Question
 ↓
 Multi-Agent Workflow
@@ -686,6 +724,7 @@ Execution
 Business Analysis
 ↓
 Dashboard / Answer
+```
 
 ---
 
@@ -702,10 +741,27 @@ Dashboard / Answer
 
 ---
 
+# Latest Stable Baseline
+
+- Stable Day：Day60
+- Validation Date：2026-07-14
+- Git Commit：pending
+- Python Version：3.10.3
+- Virtual Environment：`venv_day51_a`
+- Dataset Version：`beauty_bi_v1`
+- Dependency Lock：`requirements-lock.txt`
+
+说明：
+- 当前已验证环境仍为 `venv_day51_a`。
+- 项目根目录中的旧 `venv` 尚未作为稳定环境验证。
+- 环境命名迁移已记录为后续维护项，不在 Day60 直接覆盖或改名。
+
+---
+
 # 当前版本
 
 Version: v0.33
-完成度：Day59 / 100
+完成度：Day60 / 100
 
 当前实现：
 
@@ -728,14 +784,19 @@ Version: v0.33
 ```
 
 当前测试基线：
-- `analyst_graph_tests.py`：8/8 PASS
+- `sql_cleaner_tests.py`：6/6 PASS
 - `sql_repair_graph_tests.py`：9/9 PASS
+- `analyst_graph_tests.py`：9/9 PASS
 - `retrieval_evaluator.py --strict`：6/6 PASS
 - `evaluator.py`：26/26 PASS
+- `answer_judge.py --mode mock`：6/6 PASS
+- `answer_judge.py --mode llm`：6/6 PASS
+- `ragas_eval.py --include-negative`：6/6 expectation passed
 - `pip check`：No broken requirements found
 
 当前阶段：
 - Phase2 已完成
-- Phase3 进行中
+- Phase3 第一里程碑已完成
+- Phase3 继续进行
 
-下一步：End-to-End Graph Regression & Phase3 First Milestone Close
+下一步：Beauty BI Dataset V2 / Data Foundation Upgrade

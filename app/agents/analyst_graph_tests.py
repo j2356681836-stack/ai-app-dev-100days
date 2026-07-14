@@ -99,6 +99,58 @@ def test_llm_metric_path():
     assert result.get("answer"), "普通指标路径应该返回 answer"
 
 
+def test_matched_without_metric_routes_to_metric_fail():
+    """
+    防御路径：
+
+    metric_result.status = matched
+    但 metrics 为空
+    → select_metric
+    → metric_fail
+    → END
+
+    不应继续加载 Query Plan 或生成 SQL。
+    """
+
+    def fake_search_metric(question: str) -> dict[str, Any]:
+        return {
+            "status": "matched",
+            "metrics": [],
+        }
+
+    def fail_if_query_plan_loaded(metric_name: str):
+        raise AssertionError(
+            "没有有效 metric_name 时不应该加载 Query Plan"
+        )
+
+    with patch_graph_dependencies(
+        parse_intent=build_test_intent,
+        search_metric=fake_search_metric,
+        get_query_plan_by_metric=fail_if_query_plan_loaded,
+    ):
+        result = analyst_graph.ask_with_graph(
+            "触发 matched but empty metrics"
+        )
+
+    assert_equal(
+        result.get("success"),
+        False,
+        "没有有效指标时不应该成功",
+    )
+
+    assert_equal(
+        result.get("status"),
+        "error",
+        "没有有效指标时状态应该是 error",
+    )
+
+    assert_equal(
+        result.get("message"),
+        "未识别到业务指标",
+        "应该返回明确的指标识别失败信息",
+    )
+
+
 def test_template_metric_path():
     """
     Template 指标正常路径：
@@ -691,6 +743,7 @@ def run_tests():
         test_llm_metric_path,
         test_template_metric_path,
         test_clarification_path,
+        test_matched_without_metric_routes_to_metric_fail,
         test_validation_error_routes_to_sql_fail,
         test_llm_execution_error_repairs_and_finishes,
         test_template_execution_error_does_not_repair,

@@ -82,10 +82,13 @@ def test_llm_execution_error_can_repair() -> None:
             "第一次执行应捕获 execution_error。",
         )
 
+        evaluation_update = nodes.evaluate_runtime_result_node(state)
+        state.update(evaluation_update)
+
         assert_equal(
-            nodes.retry_or_fail(state),
+            nodes.route_evaluation_result(state),
             "repair_sql",
-            "retry_or_fail 应路由到 repair_sql。",
+            "retryable execution_error 应路由到 repair_sql。",
         )
 
         state.update(nodes.repair_sql_node(state))

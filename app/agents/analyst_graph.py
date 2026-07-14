@@ -4,7 +4,6 @@ from langgraph.graph import END, START, StateGraph
 
 from app.semantic_layer.intent_parser import (parse_intent,enrich_intent_with_query_plan,)
 from app.semantic_layer.hybrid_search import search_metric
-from app.text_to_sql.query_service import ask_with_resolved_metric
 
 from app.semantic_layer.query_plan_loader import get_query_plan_by_metric
 
@@ -30,13 +29,22 @@ from app.agents.sql_graph_nodes import (
 
 class AnalystState(TypedDict, total=False):
     """
-    Phase3 LangGraph V1 状态。
+    Phase3 LangGraph SQL workflow 的共享状态。
 
-    当前 prototype 只拆出：
+    当前 Graph 覆盖：
     - intent parsing
-    - metric search
-    - clarification routing
-    - matched 后复用 query_service 后半段
+    - metric search 与 clarification
+    - metric selection
+    - query plan loading
+    - intent resolution
+    - Template / LLM SQL generation
+    - SQL cleaning、validation 与 execution
+    - runtime evaluation
+    - controlled SQL repair
+    - result formatting 与 answer generation
+
+    Node 读取当前 state，并返回需要更新的局部字段。
+    LangGraph 负责将局部更新合并到共享 state。
     """
 
     question: str
@@ -190,29 +198,6 @@ def clarification_node(state: AnalystState) -> AnalystState:
         **result,
         "result": result,
     }
-    
-
-def continue_pipeline_node(state: AnalystState) -> AnalystState:
-    question = state["question"]
-    intent = state["intent"]
-    metric_result = state["metric_result"]
-
-    result = ask_with_resolved_metric(
-        question=question,
-        intent=intent,
-        metric_result=metric_result,
-    )
-
-    return {
-        "success": result.get("success", False),
-        "status": result.get("status", "completed"),
-        "generation_method": result.get("generation_method"),
-        "sql": result.get("sql"),
-        "table": result.get("table"),
-        "answer": result.get("answer"),
-        "result": result,
-    }
-
 
 def generate_sql_node(state: AnalystState) -> AnalystState:
     question = state["question"]

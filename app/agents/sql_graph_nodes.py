@@ -52,13 +52,13 @@ def run_sql_node(state: dict[str, Any]) -> dict[str, Any]:
         rows = format_result(run_sql(sql))
 
         return {
-        "rows": rows,
-        "success": True,
-        "status": "sql_executed",
-        "message": None,
-        "sql_error_type": None,
-        "execution_error": None,
-    }
+            "rows": rows,
+            "success": True,
+            "status": "sql_executed",
+            "message": None,
+            "sql_error_type": None,
+            "execution_error": None,
+        }
 
     except Exception as e:
         return {
@@ -89,23 +89,6 @@ def route_clean_sql(state: dict[str, Any]) -> str:
 def route_validation(state: dict[str, Any]) -> str:
     if state.get("sql_valid") is True:
         return "run_sql"
-
-    return "fail"
-
-
-def route_execution(state: dict[str, Any]) -> str:
-    if state.get("sql_error_type") == "execution_error":
-        return "retry_or_fail"
-
-    return "format_result"
-
-
-def retry_or_fail(state: dict[str, Any]) -> str:
-    retry_count = state.get("retry_count", 0)
-    max_retries = state.get("max_retries", 1)
-
-    if retry_count < max_retries:
-        return "repair_sql"
 
     return "fail"
 
