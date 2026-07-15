@@ -376,9 +376,9 @@ fact_reviews
 
 # 当前数据集
 
-项目当前构建了美妆行业模拟 BI 数据集。
+项目当前使用 Beauty BI V1 作为稳定运行与回归数据集。
 
-## 数据规模
+## Beauty BI V1 数据规模
 
 | 数据 | 数量 |
 |--------|--------|
@@ -392,7 +392,7 @@ fact_reviews
 
 ---
 
-## 已植入业务规律
+## Beauty BI V1 已植入业务规律
 
 ### 商品规律
 
@@ -406,6 +406,31 @@ fact_reviews
 ### 用户规律
 
 - 会员用户购买频率更高
+
+---
+
+## Beauty BI Dataset V2 设计状态
+
+Day61 已完成 Dataset V2 Design Baseline。
+
+当前已完成：
+- 跨年度业务时间与售后观察尾窗设计
+- 地区、活动、促销、成本、会员历史和身份关系设计
+- R12、GMV、SO、新客与活动分群语义
+- 可复现 Generation Contract
+- Dataset Manifest 与 Acceptance Gates 设计
+- V1 / V2 隔离方案
+
+当前状态：
+
+```text
+Design：completed
+Status：draft
+Schema / Seed：not started
+Graph integration：disabled
+```
+
+Beauty BI V1 继续作为当前 Latest Stable Baseline；V2 在完成 Schema、Seed、验证、Metadata 和 Golden Cases 前不会替换 V1。
 
 ---
 
@@ -619,6 +644,15 @@ Phase3 当前进展：
 - Day58 完成 Phase3 First Milestone Review / Graph Integration Design
 - Day59 完成 SQL Runtime Evaluation Graph Integration
 - Day60 完成 End-to-End Graph Regression / Phase3 First Milestone Close
+- Day61 完成 Beauty BI Dataset V2 Design Baseline
+
+Day61 Dataset V2 设计成果：
+- 完成 V1 Coverage Review 与 V2 P0 / P1 / P2 边界
+- 确定 V1 `public` 与 V2 `beauty_bi_v2` schema 隔离
+- 完成 Version Model、Candidate Schema Map 和 Implementation Sequence
+- 明确 R12、GMV、SO、退款、新客与活动六类分群语义
+- 建立 P01-P09 Generation Contract、Dataset Manifest 结构和 Acceptance Gates
+- V2 当前仍为 `draft`，尚未创建 Schema、Seed 或接入主 Graph
 
 当前稳定依赖基线：
 - Python `3.10.3`
@@ -632,16 +666,18 @@ Phase3 当前进展：
 - 完整锁文件：`requirements-lock.txt`
 
 Phase3 后续重点：
-- Beauty BI Dataset V2 / Data Foundation Upgrade
+- Dataset V2 Manifest、Schema、Seed 与 Acceptance Gates
 - Governed Analytics / Permission / Audit
-- Tool Calling Decision / Multi-step Analysis
-- Phase3 端到端关闭
+- Tool Calling / Tool Contract
+- Workflow、Single Agent 与 Multi-Agent 架构决策
+- Minimal Reflection Experiment 与 Phase3 端到端关闭
 
 当前原则：
 - 不推翻 Phase2 主链路
 - 复用 Phase2 已完成模块
 - 让失败、评估和重试通过显式 State 与 Conditional Edge 管理
 - 在线 runtime checks 与离线 Evaluation 保持分层
+- V1 稳定基线与 V2 开发版本保持隔离
 - 不为展示 Multi-Agent 而机械拆分
 
 ---
@@ -761,7 +797,7 @@ Dashboard / Answer
 # 当前版本
 
 Version: v0.33
-完成度：Day60 / 100
+完成度：Day61 / 100
 
 当前实现：
 
@@ -799,4 +835,4 @@ Version: v0.33
 - Phase3 第一里程碑已完成
 - Phase3 继续进行
 
-下一步：Beauty BI Dataset V2 / Data Foundation Upgrade
+下一步：Day62 Manifest Skeleton + Schema Foundation
