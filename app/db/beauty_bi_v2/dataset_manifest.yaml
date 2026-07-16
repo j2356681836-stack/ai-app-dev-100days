@@ -1,0 +1,333 @@
+identity:
+  dataset_name: beauty_bi
+  dataset_version: beauty_bi_v2
+  phase: phase3
+  milestone: dataset_v2_p0
+  status: draft
+
+versions:
+  schema_version: beauty_bi_schema_v2_0
+  seed_version: beauty_bi_seed_v2_0
+  generation_contract_version: beauty_bi_contract_v2_0
+  metadata_version: beauty_bi_metadata_v2_0
+  golden_dataset_version: beauty_bi_golden_v2_0
+  manifest_version: "1.0"
+
+database:
+  engine: postgresql
+  target_schema: beauty_bi_v2
+
+  protected_schemas:
+    - public
+
+  allow_drop_target_schema: true
+  allow_modify_protected_schemas: false
+
+generation:
+  business_start_date: "2024-01-01"
+  business_end_date: "2025-12-31"
+  event_observation_end_date: "2026-01-31"
+  primary_evaluation_year: 2025
+
+  random_seed: 42
+  numpy_seed: 42
+  faker_seed: 42
+
+  scale_profile: small
+  timezone: Asia/Shanghai
+  currency: CNY
+  deterministic_mode: true
+
+scale_profiles:
+  small:
+    customers: null
+    membership_accounts: null
+    products: null
+    expected_orders: null
+
+  medium:
+    customers: null
+    membership_accounts: null
+    products: null
+    expected_orders: null
+
+  large:
+    customers: null
+    membership_accounts: null
+    products: null
+    expected_orders: null
+
+business_calendar:
+  holidays:
+    source: fixed_config
+
+  campaigns:
+    - campaign_code: "WOMENS_DAY_2024"
+      campaign_family: "WOMENS_DAY"
+      campaign_name: "2024 38大促"
+      campaign_type: "major_promotion"
+      start_date: "2024-03-01"
+      end_date: "2024-03-08"
+      status_cutoff: "2024-02-29T23:59:59"
+      objective: "customer_acquisition_and_sales"
+
+    - campaign_code: "618_2024"
+      campaign_family: "618"
+      campaign_name: "2024 618大促"
+      campaign_type: "major_promotion"
+      start_date: "2024-05-20"
+      end_date: "2024-06-20"
+      status_cutoff: "2024-05-19T23:59:59"
+      objective: "customer_acquisition_and_sales"
+
+    - campaign_code: "DOUBLE_11_2024"
+      campaign_family: "DOUBLE_11"
+      campaign_name: "2024 双十一"
+      campaign_type: "major_promotion"
+      start_date: "2024-10-22"
+      end_date: "2024-11-11"
+      status_cutoff: "2024-10-21T23:59:59"
+      objective: "sales_and_member_growth"
+
+    - campaign_code: "WOMENS_DAY_2025"
+      campaign_family: "WOMENS_DAY"
+      campaign_name: "2025 38大促"
+      campaign_type: "major_promotion"
+      start_date: "2025-03-01"
+      end_date: "2025-03-08"
+      status_cutoff: "2025-02-28T23:59:59"
+      objective: "customer_acquisition_and_sales"
+
+    - campaign_code: "618_2025"
+      campaign_family: "618"
+      campaign_name: "2025 618大促"
+      campaign_type: "major_promotion"
+      start_date: "2025-05-20"
+      end_date: "2025-06-20"
+      status_cutoff: "2025-05-19T23:59:59"
+      objective: "customer_acquisition_and_sales"
+
+    - campaign_code: "DOUBLE_11_2025"
+      campaign_family: "DOUBLE_11"
+      campaign_name: "2025 双十一"
+      campaign_type: "major_promotion"
+      start_date: "2025-10-22"
+      end_date: "2025-11-11"
+      status_cutoff: "2025-10-21T23:59:59"
+      objective: "sales_and_member_growth"
+
+membership_policy:
+  evaluation_frequency: daily
+  evaluation_time: null
+
+  rolling_window:
+    type: rolling_months
+    months: 12
+
+  valid_spend:
+    amount_source: item_paid_amount
+    exclude_unpaid_orders: true
+    exclude_cancelled_orders: true
+    subtract_successful_refunds: true
+    refund_attribution: original_paid_date
+
+  tiers: []
+
+commerce_policy:
+  gmv:
+    amount_source: item_paid_amount
+    date_attribution: paid_at
+    include_unpaid_orders: false
+    include_cancelled_orders: false
+    subtract_refunds: false
+
+  so:
+    amount_source: item_paid_amount
+    subtract_successful_refunds: true
+    refund_attribution: original_paid_date
+
+  refund:
+    request_window_days_after_delivery: 14
+    allow_partial_refund: true
+    allow_multiple_refunds_per_item: true
+    max_cumulative_refund_ratio: 1.0
+
+  fulfillment:
+    split_shipment_supported: false
+    multiple_packages_supported: false
+
+customer_semantics:
+  brand_new_customer:
+    metric_name: brand_paid_new_customer
+    definition: first_successful_payment
+    reverse_on_full_refund: false
+
+  channel_new_customer:
+    definition: first_successful_payment_in_channel
+
+  channel_contributed_brand_new_customer:
+    definition: brand_first_successful_payment_in_channel
+
+  future_metrics:
+    - brand_effective_new_customer
+
+  ambiguous_new_customer_query:
+    behavior: clarification
+
+activity_segmentation:
+  customer_grain: customer_x_activity_period
+  mutually_exclusive: true
+
+  membership_states:
+    - old_member
+    - new_member
+    - non_member
+
+  customer_states:
+    - old_customer
+    - new_customer
+
+  segments:
+    - new_member_new_customer
+    - new_member_old_customer
+    - old_member_new_customer
+    - old_member_old_customer
+    - non_member_new_customer
+    - non_member_old_customer
+
+  final_customer_basis: effective_purchase
+  require_refund_observation_window: true
+
+business_patterns:
+  P01_customer_purchase_long_tail:
+    enabled: true
+    parameters: {}
+    acceptance_gate: distribution_customer_long_tail
+
+  P02_membership_r12_transition:
+    enabled: true
+    parameters: {}
+    acceptance_gate: membership_transition_validity
+
+  P03_membership_customer_overlap:
+    enabled: true
+    parameters: {}
+    acceptance_gate: identity_overlap_coverage
+
+  P04_new_customer_scope_difference:
+    enabled: true
+    parameters: {}
+    acceptance_gate: new_customer_scope_difference
+
+  P05_product_sales_long_tail:
+    enabled: true
+    parameters: {}
+    acceptance_gate: distribution_product_long_tail
+
+  P06_season_region_demand:
+    enabled: true
+    parameters: {}
+    acceptance_gate: season_region_signal
+
+  P07_marketing_diminishing_returns:
+    enabled: true
+    parameters: {}
+    acceptance_gate: marketing_marginal_return
+
+  P08_promotion_margin_tradeoff:
+    enabled: true
+    parameters: {}
+    acceptance_gate: promotion_margin_tradeoff
+
+  P09_refund_review_quality:
+    enabled: true
+    parameters: {}
+    acceptance_gate: refund_review_statistical_relation
+
+deferred_capabilities:
+  P1:
+    - coupon_issuance_and_redemption
+    - basic_inventory
+    - controlled_data_quality_cases
+
+  P2:
+    - points_ledger
+    - points_redemption
+    - reservation_and_final_payment
+    - offline_store_return
+    - complete_birthday_benefits
+    - complete_identity_resolution
+
+data_quality:
+  mode: clean_baseline
+
+  reject_invalid_foreign_keys: true
+  reject_negative_amounts: true
+  reject_overlapping_effective_periods: true
+  reject_invalid_event_time_order: true
+  reject_refund_overpayment: true
+
+  controlled_anomalies:
+    enabled: false
+
+compatibility:
+  preserve_v1: true
+  modify_v1_schema: false
+  modify_v1_seed: false
+  require_v1_regression_pass: true
+
+  graph_integration:
+    enabled: false
+
+acceptance_gates:
+  v1_isolation:
+    enabled: true
+    validator: null
+
+  reproducibility:
+    enabled: true
+    validator: null
+
+  schema_integrity:
+    enabled: true
+    validator: null
+
+  event_time_integrity:
+    enabled: true
+    validator: null
+
+  amount_integrity:
+    enabled: true
+    validator: null
+
+  membership_policy:
+    enabled: true
+    validator: null
+
+  identity_and_segmentation:
+    enabled: true
+    validator: null
+
+  new_customer_semantics:
+    enabled: true
+    validator: null
+
+  distribution_checks:
+    enabled: true
+    validator: null
+
+  business_pattern_validation:
+    enabled: true
+    validator: null
+
+  metadata_alignment:
+    enabled: true
+    validator: null
+
+  golden_case_compatibility:
+    enabled: true
+    validator: null
+
+  performance_baseline:
+    enabled: true
+    validator: null

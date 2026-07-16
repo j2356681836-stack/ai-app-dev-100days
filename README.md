@@ -409,28 +409,48 @@ fact_reviews
 
 ---
 
-## Beauty BI Dataset V2 设计状态
+## Beauty BI Dataset V2 当前状态
 
-Day61 已完成 Dataset V2 Design Baseline。
+Day61 完成 Dataset V2 Design Baseline，Day62 完成 Manifest Skeleton 与 Schema Foundation。
 
 当前已完成：
-- 跨年度业务时间与售后观察尾窗设计
-- 地区、活动、促销、成本、会员历史和身份关系设计
-- R12、GMV、SO、新客与活动分群语义
-- 可复现 Generation Contract
-- Dataset Manifest 与 Acceptance Gates 设计
-- V1 / V2 隔离方案
+- 建立独立目录 `app/db/beauty_bi_v2/`；
+- 建立 `dataset_manifest.yaml`，绑定版本、固定日期、随机种子、业务口径和 Acceptance Gate IDs；
+- 固定 2024 / 2025 两年的 38 大促、618 和双十一，共 6 个核心活动实例；
+- 建立 `beauty_bi_v2` PostgreSQL schema；
+- 完成 11 张基础表：
+  - `dim_date`
+  - `dim_region`
+  - `dim_channel`
+  - `dim_product`
+  - `dim_campaign`
+  - `dim_promotion`
+  - `dim_customer`
+  - `dim_membership_account`
+  - `bridge_customer_membership`
+  - `fact_membership_channel_binding_history`
+  - `fact_membership_tier_history`
+- 建立主键、外键、业务唯一键、检查约束和当前开放区间的部分唯一索引；
+- 完成身份映射、渠道绑定历史和会员等级历史的事务内约束行为测试；
+- 完成 Manifest、DDL 安全性、V2 表集合和 V1 核心行数汇总验证。
 
 当前状态：
 
 ```text
 Design：completed
 Status：draft
-Schema / Seed：not started
+Manifest Skeleton：completed
+Schema Foundation：completed（11 tables）
+Transaction Facts：not started
+Seed：not started
+Day62 Foundation Validation：passed
+Full Acceptance Gates：not_run
+Metadata V2：not started
+Golden Cases V2：not started
 Graph integration：disabled
 ```
 
-Beauty BI V1 继续作为当前 Latest Stable Baseline；V2 在完成 Schema、Seed、验证、Metadata 和 Golden Cases 前不会替换 V1。
+Beauty BI V1 继续作为 Latest Stable Baseline。V2 在交易事实表、Seed、完整 Acceptance Gates、Metadata 和 Golden Cases 完成前不会替换 V1。
 
 ---
 
@@ -470,14 +490,17 @@ app/
 ├── api/
 ├── agents/
 ├── db/
+│   └── beauty_bi_v2/
+│       ├── dataset_manifest.yaml
+│       └── schema.sql
 ├── semantic_layer/
 ├── text_to_sql/
-├── evaluation/
+└── evaluation/
 metadata/
 ├── business_metrics.yaml
 ├── query_plans.yaml
 ├── table_dictionary.yaml
-├── table_relationships.yaml
+└── table_relationships.yaml
 docs/
 ```
 ---
@@ -645,14 +668,17 @@ Phase3 当前进展：
 - Day59 完成 SQL Runtime Evaluation Graph Integration
 - Day60 完成 End-to-End Graph Regression / Phase3 First Milestone Close
 - Day61 完成 Beauty BI Dataset V2 Design Baseline
+- Day62 完成 Dataset V2 Manifest Skeleton / Schema Foundation
 
-Day61 Dataset V2 设计成果：
-- 完成 V1 Coverage Review 与 V2 P0 / P1 / P2 边界
-- 确定 V1 `public` 与 V2 `beauty_bi_v2` schema 隔离
-- 完成 Version Model、Candidate Schema Map 和 Implementation Sequence
-- 明确 R12、GMV、SO、退款、新客与活动六类分群语义
-- 建立 P01-P09 Generation Contract、Dataset Manifest 结构和 Acceptance Gates
-- V2 当前仍为 `draft`，尚未创建 Schema、Seed 或接入主 Graph
+Day61-Day62 Dataset V2 成果：
+- 完成 V1 Coverage Review 与 V2 P0 / P1 / P2 边界；
+- 确定 V1 `public` 与 V2 `beauty_bi_v2` schema 隔离；
+- 完成 Version Model、Candidate Schema Map、Generation Contract 和 Acceptance Gates 设计；
+- 建立 V2 Manifest，固定跨年度窗口、6 个核心大促和 P01-P09 Gate 绑定；
+- 完成 11 张基础维度、身份关系和会员历史表；
+- 完成数据库约束与部分唯一索引行为验证；
+- 完成 Day62 汇总验证，V1 核心行数保持 Day60 基线；
+- V2 当前仍为 `draft`，尚未实现交易事实表、Seed、Metadata V2 或 Graph 接入。
 
 当前稳定依赖基线：
 - Python `3.10.3`
@@ -666,7 +692,7 @@ Day61 Dataset V2 设计成果：
 - 完整锁文件：`requirements-lock.txt`
 
 Phase3 后续重点：
-- Dataset V2 Manifest、Schema、Seed 与 Acceptance Gates
+- Dataset V2 Transaction Facts、Seed 与 Acceptance Gates
 - Governed Analytics / Permission / Audit
 - Tool Calling / Tool Contract
 - Workflow、Single Agent 与 Multi-Agent 架构决策
@@ -796,8 +822,8 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.33
-完成度：Day61 / 100
+Version: v0.34
+完成度：Day62 / 100
 
 当前实现：
 
@@ -835,4 +861,4 @@ Version: v0.33
 - Phase3 第一里程碑已完成
 - Phase3 继续进行
 
-下一步：Day62 Manifest Skeleton + Schema Foundation
+下一步：Day63 Transaction Facts DDL
