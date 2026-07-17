@@ -409,48 +409,48 @@ fact_reviews
 
 ---
 
-## Beauty BI Dataset V2 当前状态
+## Beauty BI Dataset V2 当前状态 
 
-Day61 完成 Dataset V2 Design Baseline，Day62 完成 Manifest Skeleton 与 Schema Foundation。
+Day61 完成 Dataset V2 Design Baseline，Day62 完成 Manifest Skeleton 与 Schema Foundation，Day63 完成 Transaction Facts DDL 与约束验证。 
 
-当前已完成：
-- 建立独立目录 `app/db/beauty_bi_v2/`；
-- 建立 `dataset_manifest.yaml`，绑定版本、固定日期、随机种子、业务口径和 Acceptance Gate IDs；
-- 固定 2024 / 2025 两年的 38 大促、618 和双十一，共 6 个核心活动实例；
-- 建立 `beauty_bi_v2` PostgreSQL schema；
-- 完成 11 张基础表：
-  - `dim_date`
-  - `dim_region`
-  - `dim_channel`
-  - `dim_product`
-  - `dim_campaign`
-  - `dim_promotion`
-  - `dim_customer`
-  - `dim_membership_account`
-  - `bridge_customer_membership`
-  - `fact_membership_channel_binding_history`
-  - `fact_membership_tier_history`
-- 建立主键、外键、业务唯一键、检查约束和当前开放区间的部分唯一索引；
-- 完成身份映射、渠道绑定历史和会员等级历史的事务内约束行为测试；
-- 完成 Manifest、DDL 安全性、V2 表集合和 V1 核心行数汇总验证。
+当前已完成： 
+- 建立独立目录 `app/db/beauty_bi_v2/`； 
+- 建立 `dataset_manifest.yaml`，绑定版本、固定日期、随机种子、业务口径和 Acceptance Gate IDs； 
+- 固定 2024 / 2025 两年的 38 大促、618 和双十一，共 6 个核心活动实例； 
+- 建立 `beauty_bi_v2` PostgreSQL schema； 
+- 完成 11 张基础维度、身份关系和会员历史表； 
+- 完成 5 张交易事实表： 
+    - `fact_orders` 
+    - `fact_order_items` 
+    - `fact_refunds` 
+    - `fact_marketing_spend` 
+    - `fact_reviews` 
+- V2 Schema 当前共 16 张表； 
+- 建立订单生命周期、支付与履约时间、订单和明细金额、退款状态、营销费用 Grain、评价评分与情感标签等数据库约束； 
+- 使用复合外键保证退款记录中的 `order_item_id` 与 `order_id` 归属一致； 
+- 完成五张事实表的 PostgreSQL DDL、约束结构和正反例行为验证； 
+- 所有临时测试数据均已回滚； 
+- 保持 V1 和 V2 隔离，Graph integration 继续关闭。 
 
 当前状态：
-
-```text
-Design：completed
-Status：draft
-Manifest Skeleton：completed
-Schema Foundation：completed（11 tables）
-Transaction Facts：not started
-Seed：not started
-Day62 Foundation Validation：passed
-Full Acceptance Gates：not_run
-Metadata V2：not started
-Golden Cases V2：not started
-Graph integration：disabled
+ ```text 
+ Design：completed 
+ Status：draft 
+ Manifest Skeleton：completed 
+ Schema Foundation：completed（11 tables） 
+ Transaction Facts：completed（5 tables） 
+ V2 Schema Total：16 tables 
+ Day62 Foundation Validation：passed 
+ Day63 Transaction Facts Validation：passed 
+ Seed：not started 
+ Full Acceptance Gates：not_run 
+ Metadata V2：not started 
+ Golden Cases V2：not started 
+ Graph integration：disabled
 ```
 
-Beauty BI V1 继续作为 Latest Stable Baseline。V2 在交易事实表、Seed、完整 Acceptance Gates、Metadata 和 Golden Cases 完成前不会替换 V1。
+Beauty BI V1 继续作为 Latest Stable Baseline。
+V2 在 Seed、完整 Acceptance Gates、Metadata 和 Golden Cases 完成前不会替换 V1。
 
 ---
 
@@ -669,16 +669,25 @@ Phase3 当前进展：
 - Day60 完成 End-to-End Graph Regression / Phase3 First Milestone Close
 - Day61 完成 Beauty BI Dataset V2 Design Baseline
 - Day62 完成 Dataset V2 Manifest Skeleton / Schema Foundation
+- Day63 完成 Dataset V2 Transaction Facts DDL / Constraint Validation
 
-Day61-Day62 Dataset V2 成果：
-- 完成 V1 Coverage Review 与 V2 P0 / P1 / P2 边界；
-- 确定 V1 `public` 与 V2 `beauty_bi_v2` schema 隔离；
-- 完成 Version Model、Candidate Schema Map、Generation Contract 和 Acceptance Gates 设计；
-- 建立 V2 Manifest，固定跨年度窗口、6 个核心大促和 P01-P09 Gate 绑定；
-- 完成 11 张基础维度、身份关系和会员历史表；
-- 完成数据库约束与部分唯一索引行为验证；
-- 完成 Day62 汇总验证，V1 核心行数保持 Day60 基线；
-- V2 当前仍为 `draft`，尚未实现交易事实表、Seed、Metadata V2 或 Graph 接入。
+Day61-Day63 Dataset V2 成果： 
+- 完成 V1 Coverage Review 与 V2 P0 / P1 / P2 边界； 
+- 确定 V1 `public` 与 V2 `beauty_bi_v2` schema 隔离； 
+- 完成 Version Model、Candidate Schema Map、Generation Contract 和 Acceptance Gates 设计； 
+- 建立 V2 Manifest，固定跨年度窗口、6 个核心大促和 P01-P09 Gate 绑定； 
+- 完成 11 张基础维度、身份关系和会员历史表； 
+- 完成 5 张交易事实表： 
+    - `fact_orders` 
+    - `fact_order_items` 
+    - `fact_refunds` 
+    - `fact_marketing_spend`
+    - `fact_reviews` 
+- V2 Schema 当前共 16 张表； 
+- 完成订单状态与金额、明细金额公式、退款复合外键、营销费用 Grain、评价唯一性和枚举约束； 
+- 完成 PostgreSQL DDL、关键约束结构和事务内正反例行为验证； 
+- 所有测试数据均通过外层事务回滚，五张事实表保持空表； 
+- V2 当前仍为 `draft`，尚未实现 Seed、完整 Acceptance Gates、Metadata V2 或 Graph 接入。
 
 当前稳定依赖基线：
 - Python `3.10.3`
@@ -692,7 +701,7 @@ Day61-Day62 Dataset V2 成果：
 - 完整锁文件：`requirements-lock.txt`
 
 Phase3 后续重点：
-- Dataset V2 Transaction Facts、Seed 与 Acceptance Gates
+- Dataset V2 Fixed Dimensions & Identity Seed、Time-driven Transaction Seed 与 Acceptance Gates
 - Governed Analytics / Permission / Audit
 - Tool Calling / Tool Contract
 - Workflow、Single Agent 与 Multi-Agent 架构决策
@@ -822,8 +831,8 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.34
-完成度：Day62 / 100
+Version: v0.35
+完成度：Day63 / 100
 
 当前实现：
 
@@ -861,4 +870,4 @@ Version: v0.34
 - Phase3 第一里程碑已完成
 - Phase3 继续进行
 
-下一步：Day63 Transaction Facts DDL
+下一步：Day64 Fixed Dimensions & Identity Seed
