@@ -734,6 +734,3791 @@ def validate_probability_distribution(
         )
 
 
+
+def _require_mapping(
+    parent: dict[str, Any],
+    field_name: str,
+    field_path: str,
+) -> dict[str, Any]:
+    value = parent.get(field_name)
+
+    if not isinstance(value, dict):
+        raise ValueError(
+            f"{field_path} 必须是字典。"
+        )
+
+    return value
+
+
+def _require_fields(
+    value: dict[str, Any],
+    required_fields: set[str],
+    field_path: str,
+) -> None:
+    missing_fields = required_fields - value.keys()
+
+    if missing_fields:
+        raise ValueError(
+            f"{field_path} 缺少字段："
+            f"{sorted(missing_fields)}"
+        )
+
+
+def _require_string(
+    value: Any,
+    field_path: str,
+) -> str:
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+    ):
+        raise ValueError(
+            f"{field_path} 必须是非空字符串。"
+        )
+
+    return value.strip()
+
+
+def _require_bool(
+    value: Any,
+    field_path: str,
+) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(
+            f"{field_path} 必须是布尔值，"
+            f"当前值为：{value!r}"
+        )
+
+    return value
+
+
+def _require_number(
+    value: Any,
+    field_path: str,
+    *,
+    minimum: float | None = None,
+    maximum: float | None = None,
+    minimum_inclusive: bool = True,
+    maximum_inclusive: bool = True,
+) -> float:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+    ):
+        raise ValueError(
+            f"{field_path} 必须是数值，"
+            f"当前值为：{value!r}"
+        )
+
+    number = float(value)
+
+    if minimum is not None:
+        invalid = (
+            number < minimum
+            if minimum_inclusive
+            else number <= minimum
+        )
+
+        if invalid:
+            operator = ">=" if minimum_inclusive else ">"
+
+            raise ValueError(
+                f"{field_path} 必须 {operator} {minimum}，"
+                f"当前值为：{value!r}"
+            )
+
+    if maximum is not None:
+        invalid = (
+            number > maximum
+            if maximum_inclusive
+            else number >= maximum
+        )
+
+        if invalid:
+            operator = "<=" if maximum_inclusive else "<"
+
+            raise ValueError(
+                f"{field_path} 必须 {operator} {maximum}，"
+                f"当前值为：{value!r}"
+            )
+
+    return number
+
+
+def _require_positive_int(
+    value: Any,
+    field_path: str,
+) -> int:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or value <= 0
+    ):
+        raise ValueError(
+            f"{field_path} 必须是正整数，"
+            f"当前值为：{value!r}"
+        )
+
+    return value
+
+
+def _require_exact(
+    value: Any,
+    expected_value: str,
+    field_path: str,
+) -> str:
+    normalized_value = _require_string(
+        value,
+        field_path,
+    )
+
+    if normalized_value != expected_value:
+        raise ValueError(
+            f"Day65 当前要求 {field_path}="
+            f"{expected_value!r}，"
+            f"当前值为：{normalized_value!r}"
+        )
+
+    return normalized_value
+
+def validate_membership_tier_policy(
+    manifest: dict[str, Any],
+) -> None:
+    """
+    验证 Day65 会员等级评估合同。
+
+    主要检查：
+    1. 每日评估频率和评估时间；
+    2. 初始等级赋予策略；
+    3. 等级字段、编码和顺序；
+    4. 升级与保级门槛；
+    5. 初始等级必须是最低等级。
+    """
+    policy = manifest.get("membership_policy")
+
+    if not isinstance(policy, dict):
+        raise ValueError(
+            "Manifest 缺少有效的 membership_policy。"
+        )
+
+    evaluation_frequency = policy.get(
+        "evaluation_frequency"
+    )
+
+    if evaluation_frequency != "daily":
+        raise ValueError(
+            "Day65 当前只支持 "
+            "membership_policy.evaluation_frequency "
+            "= daily，"
+            f"当前值为：{evaluation_frequency!r}"
+        )
+
+    parse_manifest_time(
+        policy.get("evaluation_time"),
+        "membership_policy.evaluation_time",
+    )
+
+    initial_assignment = policy.get(
+        "initial_assignment"
+    )
+
+    if not isinstance(initial_assignment, dict):
+        raise ValueError(
+            "membership_policy.initial_assignment "
+            "必须是字典。"
+        )
+
+    required_initial_fields = {
+        "level",
+        "effective_from_strategy",
+    }
+
+    missing_initial_fields = (
+        required_initial_fields
+        - initial_assignment.keys()
+    )
+
+    if missing_initial_fields:
+        raise ValueError(
+            "membership_policy.initial_assignment "
+            "缺少字段："
+            f"{sorted(missing_initial_fields)}"
+        )
+
+    initial_level = initial_assignment["level"]
+
+    if (
+        not isinstance(initial_level, str)
+        or not initial_level.strip()
+    ):
+        raise ValueError(
+            "membership_policy.initial_assignment."
+            "level 必须是非空字符串。"
+        )
+
+    initial_level = initial_level.strip()
+
+    effective_from_strategy = initial_assignment[
+        "effective_from_strategy"
+    ]
+
+    if (
+        not isinstance(
+            effective_from_strategy,
+            str,
+        )
+        or not effective_from_strategy.strip()
+    ):
+        raise ValueError(
+            "membership_policy.initial_assignment."
+            "effective_from_strategy "
+            "必须是非空字符串。"
+        )
+
+    effective_from_strategy = (
+        effective_from_strategy.strip()
+    )
+
+    expected_effective_from_strategy = (
+        "max_membership_joined_at_and_business_start"
+    )
+
+    if (
+        effective_from_strategy
+        != expected_effective_from_strategy
+    ):
+        raise ValueError(
+            "Day65 当前只支持 "
+            "membership_policy.initial_assignment."
+            "effective_from_strategy="
+            f"{expected_effective_from_strategy!r}，"
+            f"当前值为：{effective_from_strategy!r}"
+        )
+
+    tiers = policy.get("tiers")
+
+    if not isinstance(tiers, list) or not tiers:
+        raise ValueError(
+            "membership_policy.tiers "
+            "必须是非空列表。"
+        )
+
+    required_tier_fields = {
+        "level",
+        "rank",
+        "upgrade_threshold",
+        "retention_threshold",
+    }
+
+    parsed_tiers: list[dict[str, Any]] = []
+    levels: set[str] = set()
+    ranks: set[int] = set()
+
+    for index, tier in enumerate(tiers):
+        field_prefix = (
+            f"membership_policy.tiers[{index}]"
+        )
+
+        if not isinstance(tier, dict):
+            raise ValueError(
+                f"{field_prefix} 必须是字典。"
+            )
+
+        missing_fields = (
+            required_tier_fields
+            - tier.keys()
+        )
+
+        if missing_fields:
+            raise ValueError(
+                f"{field_prefix} 缺少字段："
+                f"{sorted(missing_fields)}"
+            )
+
+        level = tier["level"]
+
+        if (
+            not isinstance(level, str)
+            or not level.strip()
+        ):
+            raise ValueError(
+                f"{field_prefix}.level "
+                "必须是非空字符串。"
+            )
+
+        level = level.strip()
+
+        if level in levels:
+            raise ValueError(
+                "membership_policy.tiers "
+                "存在重复 level："
+                f"{level!r}"
+            )
+
+        if len(level) > 50:
+            raise ValueError(
+                f"{field_prefix}.level "
+                "超过数据库 VARCHAR(50) 长度："
+                f"{level!r}"
+            )
+
+        rank = tier["rank"]
+
+        if (
+            isinstance(rank, bool)
+            or not isinstance(rank, int)
+            or rank <= 0
+        ):
+            raise ValueError(
+                f"{field_prefix}.rank "
+                "必须是正整数，"
+                f"当前值为：{rank!r}"
+            )
+
+        if rank in ranks:
+            raise ValueError(
+                "membership_policy.tiers "
+                "存在重复 rank："
+                f"{rank}"
+            )
+
+        upgrade_threshold = tier[
+            "upgrade_threshold"
+        ]
+
+        if (
+            isinstance(upgrade_threshold, bool)
+            or not isinstance(
+                upgrade_threshold,
+                (int, float),
+            )
+            or upgrade_threshold < 0
+        ):
+            raise ValueError(
+                f"{field_prefix}.upgrade_threshold "
+                "必须是非负数，"
+                f"当前值为：{upgrade_threshold!r}"
+            )
+
+        retention_threshold = tier[
+            "retention_threshold"
+        ]
+
+        if (
+            isinstance(retention_threshold, bool)
+            or not isinstance(
+                retention_threshold,
+                (int, float),
+            )
+            or retention_threshold < 0
+        ):
+            raise ValueError(
+                f"{field_prefix}.retention_threshold "
+                "必须是非负数，"
+                f"当前值为：{retention_threshold!r}"
+            )
+
+        if (
+            retention_threshold
+            > upgrade_threshold
+        ):
+            raise ValueError(
+                f"{field_prefix} 的保级门槛"
+                "不能高于升级门槛："
+                f"retention_threshold="
+                f"{retention_threshold}, "
+                f"upgrade_threshold="
+                f"{upgrade_threshold}"
+            )
+
+        parsed_tiers.append(
+            {
+                "level": level,
+                "rank": rank,
+                "upgrade_threshold": (
+                    upgrade_threshold
+                ),
+                "retention_threshold": (
+                    retention_threshold
+                ),
+            }
+        )
+
+        levels.add(level)
+        ranks.add(rank)
+
+    parsed_tiers.sort(
+        key=lambda tier: tier["rank"]
+    )
+
+    actual_ranks = [
+        tier["rank"]
+        for tier in parsed_tiers
+    ]
+
+    expected_ranks = list(
+        range(1, len(parsed_tiers) + 1)
+    )
+
+    if actual_ranks != expected_ranks:
+        raise ValueError(
+            "membership_policy.tiers.rank "
+            "必须从 1 开始连续递增："
+            f"expected={expected_ranks}, "
+            f"actual={actual_ranks}"
+        )
+
+    for lower_tier, higher_tier in zip(
+        parsed_tiers,
+        parsed_tiers[1:],
+    ):
+        if (
+            higher_tier["upgrade_threshold"]
+            <= lower_tier["upgrade_threshold"]
+        ):
+            raise ValueError(
+                "会员等级升级门槛必须随 rank "
+                "严格递增："
+                f"{lower_tier['level']}="
+                f"{lower_tier['upgrade_threshold']}, "
+                f"{higher_tier['level']}="
+                f"{higher_tier['upgrade_threshold']}"
+            )
+
+    lowest_tier = parsed_tiers[0]
+
+    if lowest_tier["rank"] != 1:
+        raise ValueError(
+            "最低会员等级的 rank 必须为 1。"
+        )
+
+    if lowest_tier["upgrade_threshold"] != 0:
+        raise ValueError(
+            "最低会员等级的 upgrade_threshold "
+            "必须为 0。"
+        )
+
+    if lowest_tier["retention_threshold"] != 0:
+        raise ValueError(
+            "最低会员等级的 retention_threshold "
+            "必须为 0。"
+        )
+
+    if initial_level not in levels:
+        raise ValueError(
+            "membership_policy.initial_assignment."
+            "level 不存在于 membership_policy.tiers："
+            f"{initial_level!r}"
+        )
+
+    if initial_level != lowest_tier["level"]:
+        raise ValueError(
+            "初始会员等级必须是最低等级："
+            f"initial_level={initial_level!r}, "
+            "lowest_level="
+            f"{lowest_tier['level']!r}"
+        )
+
+
+
+def validate_order_generation(
+    manifest: dict[str, Any],
+) -> None:
+    """
+    验证 Day65 订单生成合同。
+
+    重点保护订单总量、日期分配、生命周期、明细分布、
+    促销概率和金额公式，避免错误配置进入交易生成器。
+    """
+    config = manifest.get("order_generation")
+
+    if not isinstance(config, dict):
+        raise ValueError(
+            "Manifest 缺少有效的 order_generation。"
+        )
+
+    _, profile = get_active_scale_profile(manifest)
+    expected_orders = profile["expected_orders"]
+
+    # 1. 订单编码与目标总量
+    order_code = _require_mapping(
+        config,
+        "order_code",
+        "order_generation.order_code",
+    )
+    _require_fields(
+        order_code,
+        {"prefix", "width"},
+        "order_generation.order_code",
+    )
+
+    prefix = _require_string(
+        order_code["prefix"],
+        "order_generation.order_code.prefix",
+    )
+    width = _require_positive_int(
+        order_code["width"],
+        "order_generation.order_code.width",
+    )
+
+    if prefix != prefix.upper():
+        raise ValueError(
+            "order_generation.order_code.prefix "
+            "必须使用大写稳定编码。"
+        )
+
+    if not prefix.replace("_", "").isalnum():
+        raise ValueError(
+            "order_generation.order_code.prefix "
+            "只能包含字母、数字和下划线。"
+        )
+
+    if len(prefix) + width > 50:
+        raise ValueError(
+            "订单编码超过 fact_orders.order_code "
+            "的 VARCHAR(50) 长度。"
+        )
+
+    if expected_orders > 10 ** width - 1:
+        raise ValueError(
+            "order_code.width 无法容纳当前 Profile "
+            f"的订单数：{expected_orders}"
+        )
+
+    target_count = _require_mapping(
+        config,
+        "target_count",
+        "order_generation.target_count",
+    )
+    _require_fields(
+        target_count,
+        {
+            "source",
+            "semantics",
+            "exact_total_required",
+        },
+        "order_generation.target_count",
+    )
+    _require_exact(
+        target_count["source"],
+        "scale_profile.expected_orders",
+        "order_generation.target_count.source",
+    )
+    _require_exact(
+        target_count["semantics"],
+        "fact_orders_total_rows",
+        "order_generation.target_count.semantics",
+    )
+
+    if not _require_bool(
+        target_count["exact_total_required"],
+        (
+            "order_generation.target_count."
+            "exact_total_required"
+        ),
+    ):
+        raise ValueError(
+            "exact_total_required 必须为 true。"
+        )
+
+    # 2. 日期分配
+    date_allocation = _require_mapping(
+        config,
+        "date_allocation",
+        "order_generation.date_allocation",
+    )
+    _require_fields(
+        date_allocation,
+        {
+            "strategy",
+            "annual_weights",
+            "weekday_multipliers",
+            "holiday_multiplier",
+            "campaign_family_multipliers",
+            "deterministic_noise",
+            "exact_total_reconciliation",
+        },
+        "order_generation.date_allocation",
+    )
+    _require_exact(
+        date_allocation["strategy"],
+        "weighted_exact_total",
+        "order_generation.date_allocation.strategy",
+    )
+
+    annual_weights = date_allocation[
+        "annual_weights"
+    ]
+    validate_probability_distribution(
+        annual_weights,
+        (
+            "order_generation.date_allocation."
+            "annual_weights"
+        ),
+    )
+
+    generation = manifest.get("generation")
+
+    if not isinstance(generation, dict):
+        raise ValueError(
+            "Manifest 缺少有效的 generation。"
+        )
+
+    business_start_date = parse_manifest_date(
+        generation.get("business_start_date"),
+        "generation.business_start_date",
+    )
+    business_end_date = parse_manifest_date(
+        generation.get("business_end_date"),
+        "generation.business_end_date",
+    )
+
+    normalized_years: set[int] = set()
+
+    for raw_year in annual_weights:
+        if isinstance(raw_year, bool):
+            raise ValueError(
+                "annual_weights 年份不能是布尔值。"
+            )
+
+        try:
+            year = int(raw_year)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "annual_weights 包含非法年份："
+                f"{raw_year!r}"
+            ) from exc
+
+        if year in normalized_years:
+            raise ValueError(
+                "annual_weights 标准化后存在"
+                f"重复年份：{year}"
+            )
+
+        normalized_years.add(year)
+
+    expected_years = set(
+        range(
+            business_start_date.year,
+            business_end_date.year + 1,
+        )
+    )
+
+    if normalized_years != expected_years:
+        raise ValueError(
+            "annual_weights 必须完整覆盖业务年份："
+            f"expected={sorted(expected_years)}, "
+            f"actual={sorted(normalized_years)}"
+        )
+
+    weekday_multipliers = date_allocation[
+        "weekday_multipliers"
+    ]
+
+    if not isinstance(weekday_multipliers, dict):
+        raise ValueError(
+            "weekday_multipliers 必须是字典。"
+        )
+
+    expected_weekdays = {
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+    }
+
+    if set(weekday_multipliers) != expected_weekdays:
+        raise ValueError(
+            "weekday_multipliers 必须完整覆盖七天。"
+        )
+
+    for weekday, multiplier in (
+        weekday_multipliers.items()
+    ):
+        _require_number(
+            multiplier,
+            (
+                "order_generation.date_allocation."
+                f"weekday_multipliers.{weekday}"
+            ),
+            minimum=0,
+            minimum_inclusive=False,
+        )
+
+    _require_number(
+        date_allocation["holiday_multiplier"],
+        (
+            "order_generation.date_allocation."
+            "holiday_multiplier"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+
+    campaign_multipliers = date_allocation[
+        "campaign_family_multipliers"
+    ]
+
+    if (
+        not isinstance(campaign_multipliers, dict)
+        or not campaign_multipliers
+    ):
+        raise ValueError(
+            "campaign_family_multipliers "
+            "必须是非空字典。"
+        )
+
+    major_campaign_families = {
+        campaign["campaign_family"].strip()
+        for campaign in manifest[
+            "business_calendar"
+        ]["campaigns"]
+        if (
+            campaign["campaign_type"].strip()
+            == "major_promotion"
+        )
+    }
+
+    if set(campaign_multipliers) != (
+        major_campaign_families
+    ):
+        raise ValueError(
+            "campaign_family_multipliers 必须与"
+            " major_promotion 活动家族一致："
+            f"expected={sorted(major_campaign_families)}, "
+            f"actual={sorted(campaign_multipliers)}"
+        )
+
+    for family, multiplier in (
+        campaign_multipliers.items()
+    ):
+        _require_number(
+            multiplier,
+            (
+                "order_generation.date_allocation."
+                "campaign_family_multipliers."
+                f"{family}"
+            ),
+            minimum=0,
+            minimum_inclusive=False,
+        )
+
+    noise = _require_mapping(
+        date_allocation,
+        "deterministic_noise",
+        (
+            "order_generation.date_allocation."
+            "deterministic_noise"
+        ),
+    )
+    _require_fields(
+        noise,
+        {
+            "enabled",
+            "minimum_multiplier",
+            "maximum_multiplier",
+        },
+        (
+            "order_generation.date_allocation."
+            "deterministic_noise"
+        ),
+    )
+
+    if not _require_bool(
+        noise["enabled"],
+        (
+            "order_generation.date_allocation."
+            "deterministic_noise.enabled"
+        ),
+    ):
+        raise ValueError(
+            "deterministic_noise.enabled 必须为 true。"
+        )
+
+    minimum_noise = _require_number(
+        noise["minimum_multiplier"],
+        (
+            "order_generation.date_allocation."
+            "deterministic_noise.minimum_multiplier"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    maximum_noise = _require_number(
+        noise["maximum_multiplier"],
+        (
+            "order_generation.date_allocation."
+            "deterministic_noise.maximum_multiplier"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+
+    if minimum_noise > maximum_noise:
+        raise ValueError(
+            "minimum_multiplier 不能大于 "
+            "maximum_multiplier。"
+        )
+
+    if not minimum_noise <= 1 <= maximum_noise:
+        raise ValueError(
+            "deterministic_noise 区间必须包含 1。"
+        )
+
+    reconciliation = _require_mapping(
+        date_allocation,
+        "exact_total_reconciliation",
+        (
+            "order_generation.date_allocation."
+            "exact_total_reconciliation"
+        ),
+    )
+    _require_exact(
+        reconciliation.get("strategy"),
+        "largest_remainder",
+        (
+            "order_generation.date_allocation."
+            "exact_total_reconciliation.strategy"
+        ),
+    )
+
+    # 3. 日内时间分布
+    time_distribution = _require_mapping(
+        config,
+        "creation_time_distribution",
+        (
+            "order_generation."
+            "creation_time_distribution"
+        ),
+    )
+    _require_fields(
+        time_distribution,
+        {
+            "strategy",
+            "interval_semantics",
+            "dayparts",
+        },
+        (
+            "order_generation."
+            "creation_time_distribution"
+        ),
+    )
+    _require_exact(
+        time_distribution["strategy"],
+        "daypart_weighted",
+        (
+            "order_generation."
+            "creation_time_distribution.strategy"
+        ),
+    )
+    _require_exact(
+        time_distribution["interval_semantics"],
+        "half_open",
+        (
+            "order_generation."
+            "creation_time_distribution."
+            "interval_semantics"
+        ),
+    )
+
+    dayparts = time_distribution["dayparts"]
+
+    if not isinstance(dayparts, list) or not dayparts:
+        raise ValueError(
+            "creation_time_distribution.dayparts "
+            "必须是非空列表。"
+        )
+
+    daypart_weights: dict[str, float] = {}
+    parsed_dayparts: list[
+        tuple[int, int, str]
+    ] = []
+
+    for index, daypart in enumerate(dayparts):
+        field_path = (
+            "order_generation."
+            "creation_time_distribution."
+            f"dayparts[{index}]"
+        )
+
+        if not isinstance(daypart, dict):
+            raise ValueError(
+                f"{field_path} 必须是字典。"
+            )
+
+        _require_fields(
+            daypart,
+            {
+                "name",
+                "start_hour",
+                "end_hour",
+                "weight",
+            },
+            field_path,
+        )
+
+        name = _require_string(
+            daypart["name"],
+            f"{field_path}.name",
+        )
+
+        if name in daypart_weights:
+            raise ValueError(
+                f"daypart name 不能重复：{name}"
+            )
+
+        start_hour = daypart["start_hour"]
+        end_hour = daypart["end_hour"]
+
+        for field_name, hour in {
+            "start_hour": start_hour,
+            "end_hour": end_hour,
+        }.items():
+            if (
+                isinstance(hour, bool)
+                or not isinstance(hour, int)
+                or not 0 <= hour <= 24
+            ):
+                raise ValueError(
+                    f"{field_path}.{field_name} "
+                    "必须是 [0, 24] 内的整数。"
+                )
+
+        if start_hour >= end_hour:
+            raise ValueError(
+                f"{field_path} 必须满足 "
+                "start_hour < end_hour。"
+            )
+
+        weight = _require_number(
+            daypart["weight"],
+            f"{field_path}.weight",
+            minimum=0,
+            maximum=1,
+            minimum_inclusive=False,
+        )
+
+        daypart_weights[name] = weight
+        parsed_dayparts.append(
+            (start_hour, end_hour, name)
+        )
+
+    validate_probability_distribution(
+        daypart_weights,
+        (
+            "order_generation."
+            "creation_time_distribution."
+            "dayparts.weight"
+        ),
+    )
+
+    parsed_dayparts.sort(key=lambda item: item[0])
+
+    if (
+        parsed_dayparts[0][0] != 0
+        or parsed_dayparts[-1][1] != 24
+    ):
+        raise ValueError(
+            "dayparts 必须完整覆盖 [0, 24)。"
+        )
+
+    for previous, current in zip(
+        parsed_dayparts,
+        parsed_dayparts[1:],
+    ):
+        if previous[1] != current[0]:
+            raise ValueError(
+                "dayparts 必须连续且不能重叠："
+                f"{previous[2]} -> {current[2]}"
+            )
+
+    # 4. 生命周期
+    lifecycle = _require_mapping(
+        config,
+        "lifecycle",
+        "order_generation.lifecycle",
+    )
+    _require_fields(
+        lifecycle,
+        {
+            "initial_status",
+            "successful_payment_probability",
+            "payment_delay_minutes",
+            "cancellation_delay_minutes",
+            "unpaid_final_status",
+            "paid_status_before_delivery",
+            "delivered_status_after_delivery",
+            "new_order_cutoff",
+            "payment_completion_cutoff",
+        },
+        "order_generation.lifecycle",
+    )
+
+    expected_statuses = {
+        "initial_status": "pending_payment",
+        "unpaid_final_status": "cancelled",
+        "paid_status_before_delivery": "paid",
+        "delivered_status_after_delivery": (
+            "delivered"
+        ),
+    }
+
+    for field_name, expected_value in (
+        expected_statuses.items()
+    ):
+        _require_exact(
+            lifecycle[field_name],
+            expected_value,
+            f"order_generation.lifecycle.{field_name}",
+        )
+
+    payment_probability = _require_number(
+        lifecycle[
+            "successful_payment_probability"
+        ],
+        (
+            "order_generation.lifecycle."
+            "successful_payment_probability"
+        ),
+        minimum=0,
+        maximum=1,
+        minimum_inclusive=False,
+        maximum_inclusive=False,
+    )
+
+    if (
+        expected_orders * payment_probability < 1
+        or expected_orders * (1 - payment_probability) < 1
+    ):
+        raise ValueError(
+            "当前 payment probability 无法同时"
+            "生成支付成功和取消订单。"
+        )
+
+    for delay_name in {
+        "payment_delay_minutes",
+        "cancellation_delay_minutes",
+    }:
+        delay = _require_mapping(
+            lifecycle,
+            delay_name,
+            (
+                "order_generation.lifecycle."
+                f"{delay_name}"
+            ),
+        )
+        _require_fields(
+            delay,
+            {"minimum", "maximum"},
+            (
+                "order_generation.lifecycle."
+                f"{delay_name}"
+            ),
+        )
+        minimum_delay = _require_positive_int(
+            delay["minimum"],
+            (
+                "order_generation.lifecycle."
+                f"{delay_name}.minimum"
+            ),
+        )
+        maximum_delay = _require_positive_int(
+            delay["maximum"],
+            (
+                "order_generation.lifecycle."
+                f"{delay_name}.maximum"
+            ),
+        )
+
+        if minimum_delay > maximum_delay:
+            raise ValueError(
+                f"{delay_name}.minimum "
+                "不能大于 maximum。"
+            )
+
+    cutoff = _require_mapping(
+        lifecycle,
+        "new_order_cutoff",
+        (
+            "order_generation.lifecycle."
+            "new_order_cutoff"
+        ),
+    )
+    _require_exact(
+        cutoff.get("source"),
+        "generation.business_end_date",
+        (
+            "order_generation.lifecycle."
+            "new_order_cutoff.source"
+        ),
+    )
+
+    payment_cutoff = _require_mapping(
+        lifecycle,
+        "payment_completion_cutoff",
+        (
+            "order_generation.lifecycle."
+            "payment_completion_cutoff"
+        ),
+    )
+    _require_fields(
+        payment_cutoff,
+        {
+            "source",
+            "boundary",
+            "overflow_behavior",
+        },
+        (
+            "order_generation.lifecycle."
+            "payment_completion_cutoff"
+        ),
+    )
+    _require_exact(
+        payment_cutoff["source"],
+        "generation.business_end_date",
+        (
+            "order_generation.lifecycle."
+            "payment_completion_cutoff.source"
+        ),
+    )
+    _require_exact(
+        payment_cutoff["boundary"],
+        "end_of_day",
+        (
+            "order_generation.lifecycle."
+            "payment_completion_cutoff.boundary"
+        ),
+    )
+    _require_exact(
+        payment_cutoff["overflow_behavior"],
+        "cancel_order",
+        (
+            "order_generation.lifecycle."
+            "payment_completion_cutoff."
+            "overflow_behavior"
+        ),
+    )
+
+    # 5. 实体选择
+    entity_selection = _require_mapping(
+        config,
+        "entity_selection",
+        "order_generation.entity_selection",
+    )
+    _require_fields(
+        entity_selection,
+        {
+            "customer",
+            "channel",
+            "shipping_region",
+            "campaign_attribution",
+        },
+        "order_generation.entity_selection",
+    )
+
+    customer = _require_mapping(
+        entity_selection,
+        "customer",
+        (
+            "order_generation.entity_selection."
+            "customer"
+        ),
+    )
+    _require_exact(
+        customer.get("strategy"),
+        "simulation_profile_weighted",
+        (
+            "order_generation.entity_selection."
+            "customer.strategy"
+        ),
+    )
+
+    for field_name in {
+        "require_first_seen_before_order",
+        "require_active_status",
+    }:
+        if not _require_bool(
+            customer.get(field_name),
+            (
+                "order_generation.entity_selection."
+                f"customer.{field_name}"
+            ),
+        ):
+            raise ValueError(
+                f"customer.{field_name} 必须为 true。"
+            )
+
+    channel = _require_mapping(
+        entity_selection,
+        "channel",
+        (
+            "order_generation.entity_selection."
+            "channel"
+        ),
+    )
+    _require_exact(
+        channel.get("strategy"),
+        "customer_preference_x_daily_context",
+        (
+            "order_generation.entity_selection."
+            "channel.strategy"
+        ),
+    )
+
+    if not _require_bool(
+        channel.get("require_active_sales_channel"),
+        (
+            "order_generation.entity_selection."
+            "channel.require_active_sales_channel"
+        ),
+    ):
+        raise ValueError(
+            "require_active_sales_channel 必须为 true。"
+        )
+
+    shipping_region = _require_mapping(
+        entity_selection,
+        "shipping_region",
+        (
+            "order_generation.entity_selection."
+            "shipping_region"
+        ),
+    )
+    _require_exact(
+        shipping_region.get("strategy"),
+        "customer_home_region_with_override",
+        (
+            "order_generation.entity_selection."
+            "shipping_region.strategy"
+        ),
+    )
+
+    shipping_distribution = (
+        shipping_region.get("distribution")
+    )
+    validate_probability_distribution(
+        shipping_distribution,
+        (
+            "order_generation.entity_selection."
+            "shipping_region.distribution"
+        ),
+    )
+
+    expected_shipping_keys = {
+        "home_region",
+        "same_region_group",
+        "other_region",
+    }
+
+    if set(shipping_distribution) != (
+        expected_shipping_keys
+    ):
+        raise ValueError(
+            "shipping_region.distribution 字段不完整。"
+        )
+
+    attribution = _require_mapping(
+        entity_selection,
+        "campaign_attribution",
+        (
+            "order_generation.entity_selection."
+            "campaign_attribution"
+        ),
+    )
+    _require_exact(
+        attribution.get("strategy"),
+        "active_major_campaign_else_null",
+        (
+            "order_generation.entity_selection."
+            "campaign_attribution.strategy"
+        ),
+    )
+
+    attribution_probability = _require_number(
+        attribution.get(
+            "major_campaign_attribution_probability"
+        ),
+        (
+            "order_generation.entity_selection."
+            "campaign_attribution."
+            "major_campaign_attribution_probability"
+        ),
+        minimum=0,
+        maximum=1,
+    )
+    allow_null_campaign = _require_bool(
+        attribution.get("allow_null_campaign"),
+        (
+            "order_generation.entity_selection."
+            "campaign_attribution.allow_null_campaign"
+        ),
+    )
+
+    if (
+        attribution_probability < 1
+        and not allow_null_campaign
+    ):
+        raise ValueError(
+            "活动归因概率小于 1 时必须允许 "
+            "campaign_id 为 null。"
+        )
+
+    # 6. 订单明细与促销
+    item_generation = _require_mapping(
+        config,
+        "item_generation",
+        "order_generation.item_generation",
+    )
+    _require_fields(
+        item_generation,
+        {
+            "item_count_distribution",
+            "quantity_distribution",
+            "allow_duplicate_product_in_order",
+            "product_selection",
+            "promotion_application",
+        },
+        "order_generation.item_generation",
+    )
+
+    for distribution_name in {
+        "item_count_distribution",
+        "quantity_distribution",
+    }:
+        distribution = item_generation[
+            distribution_name
+        ]
+        validate_probability_distribution(
+            distribution,
+            (
+                "order_generation.item_generation."
+                f"{distribution_name}"
+            ),
+        )
+
+        for count in distribution:
+            if (
+                isinstance(count, bool)
+                or not isinstance(count, int)
+                or count <= 0
+            ):
+                raise ValueError(
+                    f"{distribution_name} 的键"
+                    "必须是正整数。"
+                )
+
+    if (
+        max(
+            item_generation[
+                "item_count_distribution"
+            ]
+        )
+        > profile["products"]
+    ):
+        raise ValueError(
+            "单订单最大明细数不能超过商品总数。"
+        )
+
+    if _require_bool(
+        item_generation[
+            "allow_duplicate_product_in_order"
+        ],
+        (
+            "order_generation.item_generation."
+            "allow_duplicate_product_in_order"
+        ),
+    ):
+        raise ValueError(
+            "Day65 当前不允许同一订单重复商品。"
+        )
+
+    product_selection = _require_mapping(
+        item_generation,
+        "product_selection",
+        (
+            "order_generation.item_generation."
+            "product_selection"
+        ),
+    )
+    _require_exact(
+        product_selection.get("strategy"),
+        "simulation_profile_weighted",
+        (
+            "order_generation.item_generation."
+            "product_selection.strategy"
+        ),
+    )
+
+    for field_name in {
+        "require_launch_before_order",
+        "require_active_product",
+    }:
+        if not _require_bool(
+            product_selection.get(field_name),
+            (
+                "order_generation.item_generation."
+                f"product_selection.{field_name}"
+            ),
+        ):
+            raise ValueError(
+                f"product_selection.{field_name} "
+                "必须为 true。"
+            )
+
+    promotion = _require_mapping(
+        item_generation,
+        "promotion_application",
+        (
+            "order_generation.item_generation."
+            "promotion_application"
+        ),
+    )
+    _require_fields(
+        promotion,
+        {
+            "strategy",
+            "probability_by_campaign_type",
+            "maximum_promotions_per_item",
+            "allow_no_promotion",
+        },
+        (
+            "order_generation.item_generation."
+            "promotion_application"
+        ),
+    )
+    _require_exact(
+        promotion["strategy"],
+        "active_promotion_probability",
+        (
+            "order_generation.item_generation."
+            "promotion_application.strategy"
+        ),
+    )
+
+    promotion_probabilities = promotion[
+        "probability_by_campaign_type"
+    ]
+
+    if (
+        not isinstance(promotion_probabilities, dict)
+        or set(promotion_probabilities)
+        != {"always_on", "major_promotion"}
+    ):
+        raise ValueError(
+            "probability_by_campaign_type 必须仅包含 "
+            "always_on 和 major_promotion。"
+        )
+
+    for campaign_type, probability in (
+        promotion_probabilities.items()
+    ):
+        _require_number(
+            probability,
+            (
+                "order_generation.item_generation."
+                "promotion_application."
+                "probability_by_campaign_type."
+                f"{campaign_type}"
+            ),
+            minimum=0,
+            maximum=1,
+        )
+
+    if _require_positive_int(
+        promotion["maximum_promotions_per_item"],
+        (
+            "order_generation.item_generation."
+            "promotion_application."
+            "maximum_promotions_per_item"
+        ),
+    ) != 1:
+        raise ValueError(
+            "maximum_promotions_per_item 必须为 1。"
+        )
+
+    if not _require_bool(
+        promotion["allow_no_promotion"],
+        (
+            "order_generation.item_generation."
+            "promotion_application."
+            "allow_no_promotion"
+        ),
+    ):
+        raise ValueError(
+            "allow_no_promotion 必须为 true。"
+        )
+
+    # 7. 金额合同
+    pricing = _require_mapping(
+        config,
+        "pricing",
+        "order_generation.pricing",
+    )
+    _require_fields(
+        pricing,
+        {
+            "unit_list_price_source",
+            "unit_paid_price_strategy",
+            "unit_cost_source",
+            "decimal_places",
+            "rounding_mode",
+            "item_amount_formulas",
+            "order_amount_strategy",
+            "allow_negative_margin",
+        },
+        "order_generation.pricing",
+    )
+
+    expected_pricing_values = {
+        "unit_list_price_source": (
+            "dim_product.list_price"
+        ),
+        "unit_paid_price_strategy": (
+            "promotion_discount_else_list_price"
+        ),
+        "unit_cost_source": (
+            "hidden_product_simulation_profile"
+        ),
+        "rounding_mode": "ROUND_HALF_UP",
+        "order_amount_strategy": "sum_order_items",
+    }
+
+    for field_name, expected_value in (
+        expected_pricing_values.items()
+    ):
+        _require_exact(
+            pricing[field_name],
+            expected_value,
+            f"order_generation.pricing.{field_name}",
+        )
+
+    if (
+        isinstance(pricing["decimal_places"], bool)
+        or not isinstance(
+            pricing["decimal_places"],
+            int,
+        )
+        or pricing["decimal_places"] != 2
+    ):
+        raise ValueError(
+            "pricing.decimal_places 必须为 2。"
+        )
+
+    formulas = _require_mapping(
+        pricing,
+        "item_amount_formulas",
+        (
+            "order_generation.pricing."
+            "item_amount_formulas"
+        ),
+    )
+
+    expected_formulas = {
+        "item_list_amount": (
+            "unit_list_price_x_quantity"
+        ),
+        "item_paid_amount": (
+            "unit_paid_price_x_quantity"
+        ),
+        "item_discount_amount": (
+            "item_list_amount_minus_item_paid_amount"
+        ),
+        "item_cost_amount": (
+            "unit_cost_at_order_x_quantity"
+        ),
+    }
+
+    if set(formulas) != set(expected_formulas):
+        raise ValueError(
+            "item_amount_formulas 字段与"
+            "当前金额合同不一致。"
+        )
+
+    for field_name, expected_value in (
+        expected_formulas.items()
+    ):
+        _require_exact(
+            formulas[field_name],
+            expected_value,
+            (
+                "order_generation.pricing."
+                f"item_amount_formulas.{field_name}"
+            ),
+        )
+
+    _require_bool(
+        pricing["allow_negative_margin"],
+        (
+            "order_generation.pricing."
+            "allow_negative_margin"
+        ),
+    )
+
+def validate_fulfillment_generation(
+    manifest: dict[str, Any],
+) -> None:
+    """
+    验证 Day65 履约生成合同。
+
+    主要检查：
+    1. 只有成功支付且未取消的订单进入履约；
+    2. 发货、送达、偏远地区和活动拥堵延迟合法；
+    3. 偏远地区与 major promotion 活动配置可解析；
+    4. 履约最终状态与订单生命周期一致；
+    5. 观察尾窗足以容纳最大履约延迟。
+    """
+    config = manifest.get("fulfillment_generation")
+
+    if not isinstance(config, dict):
+        raise ValueError(
+            "Manifest 缺少有效的 "
+            "fulfillment_generation。"
+        )
+
+    eligibility = _require_mapping(
+        config,
+        "eligibility",
+        "fulfillment_generation.eligibility",
+    )
+    _require_fields(
+        eligibility,
+        {
+            "require_successful_payment",
+            "exclude_cancelled_orders",
+        },
+        "fulfillment_generation.eligibility",
+    )
+
+    for field_name in {
+        "require_successful_payment",
+        "exclude_cancelled_orders",
+    }:
+        if not _require_bool(
+            eligibility[field_name],
+            (
+                "fulfillment_generation.eligibility."
+                f"{field_name}"
+            ),
+        ):
+            raise ValueError(
+                "fulfillment_generation.eligibility."
+                f"{field_name} 必须为 true。"
+            )
+
+    shipping_delay = _require_mapping(
+        config,
+        "shipping_delay_hours",
+        "fulfillment_generation.shipping_delay_hours",
+    )
+    _require_fields(
+        shipping_delay,
+        {"minimum", "maximum"},
+        "fulfillment_generation.shipping_delay_hours",
+    )
+
+    shipping_minimum = _require_positive_int(
+        shipping_delay["minimum"],
+        (
+            "fulfillment_generation."
+            "shipping_delay_hours.minimum"
+        ),
+    )
+    shipping_maximum = _require_positive_int(
+        shipping_delay["maximum"],
+        (
+            "fulfillment_generation."
+            "shipping_delay_hours.maximum"
+        ),
+    )
+
+    if shipping_minimum > shipping_maximum:
+        raise ValueError(
+            "shipping_delay_hours.minimum "
+            "不能大于 maximum。"
+        )
+
+    delivery_delay = _require_mapping(
+        config,
+        "delivery_delay_days",
+        "fulfillment_generation.delivery_delay_days",
+    )
+    _require_fields(
+        delivery_delay,
+        {"minimum", "maximum"},
+        "fulfillment_generation.delivery_delay_days",
+    )
+
+    delivery_minimum = _require_positive_int(
+        delivery_delay["minimum"],
+        (
+            "fulfillment_generation."
+            "delivery_delay_days.minimum"
+        ),
+    )
+    delivery_maximum = _require_positive_int(
+        delivery_delay["maximum"],
+        (
+            "fulfillment_generation."
+            "delivery_delay_days.maximum"
+        ),
+    )
+
+    if delivery_minimum > delivery_maximum:
+        raise ValueError(
+            "delivery_delay_days.minimum "
+            "不能大于 maximum。"
+        )
+
+    remote_delay = _require_mapping(
+        config,
+        "remote_region_extra_delay_days",
+        (
+            "fulfillment_generation."
+            "remote_region_extra_delay_days"
+        ),
+    )
+    _require_fields(
+        remote_delay,
+        {
+            "enabled",
+            "region_groups",
+            "minimum",
+            "maximum",
+        },
+        (
+            "fulfillment_generation."
+            "remote_region_extra_delay_days"
+        ),
+    )
+
+    if not _require_bool(
+        remote_delay["enabled"],
+        (
+            "fulfillment_generation."
+            "remote_region_extra_delay_days.enabled"
+        ),
+    ):
+        raise ValueError(
+            "remote_region_extra_delay_days.enabled "
+            "必须为 true。"
+        )
+
+    region_groups = remote_delay["region_groups"]
+
+    if (
+        not isinstance(region_groups, list)
+        or not region_groups
+    ):
+        raise ValueError(
+            "remote_region_extra_delay_days."
+            "region_groups 必须是非空列表。"
+        )
+
+    normalized_region_groups: list[str] = []
+
+    for index, region_group in enumerate(
+        region_groups
+    ):
+        normalized_region_groups.append(
+            _require_string(
+                region_group,
+                (
+                    "fulfillment_generation."
+                    "remote_region_extra_delay_days."
+                    f"region_groups[{index}]"
+                ),
+            )
+        )
+
+    if len(set(normalized_region_groups)) != len(
+        normalized_region_groups
+    ):
+        raise ValueError(
+            "remote_region_extra_delay_days."
+            "region_groups 不能重复。"
+        )
+
+    expected_remote_region_groups = {
+        "northwest",
+        "southwest",
+        "northeast",
+    }
+
+    if set(normalized_region_groups) != (
+        expected_remote_region_groups
+    ):
+        raise ValueError(
+            "Day65 当前要求偏远地区组为："
+            f"{sorted(expected_remote_region_groups)}，"
+            "当前值为："
+            f"{sorted(normalized_region_groups)}"
+        )
+
+    configured_region_groups = {
+        region["region_group"].strip()
+        for region in manifest[
+            "fixed_dimensions"
+        ]["regions"]
+    }
+
+    unknown_region_groups = (
+        set(normalized_region_groups)
+        - configured_region_groups
+    )
+
+    if unknown_region_groups:
+        raise ValueError(
+            "履约偏远地区组不存在于 "
+            "fixed_dimensions.regions："
+            f"{sorted(unknown_region_groups)}"
+        )
+
+    remote_minimum = _require_positive_int(
+        remote_delay["minimum"],
+        (
+            "fulfillment_generation."
+            "remote_region_extra_delay_days.minimum"
+        ),
+    )
+    remote_maximum = _require_positive_int(
+        remote_delay["maximum"],
+        (
+            "fulfillment_generation."
+            "remote_region_extra_delay_days.maximum"
+        ),
+    )
+
+    if remote_minimum > remote_maximum:
+        raise ValueError(
+            "remote_region_extra_delay_days.minimum "
+            "不能大于 maximum。"
+        )
+
+    congestion = _require_mapping(
+        config,
+        "campaign_congestion",
+        "fulfillment_generation.campaign_congestion",
+    )
+    _require_fields(
+        congestion,
+        {
+            "enabled",
+            (
+                "extra_delay_probability_"
+                "by_campaign_family"
+            ),
+            "extra_delay_days",
+        },
+        "fulfillment_generation.campaign_congestion",
+    )
+
+    if not _require_bool(
+        congestion["enabled"],
+        (
+            "fulfillment_generation."
+            "campaign_congestion.enabled"
+        ),
+    ):
+        raise ValueError(
+            "campaign_congestion.enabled 必须为 true。"
+        )
+
+    congestion_probabilities = congestion[
+        "extra_delay_probability_by_campaign_family"
+    ]
+
+    if (
+        not isinstance(congestion_probabilities, dict)
+        or not congestion_probabilities
+    ):
+        raise ValueError(
+            "extra_delay_probability_by_campaign_family "
+            "必须是非空字典。"
+        )
+
+    major_campaign_families = {
+        campaign["campaign_family"].strip()
+        for campaign in manifest[
+            "business_calendar"
+        ]["campaigns"]
+        if (
+            campaign["campaign_type"].strip()
+            == "major_promotion"
+        )
+    }
+
+    if set(congestion_probabilities) != (
+        major_campaign_families
+    ):
+        raise ValueError(
+            "履约拥堵概率必须完整覆盖 "
+            "major_promotion 活动家族："
+            f"expected={sorted(major_campaign_families)}, "
+            f"actual={sorted(congestion_probabilities)}"
+        )
+
+    for family, probability in (
+        congestion_probabilities.items()
+    ):
+        _require_number(
+            probability,
+            (
+                "fulfillment_generation."
+                "campaign_congestion."
+                "extra_delay_probability_by_"
+                f"campaign_family.{family}"
+            ),
+            minimum=0,
+            maximum=1,
+        )
+
+    congestion_delay = _require_mapping(
+        congestion,
+        "extra_delay_days",
+        (
+            "fulfillment_generation."
+            "campaign_congestion.extra_delay_days"
+        ),
+    )
+    _require_fields(
+        congestion_delay,
+        {"minimum", "maximum"},
+        (
+            "fulfillment_generation."
+            "campaign_congestion.extra_delay_days"
+        ),
+    )
+
+    congestion_minimum = _require_positive_int(
+        congestion_delay["minimum"],
+        (
+            "fulfillment_generation."
+            "campaign_congestion."
+            "extra_delay_days.minimum"
+        ),
+    )
+    congestion_maximum = _require_positive_int(
+        congestion_delay["maximum"],
+        (
+            "fulfillment_generation."
+            "campaign_congestion."
+            "extra_delay_days.maximum"
+        ),
+    )
+
+    if congestion_minimum > congestion_maximum:
+        raise ValueError(
+            "campaign_congestion.extra_delay_days."
+            "minimum 不能大于 maximum。"
+        )
+
+    final_status = _require_mapping(
+        config,
+        "final_status",
+        "fulfillment_generation.final_status",
+    )
+    _require_fields(
+        final_status,
+        {"delivered_event_status"},
+        "fulfillment_generation.final_status",
+    )
+    _require_exact(
+        final_status["delivered_event_status"],
+        "delivered",
+        (
+            "fulfillment_generation.final_status."
+            "delivered_event_status"
+        ),
+    )
+
+    observation_window = _require_mapping(
+        config,
+        "observation_window",
+        "fulfillment_generation.observation_window",
+    )
+    _require_fields(
+        observation_window,
+        {
+            "allow_delivery_after_business_end",
+            "maximum_timestamp_source",
+            "incomplete_after_observation_end_status",
+        },
+        "fulfillment_generation.observation_window",
+    )
+
+    if not _require_bool(
+        observation_window[
+            "allow_delivery_after_business_end"
+        ],
+        (
+            "fulfillment_generation."
+            "observation_window."
+            "allow_delivery_after_business_end"
+        ),
+    ):
+        raise ValueError(
+            "allow_delivery_after_business_end "
+            "必须为 true。"
+        )
+
+    _require_exact(
+        observation_window[
+            "maximum_timestamp_source"
+        ],
+        "generation.event_observation_end_date",
+        (
+            "fulfillment_generation."
+            "observation_window."
+            "maximum_timestamp_source"
+        ),
+    )
+    _require_exact(
+        observation_window[
+            "incomplete_after_observation_end_status"
+        ],
+        "paid",
+        (
+            "fulfillment_generation."
+            "observation_window."
+            "incomplete_after_observation_end_status"
+        ),
+    )
+
+    order_lifecycle = manifest[
+        "order_generation"
+    ]["lifecycle"]
+
+    if (
+        order_lifecycle[
+            "paid_status_before_delivery"
+        ]
+        != observation_window[
+            "incomplete_after_observation_end_status"
+        ]
+    ):
+        raise ValueError(
+            "履约未完成状态必须与订单支付后、"
+            "送达前状态一致。"
+        )
+
+    if (
+        order_lifecycle[
+            "delivered_status_after_delivery"
+        ]
+        != final_status["delivered_event_status"]
+    ):
+        raise ValueError(
+            "履约送达状态必须与订单生命周期"
+            "送达状态一致。"
+        )
+
+    generation = manifest["generation"]
+    business_end_date = parse_manifest_date(
+        generation["business_end_date"],
+        "generation.business_end_date",
+    )
+    observation_end_date = parse_manifest_date(
+        generation["event_observation_end_date"],
+        "generation.event_observation_end_date",
+    )
+
+    maximum_delay = timedelta(
+        hours=shipping_maximum,
+        days=(
+            delivery_maximum
+            + remote_maximum
+            + congestion_maximum
+        ),
+    )
+
+    available_tail = (
+        datetime.combine(
+            observation_end_date,
+            time(23, 59, 59),
+        )
+        - datetime.combine(
+            business_end_date,
+            time(23, 59, 59),
+        )
+    )
+
+    if maximum_delay > available_tail:
+        raise ValueError(
+            "事件观察尾窗不足以容纳最大履约延迟："
+            f"maximum_delay={maximum_delay}, "
+            f"available_tail={available_tail}"
+        )
+
+
+def validate_refund_generation(
+    manifest: dict[str, Any],
+) -> None:
+    """
+    验证 Day65 退款生成合同。
+
+    主要检查：
+    1. 退款资格与每个订单明细的事件上限；
+    2. 退款概率模型与概率边界；
+    3. 退款申请、数量、金额和处理时序；
+    4. 退款状态、原因及观察尾窗处理；
+    5. SO 与会员 R12 只扣减 completed 退款。
+    """
+    config = _require_mapping(
+        manifest,
+        "refund_generation",
+        "refund_generation",
+    )
+
+    _require_fields(
+        config,
+        {
+            "eligibility",
+            "probability_model",
+            "request_delay_days",
+            "quantity",
+            "amount",
+            "resolution",
+            "reason_distribution",
+            "observation_window",
+            "business_effect",
+        },
+        "refund_generation",
+    )
+
+    eligibility = _require_mapping(
+        config,
+        "eligibility",
+        "refund_generation.eligibility",
+    )
+
+    _require_fields(
+        eligibility,
+        {
+            "require_successful_payment",
+            "require_delivery",
+            "exclude_cancelled_orders",
+            "maximum_refund_events_per_order_item",
+        },
+        "refund_generation.eligibility",
+    )
+
+    for field_name in {
+        "require_successful_payment",
+        "require_delivery",
+        "exclude_cancelled_orders",
+    }:
+        value = _require_bool(
+            eligibility[field_name],
+            (
+                "refund_generation.eligibility."
+                f"{field_name}"
+            ),
+        )
+
+        if not value:
+            raise ValueError(
+                "Day65 退款生成要求 "
+                "refund_generation.eligibility."
+                f"{field_name}=true。"
+            )
+
+    maximum_events = _require_positive_int(
+        eligibility[
+            "maximum_refund_events_per_order_item"
+        ],
+        (
+            "refund_generation.eligibility."
+            "maximum_refund_events_per_order_item"
+        ),
+    )
+
+    if maximum_events != 1:
+        raise ValueError(
+            "Day65 当前每个订单明细最多只生成"
+            "一个退款事件，"
+            "maximum_refund_events_per_order_item "
+            f"必须为 1，当前值为：{maximum_events}"
+        )
+
+    probability_model = _require_mapping(
+        config,
+        "probability_model",
+        "refund_generation.probability_model",
+    )
+
+    _require_fields(
+        probability_model,
+        {
+            "strategy",
+            "base_item_refund_probability",
+            "quality_risk_multiplier",
+            "customer_refund_propensity_multiplier",
+            "deep_discount",
+            "final_probability",
+        },
+        "refund_generation.probability_model",
+    )
+
+    _require_exact(
+        probability_model["strategy"],
+        "hidden_profile_multiplicative",
+        "refund_generation.probability_model.strategy",
+    )
+
+    _require_number(
+        probability_model[
+            "base_item_refund_probability"
+        ],
+        (
+            "refund_generation.probability_model."
+            "base_item_refund_probability"
+        ),
+        minimum=0,
+        maximum=1,
+        minimum_inclusive=False,
+        maximum_inclusive=False,
+    )
+
+    for field_name in {
+        "quality_risk_multiplier",
+        "customer_refund_propensity_multiplier",
+    }:
+        multiplier = _require_mapping(
+            probability_model,
+            field_name,
+            (
+                "refund_generation.probability_model."
+                f"{field_name}"
+            ),
+        )
+
+        _require_fields(
+            multiplier,
+            {"minimum", "maximum"},
+            (
+                "refund_generation.probability_model."
+                f"{field_name}"
+            ),
+        )
+
+        minimum = _require_number(
+            multiplier["minimum"],
+            (
+                "refund_generation.probability_model."
+                f"{field_name}.minimum"
+            ),
+            minimum=0,
+            minimum_inclusive=False,
+        )
+
+        maximum = _require_number(
+            multiplier["maximum"],
+            (
+                "refund_generation.probability_model."
+                f"{field_name}.maximum"
+            ),
+            minimum=0,
+            minimum_inclusive=False,
+        )
+
+        if minimum > maximum:
+            raise ValueError(
+                "退款概率乘数区间必须满足 "
+                "minimum <= maximum："
+                f"field={field_name}, "
+                f"minimum={minimum}, maximum={maximum}"
+            )
+
+    deep_discount = _require_mapping(
+        probability_model,
+        "deep_discount",
+        (
+            "refund_generation.probability_model."
+            "deep_discount"
+        ),
+    )
+
+    _require_fields(
+        deep_discount,
+        {"threshold", "multiplier"},
+        (
+            "refund_generation.probability_model."
+            "deep_discount"
+        ),
+    )
+
+    _require_number(
+        deep_discount["threshold"],
+        (
+            "refund_generation.probability_model."
+            "deep_discount.threshold"
+        ),
+        minimum=0,
+        maximum=1,
+    )
+
+    _require_number(
+        deep_discount["multiplier"],
+        (
+            "refund_generation.probability_model."
+            "deep_discount.multiplier"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+
+    final_probability = _require_mapping(
+        probability_model,
+        "final_probability",
+        (
+            "refund_generation.probability_model."
+            "final_probability"
+        ),
+    )
+
+    _require_fields(
+        final_probability,
+        {"minimum", "maximum"},
+        (
+            "refund_generation.probability_model."
+            "final_probability"
+        ),
+    )
+
+    minimum_final_probability = _require_number(
+        final_probability["minimum"],
+        (
+            "refund_generation.probability_model."
+            "final_probability.minimum"
+        ),
+        minimum=0,
+        maximum=1,
+        minimum_inclusive=False,
+    )
+
+    maximum_final_probability = _require_number(
+        final_probability["maximum"],
+        (
+            "refund_generation.probability_model."
+            "final_probability.maximum"
+        ),
+        minimum=0,
+        maximum=1,
+        maximum_inclusive=False,
+    )
+
+    if (
+        minimum_final_probability
+        > maximum_final_probability
+    ):
+        raise ValueError(
+            "退款最终概率区间必须满足 "
+            "minimum <= maximum："
+            f"minimum={minimum_final_probability}, "
+            f"maximum={maximum_final_probability}"
+        )
+
+    request_delay = _require_mapping(
+        config,
+        "request_delay_days",
+        "refund_generation.request_delay_days",
+    )
+
+    _require_fields(
+        request_delay,
+        {
+            "minimum",
+            "maximum",
+            "timestamp_reference",
+        },
+        "refund_generation.request_delay_days",
+    )
+
+    minimum_request_delay = _require_positive_int(
+        request_delay["minimum"],
+        (
+            "refund_generation.request_delay_days."
+            "minimum"
+        ),
+    )
+
+    maximum_request_delay = _require_positive_int(
+        request_delay["maximum"],
+        (
+            "refund_generation.request_delay_days."
+            "maximum"
+        ),
+    )
+
+    if minimum_request_delay > maximum_request_delay:
+        raise ValueError(
+            "退款申请延迟必须满足 "
+            "minimum <= maximum："
+            f"minimum={minimum_request_delay}, "
+            f"maximum={maximum_request_delay}"
+        )
+
+    _require_exact(
+        request_delay["timestamp_reference"],
+        "delivered_at",
+        (
+            "refund_generation.request_delay_days."
+            "timestamp_reference"
+        ),
+    )
+
+    quantity = _require_mapping(
+        config,
+        "quantity",
+        "refund_generation.quantity",
+    )
+
+    _require_fields(
+        quantity,
+        {
+            "strategy",
+            "full_quantity_probability",
+            "partial_quantity_strategy",
+            "never_exceed_purchased_quantity",
+        },
+        "refund_generation.quantity",
+    )
+
+    _require_exact(
+        quantity["strategy"],
+        "partial_or_full",
+        "refund_generation.quantity.strategy",
+    )
+
+    _require_number(
+        quantity["full_quantity_probability"],
+        (
+            "refund_generation.quantity."
+            "full_quantity_probability"
+        ),
+        minimum=0,
+        maximum=1,
+        minimum_inclusive=False,
+        maximum_inclusive=False,
+    )
+
+    partial_quantity = _require_mapping(
+        quantity,
+        "partial_quantity_strategy",
+        (
+            "refund_generation.quantity."
+            "partial_quantity_strategy"
+        ),
+    )
+
+    _require_fields(
+        partial_quantity,
+        {"minimum", "maximum_source"},
+        (
+            "refund_generation.quantity."
+            "partial_quantity_strategy"
+        ),
+    )
+
+    minimum_partial_quantity = _require_positive_int(
+        partial_quantity["minimum"],
+        (
+            "refund_generation.quantity."
+            "partial_quantity_strategy.minimum"
+        ),
+    )
+
+    if minimum_partial_quantity != 1:
+        raise ValueError(
+            "Day65 部分退款的最小数量必须为 1，"
+            f"当前值为：{minimum_partial_quantity}"
+        )
+
+    _require_exact(
+        partial_quantity["maximum_source"],
+        "purchased_quantity_minus_one",
+        (
+            "refund_generation.quantity."
+            "partial_quantity_strategy.maximum_source"
+        ),
+    )
+
+    never_exceed_quantity = _require_bool(
+        quantity[
+            "never_exceed_purchased_quantity"
+        ],
+        (
+            "refund_generation.quantity."
+            "never_exceed_purchased_quantity"
+        ),
+    )
+
+    if not never_exceed_quantity:
+        raise ValueError(
+            "refund_generation.quantity."
+            "never_exceed_purchased_quantity "
+            "必须为 true。"
+        )
+
+    amount = _require_mapping(
+        config,
+        "amount",
+        "refund_generation.amount",
+    )
+
+    _require_fields(
+        amount,
+        {
+            "source",
+            "decimal_places",
+            "rounding_mode",
+            "never_exceed_item_paid_amount",
+        },
+        "refund_generation.amount",
+    )
+
+    _require_exact(
+        amount["source"],
+        "unit_paid_price_x_refund_quantity",
+        "refund_generation.amount.source",
+    )
+
+    decimal_places = _require_positive_int(
+        amount["decimal_places"],
+        "refund_generation.amount.decimal_places",
+    )
+
+    if decimal_places != 2:
+        raise ValueError(
+            "退款金额必须保留两位小数，"
+            f"当前 decimal_places={decimal_places}"
+        )
+
+    _require_exact(
+        amount["rounding_mode"],
+        "ROUND_HALF_UP",
+        "refund_generation.amount.rounding_mode",
+    )
+
+    never_exceed_amount = _require_bool(
+        amount["never_exceed_item_paid_amount"],
+        (
+            "refund_generation.amount."
+            "never_exceed_item_paid_amount"
+        ),
+    )
+
+    if not never_exceed_amount:
+        raise ValueError(
+            "refund_generation.amount."
+            "never_exceed_item_paid_amount "
+            "必须为 true。"
+        )
+
+    resolution = _require_mapping(
+        config,
+        "resolution",
+        "refund_generation.resolution",
+    )
+
+    _require_fields(
+        resolution,
+        {
+            "final_status_distribution",
+            "delay_hours",
+            "completed_timestamp_rule",
+        },
+        "refund_generation.resolution",
+    )
+
+    status_distribution = _require_mapping(
+        resolution,
+        "final_status_distribution",
+        (
+            "refund_generation.resolution."
+            "final_status_distribution"
+        ),
+    )
+
+    expected_final_statuses = {
+        "completed",
+        "rejected",
+        "cancelled",
+    }
+
+    actual_final_statuses = set(
+        status_distribution.keys()
+    )
+
+    if actual_final_statuses != expected_final_statuses:
+        raise ValueError(
+            "refund_generation.resolution."
+            "final_status_distribution "
+            "必须且只能包含 completed、rejected、"
+            "cancelled："
+            f"actual={sorted(actual_final_statuses)}"
+        )
+
+    validate_probability_distribution(
+        status_distribution,
+        (
+            "refund_generation.resolution."
+            "final_status_distribution"
+        ),
+    )
+
+    for status, probability in (
+        status_distribution.items()
+    ):
+        if probability <= 0:
+            raise ValueError(
+                "Day65 要求每种退款终态都能生成"
+                "正样本，概率必须大于 0："
+                f"status={status}, "
+                f"probability={probability}"
+            )
+
+    resolution_delay = _require_mapping(
+        resolution,
+        "delay_hours",
+        "refund_generation.resolution.delay_hours",
+    )
+
+    _require_fields(
+        resolution_delay,
+        {"minimum", "maximum"},
+        "refund_generation.resolution.delay_hours",
+    )
+
+    minimum_resolution_delay = _require_positive_int(
+        resolution_delay["minimum"],
+        (
+            "refund_generation.resolution."
+            "delay_hours.minimum"
+        ),
+    )
+
+    maximum_resolution_delay = _require_positive_int(
+        resolution_delay["maximum"],
+        (
+            "refund_generation.resolution."
+            "delay_hours.maximum"
+        ),
+    )
+
+    if (
+        minimum_resolution_delay
+        > maximum_resolution_delay
+    ):
+        raise ValueError(
+            "退款处理延迟必须满足 "
+            "minimum <= maximum："
+            f"minimum={minimum_resolution_delay}, "
+            f"maximum={maximum_resolution_delay}"
+        )
+
+    completed_timestamp_rule = _require_mapping(
+        resolution,
+        "completed_timestamp_rule",
+        (
+            "refund_generation.resolution."
+            "completed_timestamp_rule"
+        ),
+    )
+
+    expected_timestamp_keys = {
+        "completed",
+        "rejected",
+        "cancelled",
+    }
+
+    if (
+        set(completed_timestamp_rule.keys())
+        != expected_timestamp_keys
+    ):
+        raise ValueError(
+            "refund_generation.resolution."
+            "completed_timestamp_rule "
+            "必须覆盖 completed、rejected、cancelled。"
+        )
+
+    _require_exact(
+        completed_timestamp_rule["completed"],
+        "resolution_timestamp",
+        (
+            "refund_generation.resolution."
+            "completed_timestamp_rule.completed"
+        ),
+    )
+
+    for status in {"rejected", "cancelled"}:
+        if completed_timestamp_rule[status] is not None:
+            raise ValueError(
+                "非 completed 退款不能设置 "
+                "refund_completed_at："
+                f"status={status}, "
+                "configured_rule="
+                f"{completed_timestamp_rule[status]!r}"
+            )
+
+    reason_distribution = _require_mapping(
+        config,
+        "reason_distribution",
+        "refund_generation.reason_distribution",
+    )
+
+    expected_reasons = {
+        "quality_issue",
+        "damaged_in_transit",
+        "allergic_reaction",
+        "wrong_item",
+        "not_as_expected",
+        "changed_mind",
+        "other",
+    }
+
+    actual_reasons = set(
+        reason_distribution.keys()
+    )
+
+    if actual_reasons != expected_reasons:
+        raise ValueError(
+            "refund_generation.reason_distribution "
+            "必须使用冻结的退款原因集合："
+            f"missing={sorted(expected_reasons - actual_reasons)}, "
+            f"unknown={sorted(actual_reasons - expected_reasons)}"
+        )
+
+    validate_probability_distribution(
+        reason_distribution,
+        "refund_generation.reason_distribution",
+    )
+
+    for reason, probability in (
+        reason_distribution.items()
+    ):
+        if len(reason) > 100:
+            raise ValueError(
+                "退款原因编码超过数据库 "
+                "VARCHAR(100) 长度："
+                f"{reason!r}"
+            )
+
+        if probability <= 0:
+            raise ValueError(
+                "Day65 要求每种退款原因都能生成"
+                "正样本，概率必须大于 0："
+                f"reason={reason}, "
+                f"probability={probability}"
+            )
+
+    observation_window = _require_mapping(
+        config,
+        "observation_window",
+        "refund_generation.observation_window",
+    )
+
+    _require_fields(
+        observation_window,
+        {
+            "maximum_timestamp_source",
+            "unresolved_after_observation_end",
+        },
+        "refund_generation.observation_window",
+    )
+
+    _require_exact(
+        observation_window[
+            "maximum_timestamp_source"
+        ],
+        "generation.event_observation_end_date",
+        (
+            "refund_generation.observation_window."
+            "maximum_timestamp_source"
+        ),
+    )
+
+    unresolved = _require_mapping(
+        observation_window,
+        "unresolved_after_observation_end",
+        (
+            "refund_generation.observation_window."
+            "unresolved_after_observation_end"
+        ),
+    )
+
+    _require_fields(
+        unresolved,
+        {
+            "refund_status",
+            "refund_completed_at",
+        },
+        (
+            "refund_generation.observation_window."
+            "unresolved_after_observation_end"
+        ),
+    )
+
+    _require_exact(
+        unresolved["refund_status"],
+        "requested",
+        (
+            "refund_generation.observation_window."
+            "unresolved_after_observation_end."
+            "refund_status"
+        ),
+    )
+
+    if unresolved["refund_completed_at"] is not None:
+        raise ValueError(
+            "观察窗口结束时尚未解决的退款"
+            "不能设置 refund_completed_at。"
+        )
+
+    business_effect = _require_mapping(
+        config,
+        "business_effect",
+        "refund_generation.business_effect",
+    )
+
+    _require_fields(
+        business_effect,
+        {
+            "subtract_from_so_statuses",
+            "subtract_from_membership_r12_statuses",
+            "membership_effective_rule",
+        },
+        "refund_generation.business_effect",
+    )
+
+    for field_name in {
+        "subtract_from_so_statuses",
+        "subtract_from_membership_r12_statuses",
+    }:
+        statuses = business_effect[field_name]
+
+        if (
+            not isinstance(statuses, list)
+            or statuses != ["completed"]
+        ):
+            raise ValueError(
+                "Day65 当前只有 completed 退款"
+                "可以扣减业务金额："
+                "refund_generation.business_effect."
+                f"{field_name} 必须为 ['completed']，"
+                f"当前值为：{statuses!r}"
+            )
+
+    _require_exact(
+        business_effect["membership_effective_rule"],
+        "next_evaluation_after_refund_completion",
+        (
+            "refund_generation.business_effect."
+            "membership_effective_rule"
+        ),
+    )
+
+    membership_policy = _require_mapping(
+        manifest,
+        "membership_policy",
+        "membership_policy",
+    )
+
+    valid_spend = _require_mapping(
+        membership_policy,
+        "valid_spend",
+        "membership_policy.valid_spend",
+    )
+
+    subtract_successful_refunds = _require_bool(
+        valid_spend.get(
+            "subtract_successful_refunds"
+        ),
+        (
+            "membership_policy.valid_spend."
+            "subtract_successful_refunds"
+        ),
+    )
+
+    if not subtract_successful_refunds:
+        raise ValueError(
+            "退款合同要求 membership_policy."
+            "valid_spend.subtract_successful_refunds=true。"
+        )
+
+    _require_exact(
+        valid_spend.get("refund_attribution"),
+        "original_paid_date",
+        (
+            "membership_policy.valid_spend."
+            "refund_attribution"
+        ),
+    )
+
+    fulfillment = _require_mapping(
+        manifest,
+        "fulfillment_generation",
+        "fulfillment_generation",
+    )
+
+    fulfillment_eligibility = _require_mapping(
+        fulfillment,
+        "eligibility",
+        "fulfillment_generation.eligibility",
+    )
+
+    if not _require_bool(
+        fulfillment_eligibility.get(
+            "require_successful_payment"
+        ),
+        (
+            "fulfillment_generation.eligibility."
+            "require_successful_payment"
+        ),
+    ):
+        raise ValueError(
+            "退款依赖的履约合同必须要求支付成功。"
+        )
+
+    if not _require_bool(
+        fulfillment_eligibility.get(
+            "exclude_cancelled_orders"
+        ),
+        (
+            "fulfillment_generation.eligibility."
+            "exclude_cancelled_orders"
+        ),
+    ):
+        raise ValueError(
+            "退款依赖的履约合同必须排除取消订单。"
+        )
+
+
+def validate_review_generation(
+    manifest: dict[str, Any],
+) -> None:
+    """
+    验证 Day65 评价生成合同。
+
+    主要检查：
+    1. 评价资格与每个订单明细的评价上限；
+    2. 评价概率、时间窗口和评分模型；
+    3. 退款状态只能按 reviewed_at 时点生效；
+    4. sentiment 必须由 rating 确定性映射；
+    5. 文本模板不得调用实时 LLM；
+    6. 观察窗口外的评价必须直接省略。
+    """
+    config = _require_mapping(
+        manifest,
+        "review_generation",
+        "review_generation",
+    )
+
+    _require_fields(
+        config,
+        {
+            "eligibility",
+            "probability_model",
+            "review_delay_days",
+            "rating_model",
+            "sentiment",
+            "text_generation",
+            "observation_window",
+        },
+        "review_generation",
+    )
+
+    eligibility = _require_mapping(
+        config,
+        "eligibility",
+        "review_generation.eligibility",
+    )
+
+    _require_fields(
+        eligibility,
+        {
+            "require_delivery",
+            "exclude_cancelled_orders",
+            "maximum_reviews_per_order_item",
+        },
+        "review_generation.eligibility",
+    )
+
+    for field_name in {
+        "require_delivery",
+        "exclude_cancelled_orders",
+    }:
+        value = _require_bool(
+            eligibility[field_name],
+            (
+                "review_generation.eligibility."
+                f"{field_name}"
+            ),
+        )
+
+        if not value:
+            raise ValueError(
+                "Day65 评价生成要求 "
+                "review_generation.eligibility."
+                f"{field_name}=true。"
+            )
+
+    maximum_reviews = _require_positive_int(
+        eligibility[
+            "maximum_reviews_per_order_item"
+        ],
+        (
+            "review_generation.eligibility."
+            "maximum_reviews_per_order_item"
+        ),
+    )
+
+    if maximum_reviews != 1:
+        raise ValueError(
+            "Day65 当前每个订单明细最多只生成"
+            "一条评价，"
+            "maximum_reviews_per_order_item "
+            f"必须为 1，当前值为：{maximum_reviews}"
+        )
+
+    probability_model = _require_mapping(
+        config,
+        "probability_model",
+        "review_generation.probability_model",
+    )
+
+    _require_fields(
+        probability_model,
+        {
+            "strategy",
+            "base_item_review_probability",
+            "customer_review_propensity_multiplier",
+            "product_quality_engagement_multiplier",
+            "final_probability",
+        },
+        "review_generation.probability_model",
+    )
+
+    _require_exact(
+        probability_model["strategy"],
+        "hidden_profile_multiplicative",
+        "review_generation.probability_model.strategy",
+    )
+
+    base_probability = _require_number(
+        probability_model[
+            "base_item_review_probability"
+        ],
+        (
+            "review_generation.probability_model."
+            "base_item_review_probability"
+        ),
+        minimum=0,
+        maximum=1,
+        minimum_inclusive=False,
+        maximum_inclusive=False,
+    )
+
+    for field_name in {
+        "customer_review_propensity_multiplier",
+        "product_quality_engagement_multiplier",
+    }:
+        multiplier = _require_mapping(
+            probability_model,
+            field_name,
+            (
+                "review_generation.probability_model."
+                f"{field_name}"
+            ),
+        )
+
+        _require_fields(
+            multiplier,
+            {"minimum", "maximum"},
+            (
+                "review_generation.probability_model."
+                f"{field_name}"
+            ),
+        )
+
+        minimum = _require_number(
+            multiplier["minimum"],
+            (
+                "review_generation.probability_model."
+                f"{field_name}.minimum"
+            ),
+            minimum=0,
+            minimum_inclusive=False,
+        )
+
+        maximum = _require_number(
+            multiplier["maximum"],
+            (
+                "review_generation.probability_model."
+                f"{field_name}.maximum"
+            ),
+            minimum=0,
+            minimum_inclusive=False,
+        )
+
+        if minimum > maximum:
+            raise ValueError(
+                "评价概率乘数区间必须满足 "
+                "minimum <= maximum："
+                f"field={field_name}, "
+                f"minimum={minimum}, maximum={maximum}"
+            )
+
+    final_probability = _require_mapping(
+        probability_model,
+        "final_probability",
+        (
+            "review_generation.probability_model."
+            "final_probability"
+        ),
+    )
+
+    _require_fields(
+        final_probability,
+        {"minimum", "maximum"},
+        (
+            "review_generation.probability_model."
+            "final_probability"
+        ),
+    )
+
+    minimum_probability = _require_number(
+        final_probability["minimum"],
+        (
+            "review_generation.probability_model."
+            "final_probability.minimum"
+        ),
+        minimum=0,
+        maximum=1,
+        minimum_inclusive=False,
+    )
+
+    maximum_probability = _require_number(
+        final_probability["maximum"],
+        (
+            "review_generation.probability_model."
+            "final_probability.maximum"
+        ),
+        minimum=0,
+        maximum=1,
+        maximum_inclusive=False,
+    )
+
+    if minimum_probability > maximum_probability:
+        raise ValueError(
+            "评价最终概率区间必须满足 "
+            "minimum <= maximum："
+            f"minimum={minimum_probability}, "
+            f"maximum={maximum_probability}"
+        )
+
+    if not (
+        minimum_probability
+        <= base_probability
+        <= maximum_probability
+    ):
+        raise ValueError(
+            "基础评价概率必须位于最终概率截断区间内："
+            f"base={base_probability}, "
+            f"minimum={minimum_probability}, "
+            f"maximum={maximum_probability}"
+        )
+
+    review_delay = _require_mapping(
+        config,
+        "review_delay_days",
+        "review_generation.review_delay_days",
+    )
+
+    _require_fields(
+        review_delay,
+        {
+            "minimum",
+            "maximum",
+            "timestamp_reference",
+        },
+        "review_generation.review_delay_days",
+    )
+
+    minimum_delay = _require_positive_int(
+        review_delay["minimum"],
+        "review_generation.review_delay_days.minimum",
+    )
+
+    maximum_delay = _require_positive_int(
+        review_delay["maximum"],
+        "review_generation.review_delay_days.maximum",
+    )
+
+    if minimum_delay > maximum_delay:
+        raise ValueError(
+            "评价延迟必须满足 minimum <= maximum："
+            f"minimum={minimum_delay}, "
+            f"maximum={maximum_delay}"
+        )
+
+    _require_exact(
+        review_delay["timestamp_reference"],
+        "delivered_at",
+        (
+            "review_generation.review_delay_days."
+            "timestamp_reference"
+        ),
+    )
+
+    rating_model = _require_mapping(
+        config,
+        "rating_model",
+        "review_generation.rating_model",
+    )
+
+    _require_fields(
+        rating_model,
+        {
+            "strategy",
+            "product_quality_source",
+            "customer_rating_bias",
+            "random_noise",
+            "refund_penalty_by_status",
+            "refund_state_cutoff",
+            "rounding_strategy",
+            "minimum_rating",
+            "maximum_rating",
+        },
+        "review_generation.rating_model",
+    )
+
+    _require_exact(
+        rating_model["strategy"],
+        (
+            "hidden_quality_plus_customer_bias_"
+            "and_event_signals"
+        ),
+        "review_generation.rating_model.strategy",
+    )
+
+    quality_source = _require_mapping(
+        rating_model,
+        "product_quality_source",
+        (
+            "review_generation.rating_model."
+            "product_quality_source"
+        ),
+    )
+
+    _require_fields(
+        quality_source,
+        {"source", "field"},
+        (
+            "review_generation.rating_model."
+            "product_quality_source"
+        ),
+    )
+
+    _require_exact(
+        quality_source["source"],
+        "hidden_product_simulation_profile",
+        (
+            "review_generation.rating_model."
+            "product_quality_source.source"
+        ),
+    )
+
+    _require_exact(
+        quality_source["field"],
+        "quality_score",
+        (
+            "review_generation.rating_model."
+            "product_quality_source.field"
+        ),
+    )
+
+    for field_name in {
+        "customer_rating_bias",
+        "random_noise",
+    }:
+        interval = _require_mapping(
+            rating_model,
+            field_name,
+            (
+                "review_generation.rating_model."
+                f"{field_name}"
+            ),
+        )
+
+        _require_fields(
+            interval,
+            {"minimum", "maximum"},
+            (
+                "review_generation.rating_model."
+                f"{field_name}"
+            ),
+        )
+
+        minimum = _require_number(
+            interval["minimum"],
+            (
+                "review_generation.rating_model."
+                f"{field_name}.minimum"
+            ),
+        )
+
+        maximum = _require_number(
+            interval["maximum"],
+            (
+                "review_generation.rating_model."
+                f"{field_name}.maximum"
+            ),
+        )
+
+        if minimum > maximum:
+            raise ValueError(
+                "评分偏差区间必须满足 "
+                "minimum <= maximum："
+                f"field={field_name}, "
+                f"minimum={minimum}, maximum={maximum}"
+            )
+
+        if not minimum < 0 < maximum:
+            raise ValueError(
+                "Day65 评分偏差区间必须同时包含"
+                "负向与正向变化："
+                f"field={field_name}, "
+                f"minimum={minimum}, maximum={maximum}"
+            )
+
+    refund_penalties = _require_mapping(
+        rating_model,
+        "refund_penalty_by_status",
+        (
+            "review_generation.rating_model."
+            "refund_penalty_by_status"
+        ),
+    )
+
+    expected_refund_statuses = {
+        "none",
+        "requested",
+        "completed",
+        "rejected",
+        "cancelled",
+    }
+
+    actual_refund_statuses = set(
+        refund_penalties.keys()
+    )
+
+    if actual_refund_statuses != expected_refund_statuses:
+        raise ValueError(
+            "review_generation.rating_model."
+            "refund_penalty_by_status 必须覆盖 "
+            "none、requested、completed、rejected、"
+            "cancelled："
+            f"missing={sorted(expected_refund_statuses - actual_refund_statuses)}, "
+            f"unknown={sorted(actual_refund_statuses - expected_refund_statuses)}"
+        )
+
+    normalized_penalties: dict[str, float] = {}
+
+    for status, raw_penalty in (
+        refund_penalties.items()
+    ):
+        penalty = _require_number(
+            raw_penalty,
+            (
+                "review_generation.rating_model."
+                "refund_penalty_by_status."
+                f"{status}"
+            ),
+            maximum=0,
+        )
+
+        normalized_penalties[status] = penalty
+
+    if normalized_penalties["none"] != 0:
+        raise ValueError(
+            "没有退款事件时的评分惩罚必须为 0。"
+        )
+
+    if not (
+        normalized_penalties["completed"]
+        <= normalized_penalties["requested"]
+        <= normalized_penalties["rejected"]
+        <= normalized_penalties["cancelled"]
+        <= normalized_penalties["none"]
+    ):
+        raise ValueError(
+            "退款评分惩罚必须按业务严重程度递减："
+            "completed <= requested <= rejected "
+            "<= cancelled <= none。"
+        )
+
+    _require_exact(
+        rating_model["refund_state_cutoff"],
+        "reviewed_at",
+        (
+            "review_generation.rating_model."
+            "refund_state_cutoff"
+        ),
+    )
+
+    _require_exact(
+        rating_model["rounding_strategy"],
+        "nearest_integer",
+        (
+            "review_generation.rating_model."
+            "rounding_strategy"
+        ),
+    )
+
+    minimum_rating = _require_positive_int(
+        rating_model["minimum_rating"],
+        (
+            "review_generation.rating_model."
+            "minimum_rating"
+        ),
+    )
+
+    maximum_rating = _require_positive_int(
+        rating_model["maximum_rating"],
+        (
+            "review_generation.rating_model."
+            "maximum_rating"
+        ),
+    )
+
+    if minimum_rating != 1 or maximum_rating != 5:
+        raise ValueError(
+            "fact_reviews.rating 的 Day65 合同必须为 "
+            "1 到 5："
+            f"minimum={minimum_rating}, "
+            f"maximum={maximum_rating}"
+        )
+
+    sentiment = _require_mapping(
+        config,
+        "sentiment",
+        "review_generation.sentiment",
+    )
+
+    _require_fields(
+        sentiment,
+        {"strategy", "rating_mapping"},
+        "review_generation.sentiment",
+    )
+
+    _require_exact(
+        sentiment["strategy"],
+        "deterministic_from_rating",
+        "review_generation.sentiment.strategy",
+    )
+
+    rating_mapping = _require_mapping(
+        sentiment,
+        "rating_mapping",
+        "review_generation.sentiment.rating_mapping",
+    )
+
+    expected_rating_mapping = {
+        1: "negative",
+        2: "negative",
+        3: "neutral",
+        4: "positive",
+        5: "positive",
+    }
+
+    if rating_mapping != expected_rating_mapping:
+        raise ValueError(
+            "review_generation.sentiment.rating_mapping "
+            "必须严格遵守 1-2 negative、3 neutral、"
+            "4-5 positive："
+            f"actual={rating_mapping!r}"
+        )
+
+    text_generation = _require_mapping(
+        config,
+        "text_generation",
+        "review_generation.text_generation",
+    )
+
+    _require_fields(
+        text_generation,
+        {
+            "strategy",
+            "live_llm_allowed",
+            "text_presence_probability",
+            "templates",
+        },
+        "review_generation.text_generation",
+    )
+
+    _require_exact(
+        text_generation["strategy"],
+        "deterministic_template_by_sentiment",
+        "review_generation.text_generation.strategy",
+    )
+
+    live_llm_allowed = _require_bool(
+        text_generation["live_llm_allowed"],
+        (
+            "review_generation.text_generation."
+            "live_llm_allowed"
+        ),
+    )
+
+    if live_llm_allowed:
+        raise ValueError(
+            "Day65 synthetic review ground truth "
+            "不允许调用实时 LLM。"
+        )
+
+    _require_number(
+        text_generation[
+            "text_presence_probability"
+        ],
+        (
+            "review_generation.text_generation."
+            "text_presence_probability"
+        ),
+        minimum=0,
+        maximum=1,
+        minimum_inclusive=False,
+        maximum_inclusive=False,
+    )
+
+    templates = _require_mapping(
+        text_generation,
+        "templates",
+        "review_generation.text_generation.templates",
+    )
+
+    expected_sentiments = {
+        "positive",
+        "neutral",
+        "negative",
+    }
+
+    actual_sentiments = set(templates.keys())
+
+    if actual_sentiments != expected_sentiments:
+        raise ValueError(
+            "review_generation.text_generation.templates "
+            "必须且只能包含 positive、neutral、negative："
+            f"missing={sorted(expected_sentiments - actual_sentiments)}, "
+            f"unknown={sorted(actual_sentiments - expected_sentiments)}"
+        )
+
+    all_templates: set[str] = set()
+
+    for sentiment_name in sorted(expected_sentiments):
+        sentiment_templates = templates[
+            sentiment_name
+        ]
+
+        if (
+            not isinstance(sentiment_templates, list)
+            or not sentiment_templates
+        ):
+            raise ValueError(
+                "每个 sentiment 必须配置至少一个"
+                "评价文本模板："
+                f"sentiment={sentiment_name}"
+            )
+
+        normalized_templates: set[str] = set()
+
+        for index, template in enumerate(
+            sentiment_templates
+        ):
+            normalized_template = _require_string(
+                template,
+                (
+                    "review_generation.text_generation."
+                    f"templates.{sentiment_name}[{index}]"
+                ),
+            )
+
+            if normalized_template in normalized_templates:
+                raise ValueError(
+                    "同一 sentiment 下不能配置重复模板："
+                    f"sentiment={sentiment_name}, "
+                    f"template={normalized_template!r}"
+                )
+
+            if normalized_template in all_templates:
+                raise ValueError(
+                    "评价文本模板不能跨 sentiment 重复："
+                    f"template={normalized_template!r}"
+                )
+
+            normalized_templates.add(
+                normalized_template
+            )
+            all_templates.add(normalized_template)
+
+    observation_window = _require_mapping(
+        config,
+        "observation_window",
+        "review_generation.observation_window",
+    )
+
+    _require_fields(
+        observation_window,
+        {
+            "maximum_timestamp_source",
+            "omit_review_after_observation_end",
+        },
+        "review_generation.observation_window",
+    )
+
+    _require_exact(
+        observation_window[
+            "maximum_timestamp_source"
+        ],
+        "generation.event_observation_end_date",
+        (
+            "review_generation.observation_window."
+            "maximum_timestamp_source"
+        ),
+    )
+
+    omit_after_window = _require_bool(
+        observation_window[
+            "omit_review_after_observation_end"
+        ],
+        (
+            "review_generation.observation_window."
+            "omit_review_after_observation_end"
+        ),
+    )
+
+    if not omit_after_window:
+        raise ValueError(
+            "观察窗口之外的评价必须直接省略，"
+            "omit_review_after_observation_end "
+            "必须为 true。"
+        )
+
+    fulfillment = _require_mapping(
+        manifest,
+        "fulfillment_generation",
+        "fulfillment_generation",
+    )
+
+    fulfillment_eligibility = _require_mapping(
+        fulfillment,
+        "eligibility",
+        "fulfillment_generation.eligibility",
+    )
+
+    if not _require_bool(
+        fulfillment_eligibility.get(
+            "require_successful_payment"
+        ),
+        (
+            "fulfillment_generation.eligibility."
+            "require_successful_payment"
+        ),
+    ):
+        raise ValueError(
+            "评价依赖的履约合同必须要求支付成功。"
+        )
+
+    if not _require_bool(
+        fulfillment_eligibility.get(
+            "exclude_cancelled_orders"
+        ),
+        (
+            "fulfillment_generation.eligibility."
+            "exclude_cancelled_orders"
+        ),
+    ):
+        raise ValueError(
+            "评价依赖的履约合同必须排除取消订单。"
+        )
+
+    final_status = _require_mapping(
+        fulfillment,
+        "final_status",
+        "fulfillment_generation.final_status",
+    )
+
+    _require_exact(
+        final_status.get("delivered_event_status"),
+        "delivered",
+        (
+            "fulfillment_generation.final_status."
+            "delivered_event_status"
+        ),
+    )
+
+    refund = _require_mapping(
+        manifest,
+        "refund_generation",
+        "refund_generation",
+    )
+
+    resolution = _require_mapping(
+        refund,
+        "resolution",
+        "refund_generation.resolution",
+    )
+
+    final_status_distribution = _require_mapping(
+        resolution,
+        "final_status_distribution",
+        (
+            "refund_generation.resolution."
+            "final_status_distribution"
+        ),
+    )
+
+    expected_refund_final_statuses = {
+        "completed",
+        "rejected",
+        "cancelled",
+    }
+
+    if (
+        set(final_status_distribution.keys())
+        != expected_refund_final_statuses
+    ):
+        raise ValueError(
+            "评价评分模型依赖的退款终态必须为 "
+            "completed、rejected、cancelled。"
+        )
+
+    unresolved = _require_mapping(
+        _require_mapping(
+            refund,
+            "observation_window",
+            "refund_generation.observation_window",
+        ),
+        "unresolved_after_observation_end",
+        (
+            "refund_generation.observation_window."
+            "unresolved_after_observation_end"
+        ),
+    )
+
+    _require_exact(
+        unresolved.get("refund_status"),
+        "requested",
+        (
+            "refund_generation.observation_window."
+            "unresolved_after_observation_end."
+            "refund_status"
+        ),
+    )
+
 def validate_day64_manifest(
     manifest: dict[str, Any],
 ) -> None:
@@ -798,6 +4583,1273 @@ def validate_day64_manifest(
             "membership_accounts="
             f"{profile['membership_accounts']}"
         )
+
+
+
+def validate_marketing_spend_generation(
+    manifest: dict[str, Any],
+) -> None:
+    """
+    验证 Day65 营销费用生成合同。
+
+    主要检查：
+    1. fact_marketing_spend 的唯一 Grain；
+    2. 营销渠道、活动窗口与行生成策略；
+    3. 渠道基础费用及日期乘数；
+    4. 大促增量、确定性噪声与金额公式；
+    5. 营销投入对订单需求的递减收益响应；
+    6. 观察尾窗内不生成新的营销费用。
+    """
+    config = _require_mapping(
+        manifest,
+        "marketing_spend_generation",
+        "marketing_spend_generation",
+    )
+    _require_fields(
+        config,
+        {
+            "grain", "eligibility", "row_generation",
+            "base_daily_spend_by_channel", "annual_multiplier",
+            "weekday_multiplier", "holiday_multiplier",
+            "campaign_incremental_multiplier", "deterministic_noise",
+            "amount", "demand_response", "order_integration",
+            "observation_window",
+        },
+        "marketing_spend_generation",
+    )
+
+    grain = _require_mapping(config, "grain", "marketing_spend_generation.grain")
+    _require_fields(grain, {"fields", "require_unique"}, "marketing_spend_generation.grain")
+    fields = grain["fields"]
+    if fields != ["spend_date", "channel_code", "campaign_code"]:
+        raise ValueError(
+            "marketing_spend_generation.grain.fields 必须严格等于 "
+            "['spend_date', 'channel_code', 'campaign_code']。"
+        )
+    if not _require_bool(grain["require_unique"], "marketing_spend_generation.grain.require_unique"):
+        raise ValueError("营销费用 Grain 必须要求唯一。")
+
+    eligibility = _require_mapping(config, "eligibility", "marketing_spend_generation.eligibility")
+    _require_fields(
+        eligibility,
+        {"require_active_channel", "require_marketing_channel", "require_spend_date_within_campaign_window"},
+        "marketing_spend_generation.eligibility",
+    )
+    for name in eligibility:
+        if not _require_bool(eligibility[name], f"marketing_spend_generation.eligibility.{name}"):
+            raise ValueError(f"marketing_spend_generation.eligibility.{name} 必须为 true。")
+
+    row_generation = _require_mapping(config, "row_generation", "marketing_spend_generation.row_generation")
+    _require_fields(row_generation, {"always_on", "major_promotion", "allow_multiple_campaigns_per_channel_date"}, "marketing_spend_generation.row_generation")
+    _require_exact(
+        _require_mapping(row_generation, "always_on", "marketing_spend_generation.row_generation.always_on").get("strategy"),
+        "every_business_date_x_eligible_channel",
+        "marketing_spend_generation.row_generation.always_on.strategy",
+    )
+    _require_exact(
+        _require_mapping(row_generation, "major_promotion", "marketing_spend_generation.row_generation.major_promotion").get("strategy"),
+        "active_campaign_date_x_eligible_channel",
+        "marketing_spend_generation.row_generation.major_promotion.strategy",
+    )
+    if not _require_bool(row_generation["allow_multiple_campaigns_per_channel_date"], "marketing_spend_generation.row_generation.allow_multiple_campaigns_per_channel_date"):
+        raise ValueError("大促期间必须允许同一渠道日期同时存在 always_on 与 major campaign。")
+
+    eligible_channels = {
+        channel["channel_code"].strip()
+        for channel in manifest["fixed_dimensions"]["channels"]
+        if channel["is_active"] and channel["is_marketing_channel"]
+    }
+    base_spend = _require_mapping(config, "base_daily_spend_by_channel", "marketing_spend_generation.base_daily_spend_by_channel")
+    if set(base_spend) != eligible_channels:
+        raise ValueError(
+            "base_daily_spend_by_channel 必须完整且仅覆盖启用的营销渠道："
+            f"expected={sorted(eligible_channels)}, actual={sorted(base_spend)}"
+        )
+    for code, value in base_spend.items():
+        _require_number(value, f"marketing_spend_generation.base_daily_spend_by_channel.{code}", minimum=0, minimum_inclusive=False)
+
+    generation = manifest["generation"]
+    start_year = parse_manifest_date(generation["business_start_date"], "generation.business_start_date").year
+    end_year = parse_manifest_date(generation["business_end_date"], "generation.business_end_date").year
+    expected_years = set(range(start_year, end_year + 1))
+    annual = _require_mapping(config, "annual_multiplier", "marketing_spend_generation.annual_multiplier")
+    if set(annual) != expected_years:
+        raise ValueError(
+            "annual_multiplier 必须完整覆盖业务年份："
+            f"expected={sorted(expected_years)}, actual={sorted(annual)}"
+        )
+    for year, value in annual.items():
+        _require_number(value, f"marketing_spend_generation.annual_multiplier.{year}", minimum=0, minimum_inclusive=False)
+
+    weekdays = {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
+    weekday = _require_mapping(config, "weekday_multiplier", "marketing_spend_generation.weekday_multiplier")
+    if set(weekday) != weekdays:
+        raise ValueError("weekday_multiplier 必须完整覆盖星期一至星期日。")
+    for name, value in weekday.items():
+        _require_number(value, f"marketing_spend_generation.weekday_multiplier.{name}", minimum=0, minimum_inclusive=False)
+    _require_number(config["holiday_multiplier"], "marketing_spend_generation.holiday_multiplier", minimum=0, minimum_inclusive=False)
+
+    major_families = {
+        campaign["campaign_family"].strip()
+        for campaign in manifest["business_calendar"]["campaigns"]
+        if campaign["campaign_type"].strip() == "major_promotion"
+    }
+    campaign_multipliers = _require_mapping(config, "campaign_incremental_multiplier", "marketing_spend_generation.campaign_incremental_multiplier")
+    if set(campaign_multipliers) != major_families:
+        raise ValueError(
+            "campaign_incremental_multiplier 必须完整覆盖 major promotion family："
+            f"expected={sorted(major_families)}, actual={sorted(campaign_multipliers)}"
+        )
+    for family, value in campaign_multipliers.items():
+        _require_number(value, f"marketing_spend_generation.campaign_incremental_multiplier.{family}", minimum=0, minimum_inclusive=False)
+
+    noise = _require_mapping(config, "deterministic_noise", "marketing_spend_generation.deterministic_noise")
+    _require_fields(noise, {"enabled", "minimum_multiplier", "maximum_multiplier"}, "marketing_spend_generation.deterministic_noise")
+    if not _require_bool(noise["enabled"], "marketing_spend_generation.deterministic_noise.enabled"):
+        raise ValueError("营销费用噪声必须启用确定性模式。")
+    noise_min = _require_number(noise["minimum_multiplier"], "marketing_spend_generation.deterministic_noise.minimum_multiplier", minimum=0, minimum_inclusive=False)
+    noise_max = _require_number(noise["maximum_multiplier"], "marketing_spend_generation.deterministic_noise.maximum_multiplier", minimum=0, minimum_inclusive=False)
+    if noise_min > noise_max:
+        raise ValueError("deterministic_noise.minimum_multiplier 不能大于 maximum_multiplier。")
+
+    amount = _require_mapping(config, "amount", "marketing_spend_generation.amount")
+    _require_fields(amount, {"formula", "always_on_campaign_component", "major_campaign_component_strategy", "decimal_places", "rounding_mode", "minimum_spend_amount"}, "marketing_spend_generation.amount")
+    expected_formula = "base_daily_spend x annual_multiplier x weekday_multiplier x holiday_multiplier x campaign_component x deterministic_noise"
+    actual_formula = " ".join(_require_string(amount["formula"], "marketing_spend_generation.amount.formula").split())
+    if actual_formula != expected_formula:
+        raise ValueError(f"marketing_spend_generation.amount.formula 不符合冻结合同：{actual_formula!r}")
+    if _require_number(amount["always_on_campaign_component"], "marketing_spend_generation.amount.always_on_campaign_component") != 1.0:
+        raise ValueError("always_on_campaign_component 必须为 1.00。")
+    _require_exact(amount["major_campaign_component_strategy"], "one_plus_campaign_incremental_multiplier", "marketing_spend_generation.amount.major_campaign_component_strategy")
+    if _require_positive_int(amount["decimal_places"], "marketing_spend_generation.amount.decimal_places") != 2:
+        raise ValueError("营销费用金额必须保留 2 位小数。")
+    _require_exact(amount["rounding_mode"], "ROUND_HALF_UP", "marketing_spend_generation.amount.rounding_mode")
+    _require_number(amount["minimum_spend_amount"], "marketing_spend_generation.amount.minimum_spend_amount", minimum=0, minimum_inclusive=False)
+
+    response = _require_mapping(config, "demand_response", "marketing_spend_generation.demand_response")
+    _require_fields(response, {"enabled", "strategy", "input", "response_strength_by_channel", "formula", "minimum_demand_multiplier", "maximum_demand_multiplier"}, "marketing_spend_generation.demand_response")
+    if not _require_bool(response["enabled"], "marketing_spend_generation.demand_response.enabled"):
+        raise ValueError("marketing demand response 必须启用。")
+    _require_exact(response["strategy"], "logarithmic_diminishing_returns", "marketing_spend_generation.demand_response.strategy")
+    response_input = _require_mapping(response, "input", "marketing_spend_generation.demand_response.input")
+    _require_fields(response_input, {"source", "baseline_source"}, "marketing_spend_generation.demand_response.input")
+    _require_exact(response_input["source"], "total_daily_channel_spend", "marketing_spend_generation.demand_response.input.source")
+    _require_exact(response_input["baseline_source"], "base_daily_spend_by_channel", "marketing_spend_generation.demand_response.input.baseline_source")
+    strengths = _require_mapping(response, "response_strength_by_channel", "marketing_spend_generation.demand_response.response_strength_by_channel")
+    if set(strengths) != eligible_channels:
+        raise ValueError("response_strength_by_channel 必须完整覆盖启用的营销渠道。")
+    for code, value in strengths.items():
+        _require_number(value, f"marketing_spend_generation.demand_response.response_strength_by_channel.{code}", minimum=0, maximum=1, minimum_inclusive=False)
+    expected_response_formula = "1 + response_strength x log1p( maximum( total_daily_channel_spend / base_daily_spend - 1, 0 ) )"
+    actual_response_formula = " ".join(_require_string(response["formula"], "marketing_spend_generation.demand_response.formula").split())
+    if actual_response_formula != expected_response_formula:
+        raise ValueError("demand_response.formula 不符合冻结的对数递减收益合同。")
+    demand_min = _require_number(response["minimum_demand_multiplier"], "marketing_spend_generation.demand_response.minimum_demand_multiplier", minimum=1)
+    demand_max = _require_number(response["maximum_demand_multiplier"], "marketing_spend_generation.demand_response.maximum_demand_multiplier", minimum=1)
+    if demand_min > demand_max:
+        raise ValueError("minimum_demand_multiplier 不能大于 maximum_demand_multiplier。")
+
+    integration = _require_mapping(config, "order_integration", "marketing_spend_generation.order_integration")
+    _require_fields(integration, {"apply_to", "apply_before_exact_total_reconciliation", "persisted_outside_fact_marketing_spend"}, "marketing_spend_generation.order_integration")
+    _require_exact(integration["apply_to"], "daily_channel_order_weight", "marketing_spend_generation.order_integration.apply_to")
+    if not _require_bool(integration["apply_before_exact_total_reconciliation"], "marketing_spend_generation.order_integration.apply_before_exact_total_reconciliation"):
+        raise ValueError("营销需求响应必须在订单精确总量回收前应用。")
+    if _require_bool(integration["persisted_outside_fact_marketing_spend"], "marketing_spend_generation.order_integration.persisted_outside_fact_marketing_spend"):
+        raise ValueError("营销需求乘数不能作为额外事实字段持久化。")
+
+    observation = _require_mapping(config, "observation_window", "marketing_spend_generation.observation_window")
+    _require_fields(observation, {"maximum_spend_date_source", "generate_spend_in_event_observation_tail"}, "marketing_spend_generation.observation_window")
+    _require_exact(observation["maximum_spend_date_source"], "generation.business_end_date", "marketing_spend_generation.observation_window.maximum_spend_date_source")
+    if _require_bool(observation["generate_spend_in_event_observation_tail"], "marketing_spend_generation.observation_window.generate_spend_in_event_observation_tail"):
+        raise ValueError("2026-01 观察尾窗内不能生成新的营销费用。")
+
+
+def validate_simulation_profiles(
+    manifest: dict[str, Any],
+) -> None:
+    """
+    验证 Day65 隐藏 simulation profile 合同。
+
+    这些参数只用于确定性生成，不写入正式 BI 表。
+    """
+    config = _require_mapping(
+        manifest,
+        "simulation_profiles",
+        "simulation_profiles",
+    )
+    _require_fields(
+        config,
+        {
+            "customer",
+            "product",
+            "demand_context",
+        },
+        "simulation_profiles",
+    )
+
+    customer = _require_mapping(
+        config,
+        "customer",
+        "simulation_profiles.customer",
+    )
+    _require_fields(
+        customer,
+        {
+            "purchase_propensity",
+            "primary_sales_channel",
+            "refund_propensity",
+            "review_propensity",
+            "rating_bias",
+        },
+        "simulation_profiles.customer",
+    )
+
+    purchase_propensity = _require_mapping(
+        customer,
+        "purchase_propensity",
+        (
+            "simulation_profiles.customer."
+            "purchase_propensity"
+        ),
+    )
+    _require_fields(
+        purchase_propensity,
+        {
+            "strategy",
+            "lognormal_mu",
+            "lognormal_sigma",
+            "minimum_weight",
+            "maximum_weight",
+        },
+        (
+            "simulation_profiles.customer."
+            "purchase_propensity"
+        ),
+    )
+    _require_exact(
+        purchase_propensity["strategy"],
+        "lognormal_bounded",
+        (
+            "simulation_profiles.customer."
+            "purchase_propensity.strategy"
+        ),
+    )
+    _require_number(
+        purchase_propensity["lognormal_mu"],
+        (
+            "simulation_profiles.customer."
+            "purchase_propensity.lognormal_mu"
+        ),
+    )
+    _require_number(
+        purchase_propensity["lognormal_sigma"],
+        (
+            "simulation_profiles.customer."
+            "purchase_propensity.lognormal_sigma"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    customer_weight_min = _require_number(
+        purchase_propensity["minimum_weight"],
+        (
+            "simulation_profiles.customer."
+            "purchase_propensity.minimum_weight"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    customer_weight_max = _require_number(
+        purchase_propensity["maximum_weight"],
+        (
+            "simulation_profiles.customer."
+            "purchase_propensity.maximum_weight"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    if customer_weight_min >= customer_weight_max:
+        raise ValueError(
+            "customer purchase propensity "
+            "minimum_weight 必须小于 maximum_weight。"
+        )
+
+    channel_profile = _require_mapping(
+        customer,
+        "primary_sales_channel",
+        (
+            "simulation_profiles.customer."
+            "primary_sales_channel"
+        ),
+    )
+    _require_fields(
+        channel_profile,
+        {
+            "strategy",
+            "weights",
+            "preferred_channel_multiplier",
+            "non_preferred_channel_multiplier",
+        },
+        (
+            "simulation_profiles.customer."
+            "primary_sales_channel"
+        ),
+    )
+    _require_exact(
+        channel_profile["strategy"],
+        "weighted_choice",
+        (
+            "simulation_profiles.customer."
+            "primary_sales_channel.strategy"
+        ),
+    )
+
+    active_sales_channels = {
+        channel["channel_code"].strip()
+        for channel in manifest[
+            "fixed_dimensions"
+        ]["channels"]
+        if (
+            channel["is_active"]
+            and channel["is_sales_channel"]
+        )
+    }
+    channel_weights = _require_mapping(
+        channel_profile,
+        "weights",
+        (
+            "simulation_profiles.customer."
+            "primary_sales_channel.weights"
+        ),
+    )
+    if set(channel_weights) != active_sales_channels:
+        raise ValueError(
+            "primary_sales_channel.weights 必须完整覆盖"
+            "启用的销售渠道："
+            f"expected={sorted(active_sales_channels)}, "
+            f"actual={sorted(channel_weights)}"
+        )
+    weight_total = 0.0
+    for channel_code, value in channel_weights.items():
+        weight_total += _require_number(
+            value,
+            (
+                "simulation_profiles.customer."
+                "primary_sales_channel.weights."
+                f"{channel_code}"
+            ),
+            minimum=0,
+            maximum=1,
+            minimum_inclusive=False,
+        )
+    if abs(weight_total - 1.0) > 1e-9:
+        raise ValueError(
+            "primary_sales_channel.weights 合计必须为 1："
+            f"actual={weight_total}"
+        )
+
+    preferred_multiplier = _require_number(
+        channel_profile[
+            "preferred_channel_multiplier"
+        ],
+        (
+            "simulation_profiles.customer."
+            "primary_sales_channel."
+            "preferred_channel_multiplier"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    non_preferred_multiplier = _require_number(
+        channel_profile[
+            "non_preferred_channel_multiplier"
+        ],
+        (
+            "simulation_profiles.customer."
+            "primary_sales_channel."
+            "non_preferred_channel_multiplier"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    if preferred_multiplier <= non_preferred_multiplier:
+        raise ValueError(
+            "preferred_channel_multiplier 必须大于"
+            " non_preferred_channel_multiplier。"
+        )
+
+    refund_propensity = _require_mapping(
+        customer,
+        "refund_propensity",
+        (
+            "simulation_profiles.customer."
+            "refund_propensity"
+        ),
+    )
+    _require_fields(
+        refund_propensity,
+        {
+            "strategy",
+            "minimum_multiplier",
+            "maximum_multiplier",
+        },
+        (
+            "simulation_profiles.customer."
+            "refund_propensity"
+        ),
+    )
+    _require_exact(
+        refund_propensity["strategy"],
+        "uniform",
+        (
+            "simulation_profiles.customer."
+            "refund_propensity.strategy"
+        ),
+    )
+    refund_min = _require_number(
+        refund_propensity["minimum_multiplier"],
+        (
+            "simulation_profiles.customer."
+            "refund_propensity.minimum_multiplier"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    refund_max = _require_number(
+        refund_propensity["maximum_multiplier"],
+        (
+            "simulation_profiles.customer."
+            "refund_propensity.maximum_multiplier"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    if refund_min >= refund_max:
+        raise ValueError(
+            "refund propensity minimum 必须小于 maximum。"
+        )
+
+    review_propensity = _require_mapping(
+        customer,
+        "review_propensity",
+        (
+            "simulation_profiles.customer."
+            "review_propensity"
+        ),
+    )
+    _require_fields(
+        review_propensity,
+        {
+            "strategy",
+            "minimum_multiplier",
+            "maximum_multiplier",
+        },
+        (
+            "simulation_profiles.customer."
+            "review_propensity"
+        ),
+    )
+    _require_exact(
+        review_propensity["strategy"],
+        "uniform",
+        (
+            "simulation_profiles.customer."
+            "review_propensity.strategy"
+        ),
+    )
+    review_min = _require_number(
+        review_propensity["minimum_multiplier"],
+        (
+            "simulation_profiles.customer."
+            "review_propensity.minimum_multiplier"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    review_max = _require_number(
+        review_propensity["maximum_multiplier"],
+        (
+            "simulation_profiles.customer."
+            "review_propensity.maximum_multiplier"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    if review_min >= review_max:
+        raise ValueError(
+            "review propensity minimum 必须小于 maximum。"
+        )
+
+    rating_bias = _require_mapping(
+        customer,
+        "rating_bias",
+        "simulation_profiles.customer.rating_bias",
+    )
+    _require_fields(
+        rating_bias,
+        {
+            "strategy",
+            "minimum",
+            "maximum",
+        },
+        "simulation_profiles.customer.rating_bias",
+    )
+    _require_exact(
+        rating_bias["strategy"],
+        "uniform",
+        (
+            "simulation_profiles.customer."
+            "rating_bias.strategy"
+        ),
+    )
+    rating_bias_min = _require_number(
+        rating_bias["minimum"],
+        (
+            "simulation_profiles.customer."
+            "rating_bias.minimum"
+        ),
+    )
+    rating_bias_max = _require_number(
+        rating_bias["maximum"],
+        (
+            "simulation_profiles.customer."
+            "rating_bias.maximum"
+        ),
+    )
+    if rating_bias_min >= rating_bias_max:
+        raise ValueError(
+            "rating_bias.minimum 必须小于 maximum。"
+        )
+
+    product = _require_mapping(
+        config,
+        "product",
+        "simulation_profiles.product",
+    )
+    _require_fields(
+        product,
+        {
+            "demand_weight",
+            "quality_score",
+            "unit_cost_ratio",
+            "quality_mappings",
+        },
+        "simulation_profiles.product",
+    )
+
+    demand_weight = _require_mapping(
+        product,
+        "demand_weight",
+        "simulation_profiles.product.demand_weight",
+    )
+    _require_fields(
+        demand_weight,
+        {
+            "strategy",
+            "lognormal_mu",
+            "lognormal_sigma",
+            "minimum_weight",
+            "maximum_weight",
+        },
+        "simulation_profiles.product.demand_weight",
+    )
+    _require_exact(
+        demand_weight["strategy"],
+        "lognormal_bounded",
+        (
+            "simulation_profiles.product."
+            "demand_weight.strategy"
+        ),
+    )
+    _require_number(
+        demand_weight["lognormal_mu"],
+        (
+            "simulation_profiles.product."
+            "demand_weight.lognormal_mu"
+        ),
+    )
+    _require_number(
+        demand_weight["lognormal_sigma"],
+        (
+            "simulation_profiles.product."
+            "demand_weight.lognormal_sigma"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    product_weight_min = _require_number(
+        demand_weight["minimum_weight"],
+        (
+            "simulation_profiles.product."
+            "demand_weight.minimum_weight"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    product_weight_max = _require_number(
+        demand_weight["maximum_weight"],
+        (
+            "simulation_profiles.product."
+            "demand_weight.maximum_weight"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    if product_weight_min >= product_weight_max:
+        raise ValueError(
+            "product demand minimum_weight "
+            "必须小于 maximum_weight。"
+        )
+
+    quality_score = _require_mapping(
+        product,
+        "quality_score",
+        "simulation_profiles.product.quality_score",
+    )
+    _require_fields(
+        quality_score,
+        {
+            "strategy",
+            "mean",
+            "standard_deviation",
+            "minimum",
+            "maximum",
+        },
+        "simulation_profiles.product.quality_score",
+    )
+    _require_exact(
+        quality_score["strategy"],
+        "normal_bounded",
+        (
+            "simulation_profiles.product."
+            "quality_score.strategy"
+        ),
+    )
+    quality_mean = _require_number(
+        quality_score["mean"],
+        (
+            "simulation_profiles.product."
+            "quality_score.mean"
+        ),
+        minimum=1,
+        maximum=5,
+    )
+    _require_number(
+        quality_score["standard_deviation"],
+        (
+            "simulation_profiles.product."
+            "quality_score.standard_deviation"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    quality_min = _require_number(
+        quality_score["minimum"],
+        (
+            "simulation_profiles.product."
+            "quality_score.minimum"
+        ),
+        minimum=1,
+        maximum=5,
+    )
+    quality_max = _require_number(
+        quality_score["maximum"],
+        (
+            "simulation_profiles.product."
+            "quality_score.maximum"
+        ),
+        minimum=1,
+        maximum=5,
+    )
+    if not quality_min < quality_mean < quality_max:
+        raise ValueError(
+            "quality_score 必须满足 "
+            "minimum < mean < maximum。"
+        )
+
+    unit_cost_ratio = _require_mapping(
+        product,
+        "unit_cost_ratio",
+        (
+            "simulation_profiles.product."
+            "unit_cost_ratio"
+        ),
+    )
+    _require_fields(
+        unit_cost_ratio,
+        {
+            "strategy",
+            "minimum",
+            "maximum",
+        },
+        (
+            "simulation_profiles.product."
+            "unit_cost_ratio"
+        ),
+    )
+    _require_exact(
+        unit_cost_ratio["strategy"],
+        "uniform",
+        (
+            "simulation_profiles.product."
+            "unit_cost_ratio.strategy"
+        ),
+    )
+    cost_min = _require_number(
+        unit_cost_ratio["minimum"],
+        (
+            "simulation_profiles.product."
+            "unit_cost_ratio.minimum"
+        ),
+        minimum=0,
+        maximum=1,
+        minimum_inclusive=False,
+        maximum_inclusive=False,
+    )
+    cost_max = _require_number(
+        unit_cost_ratio["maximum"],
+        (
+            "simulation_profiles.product."
+            "unit_cost_ratio.maximum"
+        ),
+        minimum=0,
+        maximum=1,
+        minimum_inclusive=False,
+        maximum_inclusive=False,
+    )
+    if cost_min >= cost_max:
+        raise ValueError(
+            "unit_cost_ratio.minimum "
+            "必须小于 maximum。"
+        )
+
+    quality_mappings = _require_mapping(
+        product,
+        "quality_mappings",
+        (
+            "simulation_profiles.product."
+            "quality_mappings"
+        ),
+    )
+    _require_fields(
+        quality_mappings,
+        {
+            "refund_risk",
+            "review_engagement",
+        },
+        (
+            "simulation_profiles.product."
+            "quality_mappings"
+        ),
+    )
+
+    refund_risk = _require_mapping(
+        quality_mappings,
+        "refund_risk",
+        (
+            "simulation_profiles.product."
+            "quality_mappings.refund_risk"
+        ),
+    )
+    _require_fields(
+        refund_risk,
+        {
+            "low_quality_score",
+            "high_quality_score",
+            "low_quality_multiplier",
+            "high_quality_multiplier",
+        },
+        (
+            "simulation_profiles.product."
+            "quality_mappings.refund_risk"
+        ),
+    )
+    refund_low_score = _require_number(
+        refund_risk["low_quality_score"],
+        (
+            "simulation_profiles.product."
+            "quality_mappings.refund_risk."
+            "low_quality_score"
+        ),
+        minimum=quality_min,
+        maximum=quality_max,
+    )
+    refund_high_score = _require_number(
+        refund_risk["high_quality_score"],
+        (
+            "simulation_profiles.product."
+            "quality_mappings.refund_risk."
+            "high_quality_score"
+        ),
+        minimum=quality_min,
+        maximum=quality_max,
+    )
+    refund_low_multiplier = _require_number(
+        refund_risk["low_quality_multiplier"],
+        (
+            "simulation_profiles.product."
+            "quality_mappings.refund_risk."
+            "low_quality_multiplier"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    refund_high_multiplier = _require_number(
+        refund_risk["high_quality_multiplier"],
+        (
+            "simulation_profiles.product."
+            "quality_mappings.refund_risk."
+            "high_quality_multiplier"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    if refund_low_score >= refund_high_score:
+        raise ValueError(
+            "refund_risk low_quality_score "
+            "必须小于 high_quality_score。"
+        )
+    if refund_low_multiplier <= refund_high_multiplier:
+        raise ValueError(
+            "低质量商品的 refund risk multiplier "
+            "必须高于高质量商品。"
+        )
+
+    review_engagement = _require_mapping(
+        quality_mappings,
+        "review_engagement",
+        (
+            "simulation_profiles.product."
+            "quality_mappings.review_engagement"
+        ),
+    )
+    _require_fields(
+        review_engagement,
+        {
+            "low_quality_score",
+            "high_quality_score",
+            "low_quality_multiplier",
+            "high_quality_multiplier",
+        },
+        (
+            "simulation_profiles.product."
+            "quality_mappings.review_engagement"
+        ),
+    )
+    review_low_score = _require_number(
+        review_engagement["low_quality_score"],
+        (
+            "simulation_profiles.product."
+            "quality_mappings.review_engagement."
+            "low_quality_score"
+        ),
+        minimum=quality_min,
+        maximum=quality_max,
+    )
+    review_high_score = _require_number(
+        review_engagement["high_quality_score"],
+        (
+            "simulation_profiles.product."
+            "quality_mappings.review_engagement."
+            "high_quality_score"
+        ),
+        minimum=quality_min,
+        maximum=quality_max,
+    )
+    review_low_multiplier = _require_number(
+        review_engagement["low_quality_multiplier"],
+        (
+            "simulation_profiles.product."
+            "quality_mappings.review_engagement."
+            "low_quality_multiplier"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    review_high_multiplier = _require_number(
+        review_engagement["high_quality_multiplier"],
+        (
+            "simulation_profiles.product."
+            "quality_mappings.review_engagement."
+            "high_quality_multiplier"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    if review_low_score >= review_high_score:
+        raise ValueError(
+            "review_engagement low_quality_score "
+            "必须小于 high_quality_score。"
+        )
+    if review_low_multiplier >= review_high_multiplier:
+        raise ValueError(
+            "高质量商品的 review engagement multiplier "
+            "必须高于低质量商品。"
+        )
+
+    demand_context = _require_mapping(
+        config,
+        "demand_context",
+        "simulation_profiles.demand_context",
+    )
+    _require_fields(
+        demand_context,
+        {
+            "default_multiplier",
+            "seasonal_rules",
+            "region_rules",
+            "maximum_combined_multiplier",
+        },
+        "simulation_profiles.demand_context",
+    )
+    default_multiplier = _require_number(
+        demand_context["default_multiplier"],
+        (
+            "simulation_profiles.demand_context."
+            "default_multiplier"
+        ),
+        minimum=0,
+        minimum_inclusive=False,
+    )
+    maximum_combined_multiplier = _require_number(
+        demand_context[
+            "maximum_combined_multiplier"
+        ],
+        (
+            "simulation_profiles.demand_context."
+            "maximum_combined_multiplier"
+        ),
+        minimum=default_multiplier,
+    )
+
+    valid_categories = {
+        item["category"].strip()
+        for item in manifest[
+            "product_generation"
+        ]["subcategories"]
+    }
+    valid_region_groups = {
+        item["region_group"].strip()
+        for item in manifest[
+            "fixed_dimensions"
+        ]["regions"]
+    }
+
+    seasonal_rules = demand_context[
+        "seasonal_rules"
+    ]
+    if (
+        not isinstance(seasonal_rules, list)
+        or not seasonal_rules
+    ):
+        raise ValueError(
+            "simulation_profiles.demand_context."
+            "seasonal_rules 必须是非空列表。"
+        )
+
+    seasonal_keys: set[
+        tuple[str, tuple[int, ...]]
+    ] = set()
+    for index, rule in enumerate(
+        seasonal_rules
+    ):
+        field_prefix = (
+            "simulation_profiles.demand_context."
+            f"seasonal_rules[{index}]"
+        )
+        if not isinstance(rule, dict):
+            raise ValueError(
+                f"{field_prefix} 必须是字典。"
+            )
+        _require_fields(
+            rule,
+            {
+                "category",
+                "months",
+                "multiplier",
+            },
+            field_prefix,
+        )
+        category = _require_string(
+            rule["category"],
+            f"{field_prefix}.category",
+        )
+        if category not in valid_categories:
+            raise ValueError(
+                f"{field_prefix}.category 不存在："
+                f"{category!r}"
+            )
+        months = rule["months"]
+        if not isinstance(months, list) or not months:
+            raise ValueError(
+                f"{field_prefix}.months 必须是非空列表。"
+            )
+        normalized_months: list[int] = []
+        for month_index, month in enumerate(
+            months
+        ):
+            normalized_months.append(
+                _require_positive_int(
+                    month,
+                    (
+                        f"{field_prefix}.months"
+                        f"[{month_index}]"
+                    ),
+                )
+            )
+        if any(
+            month > 12
+            for month in normalized_months
+        ):
+            raise ValueError(
+                f"{field_prefix}.months 必须位于 1-12。"
+            )
+        if len(normalized_months) != len(
+            set(normalized_months)
+        ):
+            raise ValueError(
+                f"{field_prefix}.months 不能重复。"
+            )
+        rule_multiplier = _require_number(
+            rule["multiplier"],
+            f"{field_prefix}.multiplier",
+            minimum=0,
+            minimum_inclusive=False,
+        )
+        if (
+            default_multiplier
+            * rule_multiplier
+            > maximum_combined_multiplier
+        ):
+            raise ValueError(
+                f"{field_prefix}.multiplier "
+                "超过 maximum_combined_multiplier。"
+            )
+        key = (
+            category,
+            tuple(sorted(normalized_months)),
+        )
+        if key in seasonal_keys:
+            raise ValueError(
+                "seasonal_rules 存在重复规则："
+                f"{key}"
+            )
+        seasonal_keys.add(key)
+
+    region_rules = demand_context[
+        "region_rules"
+    ]
+    if (
+        not isinstance(region_rules, list)
+        or not region_rules
+    ):
+        raise ValueError(
+            "simulation_profiles.demand_context."
+            "region_rules 必须是非空列表。"
+        )
+
+    region_keys: set[
+        tuple[str, tuple[str, ...]]
+    ] = set()
+    for index, rule in enumerate(
+        region_rules
+    ):
+        field_prefix = (
+            "simulation_profiles.demand_context."
+            f"region_rules[{index}]"
+        )
+        if not isinstance(rule, dict):
+            raise ValueError(
+                f"{field_prefix} 必须是字典。"
+            )
+        _require_fields(
+            rule,
+            {
+                "category",
+                "region_groups",
+                "multiplier",
+            },
+            field_prefix,
+        )
+        category = _require_string(
+            rule["category"],
+            f"{field_prefix}.category",
+        )
+        if category not in valid_categories:
+            raise ValueError(
+                f"{field_prefix}.category 不存在："
+                f"{category!r}"
+            )
+        region_groups = rule[
+            "region_groups"
+        ]
+        if (
+            not isinstance(region_groups, list)
+            or not region_groups
+        ):
+            raise ValueError(
+                f"{field_prefix}.region_groups "
+                "必须是非空列表。"
+            )
+        normalized_groups: list[str] = []
+        for group_index, group in enumerate(
+            region_groups
+        ):
+            normalized_group = _require_string(
+                group,
+                (
+                    f"{field_prefix}.region_groups"
+                    f"[{group_index}]"
+                ),
+            )
+            if (
+                normalized_group
+                not in valid_region_groups
+            ):
+                raise ValueError(
+                    f"{field_prefix}.region_groups "
+                    "包含未知地区组："
+                    f"{normalized_group!r}"
+                )
+            normalized_groups.append(
+                normalized_group
+            )
+        if len(normalized_groups) != len(
+            set(normalized_groups)
+        ):
+            raise ValueError(
+                f"{field_prefix}.region_groups "
+                "不能重复。"
+            )
+        rule_multiplier = _require_number(
+            rule["multiplier"],
+            f"{field_prefix}.multiplier",
+            minimum=0,
+            minimum_inclusive=False,
+        )
+        if (
+            default_multiplier
+            * rule_multiplier
+            > maximum_combined_multiplier
+        ):
+            raise ValueError(
+                f"{field_prefix}.multiplier "
+                "超过 maximum_combined_multiplier。"
+            )
+        key = (
+            category,
+            tuple(sorted(normalized_groups)),
+        )
+        if key in region_keys:
+            raise ValueError(
+                "region_rules 存在重复规则："
+                f"{key}"
+            )
+        region_keys.add(key)
+
+    # 与退款/评价合同交叉校验，避免同一参数在两处漂移。
+    refund_probability = manifest[
+        "refund_generation"
+    ][
+        "probability_model"
+    ]
+    configured_refund_range = refund_probability[
+        "customer_refund_propensity_multiplier"
+    ]
+    if (
+        float(configured_refund_range["minimum"])
+        != refund_min
+        or float(configured_refund_range["maximum"])
+        != refund_max
+    ):
+        raise ValueError(
+            "simulation customer refund propensity "
+            "必须与 refund_generation 保持一致。"
+        )
+
+    configured_quality_risk = refund_probability[
+        "quality_risk_multiplier"
+    ]
+    if (
+        float(configured_quality_risk["minimum"])
+        != refund_high_multiplier
+        or float(configured_quality_risk["maximum"])
+        != refund_low_multiplier
+    ):
+        raise ValueError(
+            "quality_mappings.refund_risk "
+            "必须与 refund_generation 保持一致。"
+        )
+
+    review_probability = manifest[
+        "review_generation"
+    ][
+        "probability_model"
+    ]
+    configured_review_range = review_probability[
+        "customer_review_propensity_multiplier"
+    ]
+    if (
+        float(configured_review_range["minimum"])
+        != review_min
+        or float(configured_review_range["maximum"])
+        != review_max
+    ):
+        raise ValueError(
+            "simulation customer review propensity "
+            "必须与 review_generation 保持一致。"
+        )
+
+    configured_engagement = review_probability[
+        "product_quality_engagement_multiplier"
+    ]
+    if (
+        float(configured_engagement["minimum"])
+        != review_low_multiplier
+        or float(configured_engagement["maximum"])
+        != review_high_multiplier
+    ):
+        raise ValueError(
+            "quality_mappings.review_engagement "
+            "必须与 review_generation 保持一致。"
+        )
+
+    configured_rating_bias = manifest[
+        "review_generation"
+    ][
+        "rating_model"
+    ][
+        "customer_rating_bias"
+    ]
+    if (
+        float(configured_rating_bias["minimum"])
+        != rating_bias_min
+        or float(configured_rating_bias["maximum"])
+        != rating_bias_max
+    ):
+        raise ValueError(
+            "simulation customer rating_bias "
+            "必须与 review_generation 保持一致。"
+        )
+
+
+def validate_day65_manifest(
+    manifest: dict[str, Any],
+) -> None:
+    """
+    验证 Day65 当前已经冻结的 Manifest 合同。
+
+    Day65 继承 Day64 的固定维度与身份合同，
+    并增加隐藏画像、会员等级、订单、履约、退款、评价与营销费用生成合同。
+    """
+    validate_day64_manifest(manifest)
+    validate_membership_tier_policy(manifest)
+    validate_simulation_profiles(manifest)
+    validate_order_generation(manifest)
+    validate_fulfillment_generation(manifest)
+    validate_refund_generation(manifest)
+    validate_review_generation(manifest)
+    validate_marketing_spend_generation(manifest)
 
 
 def validate_fixed_regions(
@@ -3882,8 +8934,20 @@ def load_and_validate_day64_manifest(
     return manifest
 
 
+def load_and_validate_day65_manifest(
+    manifest_path: Path = MANIFEST_PATH,
+) -> dict[str, Any]:
+    """
+    Day65 Transaction Seed 使用的统一
+    Manifest 入口。
+    """
+    manifest = load_manifest(manifest_path)
+    validate_day65_manifest(manifest)
+    return manifest
+
+
 if __name__ == "__main__":
-    loaded_manifest = load_and_validate_day64_manifest()
+    loaded_manifest = load_and_validate_day65_manifest()
     profile_name, profile = get_active_scale_profile(
         loaded_manifest
     )
@@ -3911,7 +8975,7 @@ if __name__ == "__main__":
         - mapped_customer_count
     )
 
-    print("Day64 Manifest validation passed.")
+    print("Day65 Manifest validation passed.")
     print(f"Active profile: {profile_name}")
     print(f"Profile values: {profile}")
     print(

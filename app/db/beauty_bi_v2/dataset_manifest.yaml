@@ -613,7 +613,11 @@ business_calendar:
 
 membership_policy:
   evaluation_frequency: daily
-  evaluation_time: null
+  evaluation_time: "02:00:00"
+
+  initial_assignment:
+    level: bronze
+    effective_from_strategy: max_membership_joined_at_and_business_start
 
   rolling_window:
     type: rolling_months
@@ -626,7 +630,647 @@ membership_policy:
     subtract_successful_refunds: true
     refund_attribution: original_paid_date
 
-  tiers: []
+  tiers:
+    - level: bronze
+      rank: 1
+      upgrade_threshold: 0
+      retention_threshold: 0
+
+    - level: silver
+      rank: 2
+      upgrade_threshold: 1200
+      retention_threshold: 900
+
+    - level: gold
+      rank: 3
+      upgrade_threshold: 3000
+      retention_threshold: 2400
+
+    - level: platinum
+      rank: 4
+      upgrade_threshold: 6000
+      retention_threshold: 4800
+
+simulation_profiles:
+  customer:
+    purchase_propensity:
+      strategy: lognormal_bounded
+      lognormal_mu: 0.0
+      lognormal_sigma: 0.90
+      minimum_weight: 0.20
+      maximum_weight: 5.00
+
+    primary_sales_channel:
+      strategy: weighted_choice
+
+      weights:
+        OFFICIAL_MALL: 0.18
+        TMALL: 0.28
+        JD: 0.18
+        DOUYIN: 0.22
+        WECHAT_MINI_PROGRAM: 0.14
+
+      preferred_channel_multiplier: 2.50
+      non_preferred_channel_multiplier: 1.00
+
+    refund_propensity:
+      strategy: uniform
+      minimum_multiplier: 0.75
+      maximum_multiplier: 1.50
+
+    review_propensity:
+      strategy: uniform
+      minimum_multiplier: 0.60
+      maximum_multiplier: 1.60
+
+    rating_bias:
+      strategy: uniform
+      minimum: -0.40
+      maximum: 0.40
+
+  product:
+    demand_weight:
+      strategy: lognormal_bounded
+      lognormal_mu: 0.0
+      lognormal_sigma: 0.80
+      minimum_weight: 0.20
+      maximum_weight: 4.00
+
+    quality_score:
+      strategy: normal_bounded
+      mean: 4.10
+      standard_deviation: 0.55
+      minimum: 2.20
+      maximum: 4.90
+
+    unit_cost_ratio:
+      strategy: uniform
+      minimum: 0.28
+      maximum: 0.42
+
+    quality_mappings:
+      refund_risk:
+        low_quality_score: 2.20
+        high_quality_score: 4.90
+        low_quality_multiplier: 1.80
+        high_quality_multiplier: 0.70
+
+      review_engagement:
+        low_quality_score: 2.20
+        high_quality_score: 4.90
+        low_quality_multiplier: 0.85
+        high_quality_multiplier: 1.20
+
+  demand_context:
+    default_multiplier: 1.00
+
+    seasonal_rules:
+      - category: 防晒
+        months:
+          - 5
+          - 6
+          - 7
+          - 8
+        multiplier: 2.20
+
+      - category: 护肤
+        months:
+          - 11
+          - 12
+          - 1
+          - 2
+        multiplier: 1.15
+
+      - category: 香氛
+        months:
+          - 2
+          - 5
+          - 11
+          - 12
+        multiplier: 1.20
+
+    region_rules:
+      - category: 防晒
+        region_groups:
+          - south
+          - east
+          - southwest
+        multiplier: 1.15
+
+      - category: 护肤
+        region_groups:
+          - north
+          - northeast
+          - northwest
+        multiplier: 1.10
+
+    maximum_combined_multiplier: 3.00
+
+order_generation:
+  order_code:
+    prefix: ORD
+    width: 8
+
+  target_count:
+    source: scale_profile.expected_orders
+    semantics: fact_orders_total_rows
+    exact_total_required: true
+
+  date_allocation:
+    strategy: weighted_exact_total
+
+    annual_weights:
+      2024: 0.46
+      2025: 0.54
+
+    weekday_multipliers:
+      monday: 0.90
+      tuesday: 0.95
+      wednesday: 1.00
+      thursday: 1.05
+      friday: 1.10
+      saturday: 1.15
+      sunday: 1.10
+
+    holiday_multiplier: 1.08
+
+    campaign_family_multipliers:
+      WOMENS_DAY: 1.45
+      "618": 1.80
+      DOUBLE_11: 2.10
+
+    deterministic_noise:
+      enabled: true
+      minimum_multiplier: 0.85
+      maximum_multiplier: 1.15
+
+    exact_total_reconciliation:
+      strategy: largest_remainder
+
+  creation_time_distribution:
+    strategy: daypart_weighted
+    interval_semantics: half_open
+
+    dayparts:
+      - name: overnight
+        start_hour: 0
+        end_hour: 6
+        weight: 0.03
+
+      - name: morning
+        start_hour: 6
+        end_hour: 10
+        weight: 0.12
+
+      - name: midday
+        start_hour: 10
+        end_hour: 14
+        weight: 0.23
+
+      - name: afternoon
+        start_hour: 14
+        end_hour: 18
+        weight: 0.20
+
+      - name: evening
+        start_hour: 18
+        end_hour: 22
+        weight: 0.34
+
+      - name: late_night
+        start_hour: 22
+        end_hour: 24
+        weight: 0.08
+
+  lifecycle:
+    initial_status: pending_payment
+
+    successful_payment_probability: 0.95
+
+    payment_delay_minutes:
+      minimum: 1
+      maximum: 120
+
+    cancellation_delay_minutes:
+      minimum: 30
+      maximum: 240
+
+    unpaid_final_status: cancelled
+    paid_status_before_delivery: paid
+    delivered_status_after_delivery: delivered
+
+    new_order_cutoff:
+      source: generation.business_end_date
+      
+    payment_completion_cutoff:
+      source: generation.business_end_date
+      boundary: end_of_day
+      overflow_behavior: cancel_order
+
+  entity_selection:
+    customer:
+      strategy: simulation_profile_weighted
+      require_first_seen_before_order: true
+      require_active_status: true
+
+    channel:
+      strategy: customer_preference_x_daily_context
+      require_active_sales_channel: true
+
+    shipping_region:
+      strategy: customer_home_region_with_override
+
+      distribution:
+        home_region: 0.90
+        same_region_group: 0.08
+        other_region: 0.02
+
+    campaign_attribution:
+      strategy: active_major_campaign_else_null
+      major_campaign_attribution_probability: 0.75
+      allow_null_campaign: true
+
+  item_generation:
+    item_count_distribution:
+      1: 0.55
+      2: 0.28
+      3: 0.12
+      4: 0.04
+      5: 0.01
+
+    quantity_distribution:
+      1: 0.84
+      2: 0.13
+      3: 0.03
+
+    allow_duplicate_product_in_order: false
+
+    product_selection:
+      strategy: simulation_profile_weighted
+      require_launch_before_order: true
+      require_active_product: true
+
+    promotion_application:
+      strategy: active_promotion_probability
+
+      probability_by_campaign_type:
+        always_on: 0.25
+        major_promotion: 0.70
+
+      maximum_promotions_per_item: 1
+      allow_no_promotion: true
+
+  pricing:
+    unit_list_price_source: dim_product.list_price
+    unit_paid_price_strategy: promotion_discount_else_list_price
+    unit_cost_source: hidden_product_simulation_profile
+
+    decimal_places: 2
+    rounding_mode: ROUND_HALF_UP
+
+    item_amount_formulas:
+      item_list_amount: unit_list_price_x_quantity
+      item_paid_amount: unit_paid_price_x_quantity
+      item_discount_amount: item_list_amount_minus_item_paid_amount
+      item_cost_amount: unit_cost_at_order_x_quantity
+
+    order_amount_strategy: sum_order_items
+    allow_negative_margin: true
+
+fulfillment_generation:
+  eligibility:
+    require_successful_payment: true
+    exclude_cancelled_orders: true
+
+  shipping_delay_hours:
+    minimum: 2
+    maximum: 36
+
+  delivery_delay_days:
+    minimum: 1
+    maximum: 7
+
+  remote_region_extra_delay_days:
+    enabled: true
+    region_groups:
+      - northwest
+      - southwest
+      - northeast
+    minimum: 1
+    maximum: 2
+
+  campaign_congestion:
+    enabled: true
+
+    extra_delay_probability_by_campaign_family:
+      WOMENS_DAY: 0.08
+      "618": 0.18
+      DOUBLE_11: 0.25
+
+    extra_delay_days:
+      minimum: 1
+      maximum: 3
+
+  final_status:
+    delivered_event_status: delivered
+
+  observation_window:
+    allow_delivery_after_business_end: true
+    maximum_timestamp_source: generation.event_observation_end_date
+    incomplete_after_observation_end_status: paid
+
+refund_generation:
+  eligibility:
+    require_successful_payment: true
+    require_delivery: true
+    exclude_cancelled_orders: true
+    maximum_refund_events_per_order_item: 1
+
+  probability_model:
+    strategy: hidden_profile_multiplicative
+
+    base_item_refund_probability: 0.08
+
+    quality_risk_multiplier:
+      minimum: 0.70
+      maximum: 1.80
+
+    customer_refund_propensity_multiplier:
+      minimum: 0.75
+      maximum: 1.50
+
+    deep_discount:
+      threshold: 0.25
+      multiplier: 1.15
+
+    final_probability:
+      minimum: 0.01
+      maximum: 0.30
+
+  request_delay_days:
+    minimum: 1
+    maximum: 30
+    timestamp_reference: delivered_at
+
+  quantity:
+    strategy: partial_or_full
+
+    full_quantity_probability: 0.70
+
+    partial_quantity_strategy:
+      minimum: 1
+      maximum_source: purchased_quantity_minus_one
+
+    never_exceed_purchased_quantity: true
+
+  amount:
+    source: unit_paid_price_x_refund_quantity
+    decimal_places: 2
+    rounding_mode: ROUND_HALF_UP
+    never_exceed_item_paid_amount: true
+
+  resolution:
+    final_status_distribution:
+      completed: 0.85
+      rejected: 0.10
+      cancelled: 0.05
+
+    delay_hours:
+      minimum: 1
+      maximum: 72
+
+    completed_timestamp_rule:
+      completed: resolution_timestamp
+      rejected: null
+      cancelled: null
+
+  reason_distribution:
+    quality_issue: 0.30
+    damaged_in_transit: 0.15
+    allergic_reaction: 0.08
+    wrong_item: 0.07
+    not_as_expected: 0.25
+    changed_mind: 0.10
+    other: 0.05
+
+  observation_window:
+    maximum_timestamp_source: generation.event_observation_end_date
+
+    unresolved_after_observation_end:
+      refund_status: requested
+      refund_completed_at: null
+
+  business_effect:
+    subtract_from_so_statuses:
+      - completed
+
+    subtract_from_membership_r12_statuses:
+      - completed
+
+    membership_effective_rule:
+      next_evaluation_after_refund_completion
+
+review_generation:
+  eligibility:
+    require_delivery: true
+    exclude_cancelled_orders: true
+    maximum_reviews_per_order_item: 1
+
+  probability_model:
+    strategy: hidden_profile_multiplicative
+
+    base_item_review_probability: 0.22
+
+    customer_review_propensity_multiplier:
+      minimum: 0.60
+      maximum: 1.60
+
+    product_quality_engagement_multiplier:
+      minimum: 0.85
+      maximum: 1.20
+
+    final_probability:
+      minimum: 0.05
+      maximum: 0.45
+
+  review_delay_days:
+    minimum: 1
+    maximum: 45
+    timestamp_reference: delivered_at
+
+  rating_model:
+    strategy: hidden_quality_plus_customer_bias_and_event_signals
+
+    product_quality_source:
+      source: hidden_product_simulation_profile
+      field: quality_score
+
+    customer_rating_bias:
+      minimum: -0.40
+      maximum: 0.40
+
+    random_noise:
+      minimum: -0.75
+      maximum: 0.75
+
+    refund_penalty_by_status:
+      none: 0.00
+      requested: -1.00
+      completed: -1.50
+      rejected: -0.75
+      cancelled: -0.25
+
+    refund_state_cutoff: reviewed_at
+
+    rounding_strategy: nearest_integer
+    minimum_rating: 1
+    maximum_rating: 5
+
+  sentiment:
+    strategy: deterministic_from_rating
+
+    rating_mapping:
+      1: negative
+      2: negative
+      3: neutral
+      4: positive
+      5: positive
+
+  text_generation:
+    strategy: deterministic_template_by_sentiment
+    live_llm_allowed: false
+    text_presence_probability: 0.85
+
+    templates:
+      positive:
+        - 使用感不错，会考虑回购。
+        - 整体体验很好，效果符合预期。
+        - 包装和使用感都满意。
+        - 性价比不错，值得推荐。
+
+      neutral:
+        - 整体表现一般，符合基本预期。
+        - 使用感尚可，没有特别惊喜。
+        - 效果中规中矩。
+        - 目前感受一般，还会继续观察。
+
+      negative:
+        - 使用体验不理想，没有达到预期。
+        - 商品体验较差，不会考虑回购。
+        - 收到并使用后发现存在问题。
+        - 效果不太适合我。
+
+  observation_window:
+    maximum_timestamp_source: generation.event_observation_end_date
+    omit_review_after_observation_end: true
+
+marketing_spend_generation:
+  grain:
+    fields:
+      - spend_date
+      - channel_code
+      - campaign_code
+    require_unique: true
+
+  eligibility:
+    require_active_channel: true
+    require_marketing_channel: true
+    require_spend_date_within_campaign_window: true
+
+  row_generation:
+    always_on:
+      strategy: every_business_date_x_eligible_channel
+
+    major_promotion:
+      strategy: active_campaign_date_x_eligible_channel
+
+    allow_multiple_campaigns_per_channel_date: true
+
+  base_daily_spend_by_channel:
+    TMALL: 2200
+    JD: 1500
+    DOUYIN: 1800
+    XIAOHONGSHU: 1300
+
+  annual_multiplier:
+    2024: 1.00
+    2025: 1.10
+
+  weekday_multiplier:
+    monday: 0.90
+    tuesday: 0.95
+    wednesday: 1.00
+    thursday: 1.00
+    friday: 1.05
+    saturday: 1.10
+    sunday: 1.05
+
+  holiday_multiplier: 1.08
+
+  campaign_incremental_multiplier:
+    WOMENS_DAY: 0.45
+    "618": 0.80
+    DOUBLE_11: 1.20
+
+  deterministic_noise:
+    enabled: true
+    minimum_multiplier: 0.90
+    maximum_multiplier: 1.10
+
+  amount:
+    formula: >
+      base_daily_spend
+      x annual_multiplier
+      x weekday_multiplier
+      x holiday_multiplier
+      x campaign_component
+      x deterministic_noise
+
+    always_on_campaign_component: 1.00
+    major_campaign_component_strategy:
+      one_plus_campaign_incremental_multiplier
+
+    decimal_places: 2
+    rounding_mode: ROUND_HALF_UP
+    minimum_spend_amount: 0.01
+
+  demand_response:
+    enabled: true
+    strategy: logarithmic_diminishing_returns
+
+    input:
+      source: total_daily_channel_spend
+      baseline_source: base_daily_spend_by_channel
+
+    response_strength_by_channel:
+      TMALL: 0.32
+      JD: 0.28
+      DOUYIN: 0.36
+      XIAOHONGSHU: 0.24
+
+    formula: >
+      1
+      + response_strength
+      x log1p(
+          maximum(
+            total_daily_channel_spend
+            / base_daily_spend
+            - 1,
+            0
+          )
+        )
+
+    minimum_demand_multiplier: 1.00
+    maximum_demand_multiplier: 1.60
+
+  order_integration:
+    apply_to: daily_channel_order_weight
+    apply_before_exact_total_reconciliation: true
+    persisted_outside_fact_marketing_spend: false
+
+  observation_window:
+    maximum_spend_date_source: generation.business_end_date
+    generate_spend_in_event_observation_tail: false
 
 commerce_policy:
   gmv:

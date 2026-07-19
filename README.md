@@ -411,43 +411,55 @@ fact_reviews
 
 ## Beauty BI Dataset V2 当前状态
 
-Day61 完成 Dataset V2 Design Baseline，Day62 完成 Manifest Skeleton 与 Schema Foundation，Day63 完成 Transaction Facts DDL 与约束验证，Day64 完成 Fixed Dimensions & Identity Seed。
+Day61 完成 Dataset V2 Design Baseline，Day62 完成 Manifest Skeleton 与 Schema Foundation，Day63 完成 Transaction Facts DDL 与约束验证，Day64 完成 Fixed Dimensions & Identity Seed，Day65 完成 Time-driven Transaction Seed 与原子写库。
 
 当前已完成：
 - 建立独立目录 `app/db/beauty_bi_v2/`；
-- 建立 `dataset_manifest.yaml`，绑定版本、固定日期、随机种子、业务口径和 Acceptance Gate IDs；
-- 固定 2024 / 2025 两年的 6 个核心大促，并增加 `ALWAYS_ON_2024`、`ALWAYS_ON_2025`；
-- 建立 `beauty_bi_v2` PostgreSQL schema；
-- 完成 11 张基础维度、身份关系和会员历史表；
-- 完成 5 张交易事实表 DDL：
-  - `fact_orders`
-  - `fact_order_items`
-  - `fact_refunds`
-  - `fact_marketing_spend`
-  - `fact_reviews`
-- V2 Schema 当前共 16 张表；
-- 建立 `manifest_loader.py`，集中校验 Day64 使用的日期、规模、分布、身份映射和渠道绑定配置；
-- 冻结 small Profile：
-  - customers：5000
-  - membership_accounts：3250
-  - products：100
-  - expected_orders：40000
-- 完成 10 张固定维度与身份基础表的确定性 Seed：
-  - `dim_date`：762
-  - `dim_region`：16
-  - `dim_channel`：6
-  - `dim_product`：100
-  - `dim_campaign`：8
-  - `dim_promotion`：8
-  - `dim_customer`：5000
-  - `dim_membership_account`：3250
-  - `bridge_customer_membership`：3000
-  - `fact_membership_channel_binding_history`：5053
-- 保留 2000 个未映射 customer 和 250 个未映射到 customer 的 membership account；
-- 保证每个会员账户包含首次入会渠道；
-- 保证 active 账户保留开放渠道绑定，inactive 账户不保留开放绑定；
-- 完成稳定业务编码、确定性重复生成、外键解析、目标表非空保护和数据库逐行比较；
-- 保持 V1 和 V2 隔离，Graph integration 继续关闭。
+- 建立 `dataset_manifest.yaml`，绑定版本、固定日期、随机种子、业务口径与生成参数；
+- 建立 `manifest_loader.py`，集中校验固定维度、身份关系和交易生成合同；
+- 建立 16 张 Beauty BI V2 P0 Schema 表；
+- 完成 10 张固定维度与身份基础表的确定性 Seed；
+- 完成独立交易生成模块 `seed_transactions.py`；
+- 完成营销费用、订单、订单明细、履约、退款、评价和 R12 会员等级历史；
+- 使用独立 deterministic RNG streams，保证重复生成结果一致；
+- 使用单一数据库事务写入五张剩余交易事实表；
+- 完成业务键解析、外键检查、金额公式、时间顺序、等级区间与数据库逐行比较；
+- 保持 V1 `public` Schema 不变，Graph integration 继续关闭。
+
+small Profile 当前入库规模：
+
+| 表 | 行数 |
+|---|---:|
+| `dim_date` | 762 |
+| `dim_region` | 16 |
+| `dim_channel` | 6 |
+| `dim_product` | 100 |
+| `dim_campaign` | 8 |
+| `dim_promotion` | 8 |
+| `dim_customer` | 5000 |
+| `dim_membership_account` | 3250 |
+| `bridge_customer_membership` | 3000 |
+| `fact_membership_channel_binding_history` | 5053 |
+| `fact_marketing_spend` | 3412 |
+| `fact_orders` | 40000 |
+| `fact_order_items` | 66889 |
+| `fact_refunds` | 5925 |
+| `fact_reviews` | 16535 |
+| `fact_membership_tier_history` | 6564 |
+
+Day65 关键验证：
+- 订单状态：38056 delivered / 1944 cancelled；
+- 完成退款：5013；
+- 评价：16535；
+- 会员等级变化：3250 initial / 2728 upgrade / 586 downgrade；
+- 2026 年 1 月新支付订单：0；
+- 观察尾窗送达、退款和评价事件存在；
+- 订单头金额与明细汇总一致；
+- 退款金额与数量不超过购买上限；
+- 评价不存在未来退款信息泄漏；
+- `member_level_at_order` 与支付时点有效等级一致；
+- 每个会员账户只有一个开放等级区间，历史区间无重叠；
+- 原子写库和数据库逐行业务字段比较通过。
 
 当前状态：
 
@@ -460,23 +472,23 @@ Schema Foundation：completed（11 tables）
 Transaction Facts DDL：completed（5 tables）
 V2 Schema Total：16 tables
 Fixed Dimensions & Identity Seed：completed（10 tables）
-Time-driven Transaction Seed：not started
-fact_membership_tier_history Seed：not started
+Time-driven Transaction Seed：completed
+fact_membership_tier_history Seed：completed
 Day62 Foundation Validation：passed
 Day63 Transaction Facts Validation：passed
 Day64 Deterministic Seed Validation：passed
+Day65 Transaction Seed Validation：passed
 Full Acceptance Gates：not_run
 Metadata V2：not started
 Golden Cases V2：not started
 Graph integration：disabled
 ```
 
-Beauty BI V1 继续作为 Latest Stable Baseline。
-V2 在 Time-driven Transaction Seed、完整 Acceptance Gates、Metadata 和 Golden Cases 完成前不会替换 V1。
+Beauty BI V1 继续作为 Latest Stable Baseline。Day65 写库成功不等于 Dataset V2 已成为 Candidate 或 Stable；P01–P09 正式 Acceptance、Metadata V2、Golden Cases V2 和 AI 主链路回归仍未完成。
 
 ---
 
-# 技术栈
+# 技术栈# 技术栈
 
 ## Backend
 
@@ -519,7 +531,8 @@ app/
 │       ├── init_schema.py
 │       ├── db_check.py
 │       ├── manifest_loader.py
-│       └── seed_dimensions.py
+│       ├── seed_dimensions.py
+│       └── seed_transactions.py
 ├── semantic_layer/
 ├── text_to_sql/
 └── evaluation/
@@ -698,23 +711,21 @@ Phase3 当前进展：
 - Day62 完成 Dataset V2 Manifest Skeleton / Schema Foundation
 - Day63 完成 Dataset V2 Transaction Facts DDL / Constraint Validation
 - Day64 完成 Dataset V2 Fixed Dimensions & Identity Seed
+- Day65 完成 Dataset V2 Time-driven Transaction Seed / Atomic Database Write
 
-Day61-Day64 Dataset V2 成果：
+Day61-Day65 Dataset V2 成果：
 - 完成 V1 Coverage Review 与 V2 P0 / P1 / P2 边界；
 - 确定 V1 `public` 与 V2 `beauty_bi_v2` schema 隔离；
 - 完成 Version Model、Candidate Schema Map、Generation Contract 和 Acceptance Gates 设计；
-- 建立 V2 Manifest，固定跨年度窗口、6 个核心大促、2 个 always-on 活动和 P01-P09 Gate 绑定；
-- 完成 11 张基础维度、身份关系和会员历史表；
-- 完成 5 张交易事实表 DDL，V2 Schema 当前共 16 张表；
-- 完成订单状态与金额、明细金额公式、退款复合外键、营销费用 Grain、评价唯一性和枚举约束；
-- 完成 PostgreSQL DDL、关键约束结构和事务内正反例行为验证；
-- 建立 Manifest Loader，冻结 small Profile 为 5000 customers、3250 membership accounts、100 products 和 40000 expected orders；
+- 建立 V2 Manifest，固定业务窗口、观察尾窗、活动日历、随机种子和生成合同；
+- 完成 16 张 P0 Schema 表及数据库约束验证；
 - 完成 10 张固定维度与身份基础表的确定性 Seed；
-- 完成 3000 条 customer-membership 映射和 5053 条会员渠道绑定历史；
-- 完成稳定业务编码、确定性重复生成、外键解析和数据库逐行比较；
-- V2 当前仍为 `draft`，尚未实现 Time-driven Transaction Seed、完整 Acceptance Gates、Metadata V2 或 Graph 接入。
+- 完成 3412 条营销费用、40000 张订单、66889 条订单明细、5925 条退款、16535 条评价和 6564 条会员等级历史；
+- 完成订单、履约、退款、评价和会员等级的事件时间顺序；
+- 完成独立随机流、稳定业务键、原子写库和数据库逐行比较；
+- V2 当前仍为 `draft`，尚未执行 P01–P09 正式 Acceptance、Metadata V2、Golden Cases V2 或 Graph 接入。
 
-当前稳定依赖基线：
+当前稳定依赖基线：当前稳定依赖基线：
 - Python `3.10.3`
 - `langchain==0.3.30`
 - `langchain-core==0.3.86`
@@ -726,7 +737,7 @@ Day61-Day64 Dataset V2 成果：
 - 完整锁文件：`requirements-lock.txt`
 
 Phase3 后续重点：
-- Dataset V2 Time-driven Transaction Seed 与 Acceptance Gates
+- Dataset V2 P01–P09 Acceptance Calibration 与正式 Gate
 - Governed Analytics / Permission / Audit
 - Tool Calling / Tool Contract
 - Workflow、Single Agent 与 Multi-Agent 架构决策
@@ -856,8 +867,8 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.35
-完成度：Day64 / 100
+Version: v0.36
+完成度：Day65 / 100
 
 当前实现：
 
@@ -895,4 +906,4 @@ Version: v0.35
 - Phase3 第一里程碑已完成
 - Phase3 继续进行
 
-下一步：Day65 Time-driven Transaction Seed
+下一步：Day66 Acceptance Gates & Calibration
