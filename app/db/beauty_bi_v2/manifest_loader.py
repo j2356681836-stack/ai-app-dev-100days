@@ -5833,6 +5833,326 @@ def validate_simulation_profiles(
         )
 
 
+
+def validate_business_pattern_acceptance(
+    manifest: dict[str, Any],
+) -> None:
+    """
+    验证 Day66 P01-P09 正式 Acceptance Contract。
+
+    该合同只冻结当前 small Profile 的业务规律宽区间，
+    不代表 Dataset V2 已满足 Metadata、Golden Cases、
+    Performance 或 AI 主链路回归要求。
+    """
+    contract = _require_mapping(
+        manifest,
+        "business_pattern_acceptance",
+        "business_pattern_acceptance",
+    )
+
+    _require_fields(
+        contract,
+        {
+            "contract_version",
+            "scale_profile",
+            "status",
+            "thresholds_frozen",
+            "target_schema",
+            "all_patterns_required",
+            "candidate_eligibility_after_pass",
+            "patterns",
+        },
+        "business_pattern_acceptance",
+    )
+
+    versions = _require_mapping(
+        manifest,
+        "versions",
+        "versions",
+    )
+
+    contract_version = _require_string(
+        contract["contract_version"],
+        "business_pattern_acceptance.contract_version",
+    )
+
+    configured_version = _require_string(
+        versions.get("acceptance_contract_version"),
+        "versions.acceptance_contract_version",
+    )
+
+    if contract_version != configured_version:
+        raise ValueError(
+            "Acceptance Contract 版本不一致："
+            f"contract={contract_version!r}, "
+            f"versions={configured_version!r}"
+        )
+
+    if contract["scale_profile"] != manifest[
+        "generation"
+    ]["scale_profile"]:
+        raise ValueError(
+            "business_pattern_acceptance.scale_profile "
+            "必须与 generation.scale_profile 一致。"
+        )
+
+    _require_exact(
+        contract["status"],
+        "frozen",
+        "business_pattern_acceptance.status",
+    )
+
+    if not _require_bool(
+        contract["thresholds_frozen"],
+        "business_pattern_acceptance.thresholds_frozen",
+    ):
+        raise ValueError(
+            "Day66 正式 Acceptance 要求 thresholds_frozen=true。"
+        )
+
+    if contract["target_schema"] != manifest[
+        "database"
+    ]["target_schema"]:
+        raise ValueError(
+            "Acceptance target_schema 必须与 database.target_schema 一致。"
+        )
+
+    if not _require_bool(
+        contract["all_patterns_required"],
+        "business_pattern_acceptance.all_patterns_required",
+    ):
+        raise ValueError(
+            "P01-P09 必须全部通过，all_patterns_required 必须为 true。"
+        )
+
+    if _require_bool(
+        contract["candidate_eligibility_after_pass"],
+        (
+            "business_pattern_acceptance."
+            "candidate_eligibility_after_pass"
+        ),
+    ):
+        raise ValueError(
+            "Day66 业务 Pattern 通过后仍不能直接成为 Candidate。"
+        )
+
+    acceptance_gate = _require_mapping(
+        _require_mapping(
+            manifest,
+            "acceptance_gates",
+            "acceptance_gates",
+        ),
+        "business_pattern_validation",
+        "acceptance_gates.business_pattern_validation",
+    )
+
+    if not _require_bool(
+        acceptance_gate.get("enabled"),
+        "acceptance_gates.business_pattern_validation.enabled",
+    ):
+        raise ValueError(
+            "business_pattern_validation gate 必须启用。"
+        )
+
+    _require_exact(
+        acceptance_gate.get("validator"),
+        "app.db.beauty_bi_v2.acceptance_observer",
+        "acceptance_gates.business_pattern_validation.validator",
+    )
+
+    expected_patterns = {
+        "P01": "customer_purchase_long_tail",
+        "P02": "membership_r12_transition",
+        "P03": "identity_channel_binding_overlap",
+        "P04": "new_customer_scope_difference",
+        "P05": "product_sales_long_tail",
+        "P06": "season_region_demand",
+        "P07": "marketing_diminishing_returns",
+        "P08": "promotion_margin_tradeoff",
+        "P09": "refund_review_quality_relation",
+    }
+
+    pattern_key_mapping = {
+        "P01": "P01_customer_purchase_long_tail",
+        "P02": "P02_membership_r12_transition",
+        "P03": "P03_membership_customer_overlap",
+        "P04": "P04_new_customer_scope_difference",
+        "P05": "P05_product_sales_long_tail",
+        "P06": "P06_season_region_demand",
+        "P07": "P07_marketing_diminishing_returns",
+        "P08": "P08_promotion_margin_tradeoff",
+        "P09": "P09_refund_review_quality",
+    }
+
+    patterns = _require_mapping(
+        contract,
+        "patterns",
+        "business_pattern_acceptance.patterns",
+    )
+
+    if set(patterns) != set(expected_patterns):
+        raise ValueError(
+            "business_pattern_acceptance.patterns 必须完整覆盖 P01-P09："
+            f"actual={sorted(patterns)}"
+        )
+
+    business_patterns = _require_mapping(
+        manifest,
+        "business_patterns",
+        "business_patterns",
+    )
+
+    allowed_operators = {
+        "between",
+        "minimum",
+        "maximum",
+        "equals",
+        "not_equals",
+    }
+
+    global_check_ids: set[str] = set()
+
+    for pattern_id, expected_validator in expected_patterns.items():
+        pattern_path = (
+            "business_pattern_acceptance.patterns."
+            f"{pattern_id}"
+        )
+        pattern = _require_mapping(
+            patterns,
+            pattern_id,
+            pattern_path,
+        )
+        _require_fields(
+            pattern,
+            {"validator_name", "checks"},
+            pattern_path,
+        )
+
+        _require_exact(
+            pattern["validator_name"],
+            expected_validator,
+            f"{pattern_path}.validator_name",
+        )
+
+        source_pattern_key = pattern_key_mapping[pattern_id]
+        source_pattern = _require_mapping(
+            business_patterns,
+            source_pattern_key,
+            f"business_patterns.{source_pattern_key}",
+        )
+
+        if not _require_bool(
+            source_pattern.get("enabled"),
+            f"business_patterns.{source_pattern_key}.enabled",
+        ):
+            raise ValueError(
+                f"{source_pattern_key} 已配置正式 Gate，不能禁用。"
+            )
+
+        checks = pattern["checks"]
+        if not isinstance(checks, list) or not checks:
+            raise ValueError(
+                f"{pattern_path}.checks 必须是非空列表。"
+            )
+
+        pattern_metrics: set[str] = set()
+
+        for index, check in enumerate(checks):
+            check_path = f"{pattern_path}.checks[{index}]"
+            if not isinstance(check, dict):
+                raise ValueError(
+                    f"{check_path} 必须是字典。"
+                )
+
+            _require_fields(
+                check,
+                {"check_id", "metric", "operator"},
+                check_path,
+            )
+
+            check_id = _require_string(
+                check["check_id"],
+                f"{check_path}.check_id",
+            )
+            metric = _require_string(
+                check["metric"],
+                f"{check_path}.metric",
+            )
+            operator = _require_string(
+                check["operator"],
+                f"{check_path}.operator",
+            )
+
+            if check_id in global_check_ids:
+                raise ValueError(
+                    f"Acceptance check_id 不能重复：{check_id}"
+                )
+            global_check_ids.add(check_id)
+
+            if metric in pattern_metrics:
+                raise ValueError(
+                    f"同一 Pattern 不能重复检查 metric：{metric}"
+                )
+            pattern_metrics.add(metric)
+
+            if operator not in allowed_operators:
+                raise ValueError(
+                    f"{check_path}.operator 不支持：{operator!r}"
+                )
+
+            if operator == "between":
+                _require_fields(
+                    check,
+                    {"minimum", "maximum"},
+                    check_path,
+                )
+                minimum = _require_number(
+                    check["minimum"],
+                    f"{check_path}.minimum",
+                )
+                maximum = _require_number(
+                    check["maximum"],
+                    f"{check_path}.maximum",
+                )
+                if minimum > maximum:
+                    raise ValueError(
+                        f"{check_path} 必须满足 minimum <= maximum。"
+                    )
+
+            elif operator == "minimum":
+                _require_number(
+                    check.get("minimum"),
+                    f"{check_path}.minimum",
+                )
+
+            elif operator == "maximum":
+                _require_number(
+                    check.get("maximum"),
+                    f"{check_path}.maximum",
+                )
+
+            else:
+                if "expected" not in check:
+                    raise ValueError(
+                        f"{check_path}.expected 不能为空。"
+                    )
+                expected = check["expected"]
+                if isinstance(expected, (dict, list)):
+                    raise ValueError(
+                        f"{check_path}.expected 必须是标量。"
+                    )
+
+
+def validate_day66_manifest(
+    manifest: dict[str, Any],
+) -> None:
+    """
+    验证 Day66：Day65 生成合同 + P01-P09 正式阈值合同。
+    """
+    validate_day65_manifest(manifest)
+    validate_business_pattern_acceptance(manifest)
+
+
 def validate_day65_manifest(
     manifest: dict[str, Any],
 ) -> None:
@@ -8946,8 +9266,20 @@ def load_and_validate_day65_manifest(
     return manifest
 
 
+
+def load_and_validate_day66_manifest(
+    manifest_path: Path = MANIFEST_PATH,
+) -> dict[str, Any]:
+    """
+    Day66 Formal Acceptance 使用的统一 Manifest 入口。
+    """
+    manifest = load_manifest(manifest_path)
+    validate_day66_manifest(manifest)
+    return manifest
+
+
 if __name__ == "__main__":
-    loaded_manifest = load_and_validate_day65_manifest()
+    loaded_manifest = load_and_validate_day66_manifest()
     profile_name, profile = get_active_scale_profile(
         loaded_manifest
     )
@@ -8975,7 +9307,7 @@ if __name__ == "__main__":
         - mapped_customer_count
     )
 
-    print("Day65 Manifest validation passed.")
+    print("Day66 Manifest validation passed.")
     print(f"Active profile: {profile_name}")
     print(f"Profile values: {profile}")
     print(

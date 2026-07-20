@@ -11,7 +11,8 @@ versions:
   generation_contract_version: beauty_bi_contract_v2_0
   metadata_version: beauty_bi_metadata_v2_0
   golden_dataset_version: beauty_bi_golden_v2_0
-  manifest_version: "1.0"
+  manifest_version: "1.1"
+  acceptance_contract_version: beauty_bi_acceptance_v2_0
 
 database:
   engine: postgresql
@@ -1400,6 +1401,398 @@ business_patterns:
     parameters: {}
     acceptance_gate: refund_review_statistical_relation
 
+business_pattern_acceptance:
+  contract_version: beauty_bi_acceptance_v2_0
+  scale_profile: small
+  status: frozen
+  thresholds_frozen: true
+  target_schema: beauty_bi_v2
+  all_patterns_required: true
+  candidate_eligibility_after_pass: false
+
+  patterns:
+    P01:
+      validator_name: customer_purchase_long_tail
+      checks:
+        - check_id: p01_no_purchase_customer_share
+          metric: no_purchase_customer_share
+          operator: between
+          minimum: 0.08
+          maximum: 0.20
+        - check_id: p01_zero_to_two_order_customer_share
+          metric: zero_to_two_order_customer_share
+          operator: between
+          minimum: 0.25
+          maximum: 0.45
+        - check_id: p01_ten_plus_order_customer_share
+          metric: ten_plus_order_customer_share
+          operator: between
+          minimum: 0.15
+          maximum: 0.35
+        - check_id: p01_top_10_percent_paid_share
+          metric: top_10_percent_paid_share
+          operator: between
+          minimum: 0.30
+          maximum: 0.50
+        - check_id: p01_maximum_to_p90_order_count_ratio
+          metric: maximum_to_p90_order_count_ratio
+          operator: between
+          minimum: 2.00
+          maximum: 5.00
+
+    P02:
+      validator_name: membership_r12_transition
+      checks:
+        - check_id: p02_initial_count_matches_accounts
+          metric: initial_count_matches_accounts
+          operator: equals
+          expected: true
+        - check_id: p02_unchanged_accounts
+          metric: unchanged_accounts
+          operator: between
+          minimum: 1200
+          maximum: 2300
+        - check_id: p02_accounts_with_upgrade
+          metric: accounts_with_upgrade
+          operator: between
+          minimum: 1200
+          maximum: 2200
+        - check_id: p02_accounts_with_downgrade
+          metric: accounts_with_downgrade
+          operator: between
+          minimum: 300
+          maximum: 800
+        - check_id: p02_accounts_with_both_directions
+          metric: accounts_with_both_directions
+          operator: between
+          minimum: 300
+          maximum: 800
+        - check_id: p02_transitions_2024
+          metric: transitions_2024
+          operator: between
+          minimum: 600
+          maximum: 1300
+        - check_id: p02_transitions_2025
+          metric: transitions_2025
+          operator: between
+          minimum: 1800
+          maximum: 2800
+        - check_id: p02_transitions_observation_tail
+          metric: transitions_observation_tail
+          operator: between
+          minimum: 20
+          maximum: 200
+        - check_id: p02_all_current_levels_positive
+          metric: all_current_levels_positive
+          operator: equals
+          expected: true
+        - check_id: p02_history_and_snapshot_errors_zero
+          metric: history_and_snapshot_errors_zero
+          operator: equals
+          expected: true
+
+    P03:
+      validator_name: identity_channel_binding_overlap
+      checks:
+        - check_id: p03_mapped_customer_share
+          metric: mapped_customer_share
+          operator: between
+          minimum: 0.55
+          maximum: 0.65
+        - check_id: p03_single_channel_member_share
+          metric: single_channel_member_share
+          operator: between
+          minimum: 0.50
+          maximum: 0.70
+        - check_id: p03_multi_channel_member_share
+          metric: multi_channel_member_share
+          operator: between
+          minimum: 0.30
+          maximum: 0.50
+        - check_id: p03_bound_member_order_share
+          metric: bound_member_order_share
+          operator: between
+          minimum: 0.15
+          maximum: 0.35
+        - check_id: p03_required_overlap_cases_present
+          metric: required_overlap_cases_present
+          operator: equals
+          expected: true
+        - check_id: p03_mapping_and_binding_errors_zero
+          metric: mapping_and_binding_errors_zero
+          operator: equals
+          expected: true
+
+    P04:
+      validator_name: new_customer_scope_difference
+      checks:
+        - check_id: p04_channel_to_brand_new_ratio
+          metric: channel_to_brand_new_ratio
+          operator: between
+          minimum: 2.50
+          maximum: 3.80
+        - check_id: p04_channel_new_not_brand_new_share
+          metric: channel_new_not_brand_new_share
+          operator: between
+          minimum: 0.60
+          maximum: 0.75
+        - check_id: p04_cross_channel_customer_share
+          metric: cross_channel_customer_share
+          operator: between
+          minimum: 0.75
+          maximum: 0.90
+        - check_id: p04_minimum_channel_scope_gap
+          metric: minimum_channel_scope_gap
+          operator: between
+          minimum: 1000
+          maximum: 3000
+        - check_id: p04_scope_invariants_valid
+          metric: scope_invariants_valid
+          operator: equals
+          expected: true
+        - check_id: p04_cross_channel_cases_present
+          metric: cross_channel_cases_present
+          operator: equals
+          expected: true
+
+    P05:
+      validator_name: product_sales_long_tail
+      checks:
+        - check_id: p05_active_product_sales_coverage
+          metric: active_product_sales_coverage
+          operator: between
+          minimum: 0.97
+          maximum: 1.00
+        - check_id: p05_active_products_without_sales
+          metric: active_products_without_sales
+          operator: maximum
+          maximum: 3
+        - check_id: p05_maximum_to_median_quantity_ratio
+          metric: maximum_to_median_quantity_ratio
+          operator: between
+          minimum: 4.00
+          maximum: 9.00
+        - check_id: p05_top_10_percent_quantity_share
+          metric: top_10_percent_quantity_share
+          operator: between
+          minimum: 0.25
+          maximum: 0.45
+        - check_id: p05_top_10_percent_gmv_share
+          metric: top_10_percent_gmv_share
+          operator: between
+          minimum: 0.25
+          maximum: 0.45
+        - check_id: p05_top_10_percent_margin_share
+          metric: top_10_percent_margin_share
+          operator: between
+          minimum: 0.25
+          maximum: 0.45
+        - check_id: p05_quantity_gmv_rank_not_identical
+          metric: quantity_gmv_rank_not_identical
+          operator: equals
+          expected: true
+        - check_id: p05_gmv_margin_rank_not_identical
+          metric: gmv_margin_rank_not_identical
+          operator: equals
+          expected: true
+        - check_id: p05_category_count
+          metric: category_count
+          operator: minimum
+          minimum: 4
+
+    P06:
+      validator_name: season_region_demand
+      checks:
+        - check_id: p06_sunscreen_peak_ratio
+          metric: sunscreen_peak_ratio
+          operator: between
+          minimum: 1.40
+          maximum: 2.10
+        - check_id: p06_skincare_winter_ratio
+          metric: skincare_winter_ratio
+          operator: between
+          minimum: 1.10
+          maximum: 1.50
+        - check_id: p06_sunscreen_region_ratio
+          metric: sunscreen_region_ratio
+          operator: between
+          minimum: 1.05
+          maximum: 1.25
+        - check_id: p06_skincare_region_ratio
+          metric: skincare_region_ratio
+          operator: between
+          minimum: 1.03
+          maximum: 1.20
+        - check_id: p06_sunscreen_nonzero_months
+          metric: sunscreen_nonzero_months
+          operator: equals
+          expected: 12
+        - check_id: p06_skincare_nonzero_months
+          metric: skincare_nonzero_months
+          operator: equals
+          expected: 12
+        - check_id: p06_all_region_groups_nonzero
+          metric: all_region_groups_nonzero
+          operator: equals
+          expected: true
+
+    P07:
+      validator_name: marketing_diminishing_returns
+      checks:
+        - check_id: p07_direct_response_channel_count
+          metric: direct_response_channel_count
+          operator: between
+          minimum: 3
+          maximum: 5
+        - check_id: p07_minimum_observation_days
+          metric: minimum_observation_days
+          operator: minimum
+          minimum: 700
+        - check_id: p07_minimum_spend_order_correlation
+          metric: minimum_spend_order_correlation
+          operator: between
+          minimum: 0.75
+          maximum: 0.95
+        - check_id: p07_minimum_spend_channel_new_correlation
+          metric: minimum_spend_channel_new_correlation
+          operator: between
+          minimum: 0.45
+          maximum: 0.75
+        - check_id: p07_high_spend_more_orders_share
+          metric: high_spend_more_orders_share
+          operator: equals
+          expected: 1.0
+        - check_id: p07_strict_order_diminishing_share
+          metric: strict_order_diminishing_share
+          operator: minimum
+          minimum: 0.66
+        - check_id: p07_order_within_noise_tolerance_share
+          metric: order_within_noise_tolerance_share
+          operator: equals
+          expected: 1.0
+        - check_id: p07_high_spend_more_channel_new_share
+          metric: high_spend_more_channel_new_share
+          operator: equals
+          expected: 1.0
+        - check_id: p07_channel_new_diminishing_share
+          metric: channel_new_diminishing_share
+          operator: equals
+          expected: 1.0
+        - check_id: p07_gmv_roi_decline_share
+          metric: gmv_roi_decline_share
+          operator: equals
+          expected: 1.0
+        - check_id: p07_maximum_order_efficiency_retention
+          metric: maximum_order_efficiency_retention
+          operator: maximum
+          maximum: 1.05
+        - check_id: p07_order_response_curve_spread
+          metric: order_response_curve_spread
+          operator: between
+          minimum: 0.05
+          maximum: 0.25
+        - check_id: p07_marketing_only_channel_count
+          metric: marketing_only_channel_count
+          operator: minimum
+          minimum: 1
+
+    P08:
+      validator_name: promotion_margin_tradeoff
+      checks:
+        - check_id: p08_promotion_count_with_sales
+          metric: promotion_count_with_sales
+          operator: equals
+          expected: 8
+        - check_id: p08_promoted_margin_rate
+          metric: promoted_margin_rate
+          operator: between
+          minimum: 0.55
+          maximum: 0.63
+        - check_id: p08_non_promoted_margin_rate
+          metric: non_promoted_margin_rate
+          operator: between
+          minimum: 0.62
+          maximum: 0.68
+        - check_id: p08_margin_rate_gap
+          metric: margin_rate_gap
+          operator: between
+          minimum: 0.03
+          maximum: 0.08
+        - check_id: p08_discount_margin_correlation
+          metric: discount_depth_margin_rate_correlation
+          operator: between
+          minimum: -1.00
+          maximum: -0.90
+        - check_id: p08_product_tradeoff_share
+          metric: product_tradeoff_share
+          operator: between
+          minimum: 0.30
+          maximum: 0.55
+        - check_id: p08_normalized_tradeoff_present
+          metric: normalized_tradeoff_present
+          operator: equals
+          expected: true
+        - check_id: p08_formula_and_contract_errors_zero
+          metric: formula_and_contract_errors_zero
+          operator: equals
+          expected: true
+
+    P09:
+      validator_name: refund_review_quality_relation
+      checks:
+        - check_id: p09_compared_products
+          metric: compared_products
+          operator: minimum
+          minimum: 85
+        - check_id: p09_completed_refund_average_rating
+          metric: completed_refund_average_rating
+          operator: between
+          minimum: 2.70
+          maximum: 3.30
+        - check_id: p09_no_refund_average_rating
+          metric: no_refund_average_rating
+          operator: between
+          minimum: 3.80
+          maximum: 4.20
+        - check_id: p09_refund_no_refund_rating_gap
+          metric: refund_no_refund_rating_gap
+          operator: between
+          minimum: 0.80
+          maximum: 1.30
+        - check_id: p09_low_rating_completed_refund_rate
+          metric: low_rating_completed_refund_rate
+          operator: between
+          minimum: 0.50
+          maximum: 0.75
+        - check_id: p09_high_rating_completed_refund_rate
+          metric: high_rating_completed_refund_rate
+          operator: between
+          minimum: 0.02
+          maximum: 0.06
+        - check_id: p09_product_rating_refund_correlation
+          metric: product_rating_refund_correlation
+          operator: between
+          minimum: -0.90
+          maximum: -0.60
+        - check_id: p09_product_rating_refund_rank_correlation
+          metric: product_rating_refund_rank_correlation
+          operator: between
+          minimum: -0.90
+          maximum: -0.70
+        - check_id: p09_low_to_high_quartile_refund_ratio
+          metric: low_to_high_rating_quartile_refund_ratio
+          operator: between
+          minimum: 1.50
+          maximum: 2.20
+        - check_id: p09_nonmechanical_cases_present
+          metric: nonmechanical_cases_present
+          operator: equals
+          expected: true
+        - check_id: p09_review_integrity_errors_zero
+          metric: review_integrity_errors_zero
+          operator: equals
+          expected: true
+
 deferred_capabilities:
   P1:
     - coupon_issuance_and_redemption
@@ -1474,7 +1867,7 @@ acceptance_gates:
 
   business_pattern_validation:
     enabled: true
-    validator: null
+    validator: app.db.beauty_bi_v2.acceptance_observer
 
   metadata_alignment:
     enabled: true

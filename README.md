@@ -411,19 +411,17 @@ fact_reviews
 
 ## Beauty BI Dataset V2 当前状态
 
-Day61 完成 Dataset V2 Design Baseline，Day62 完成 Manifest Skeleton 与 Schema Foundation，Day63 完成 Transaction Facts DDL 与约束验证，Day64 完成 Fixed Dimensions & Identity Seed，Day65 完成 Time-driven Transaction Seed 与原子写库。
+Day61-Day66 已完成 Dataset V2 从设计、Schema、确定性 Seed 到 P01-P09 正式业务规律验收的第一阶段闭环。Dataset 当前仍保持 `draft`，尚未接入主 Graph。
 
 当前已完成：
 - 建立独立目录 `app/db/beauty_bi_v2/`；
-- 建立 `dataset_manifest.yaml`，绑定版本、固定日期、随机种子、业务口径与生成参数；
-- 建立 `manifest_loader.py`，集中校验固定维度、身份关系和交易生成合同；
+- 建立并升级 `dataset_manifest.yaml`，集中管理版本、日期窗口、随机种子、生成合同和 small Profile Acceptance Contract；
+- 建立 `manifest_loader.py`，集中校验固定维度、身份关系、交易生成合同和 Day66 Acceptance Contract；
 - 建立 16 张 Beauty BI V2 P0 Schema 表；
-- 完成 10 张固定维度与身份基础表的确定性 Seed；
-- 完成独立交易生成模块 `seed_transactions.py`；
-- 完成营销费用、订单、订单明细、履约、退款、评价和 R12 会员等级历史；
-- 使用独立 deterministic RNG streams，保证重复生成结果一致；
-- 使用单一数据库事务写入五张剩余交易事实表；
-- 完成业务键解析、外键检查、金额公式、时间顺序、等级区间与数据库逐行比较；
+- 完成固定维度、身份关系、营销、订单、订单明细、退款、评价和 R12 会员等级历史的确定性 Seed；
+- 建立 `acceptance_observer.py`，同时保留 observation 模式和 formal acceptance 模式；
+- 完成 P01-P09 逐项观察、统计口径校准和正式阈值冻结；
+- 完成 Manifest Loader 校验与 P01-P09 Formal Acceptance；
 - 保持 V1 `public` Schema 不变，Graph integration 继续关闭。
 
 small Profile 当前入库规模：
@@ -447,19 +445,22 @@ small Profile 当前入库规模：
 | `fact_reviews` | 16535 |
 | `fact_membership_tier_history` | 6564 |
 
-Day65 关键验证：
-- 订单状态：38056 delivered / 1944 cancelled；
-- 完成退款：5013；
-- 评价：16535；
-- 会员等级变化：3250 initial / 2728 upgrade / 586 downgrade；
-- 2026 年 1 月新支付订单：0；
-- 观察尾窗送达、退款和评价事件存在；
-- 订单头金额与明细汇总一致；
-- 退款金额与数量不超过购买上限；
-- 评价不存在未来退款信息泄漏；
-- `member_level_at_order` 与支付时点有效等级一致；
-- 每个会员账户只有一个开放等级区间，历史区间无重叠；
-- 原子写库和数据库逐行业务字段比较通过。
+Day66 正式验证结果：
+
+| 验证项 | 结果 |
+|---|---:|
+| Day66 Manifest validation | PASS |
+| P01 Customer Purchase Long Tail | PASS |
+| P02 Membership R12 Transition | PASS |
+| P03 Identity / Channel Binding Overlap | PASS |
+| P04 New Customer Scope Difference | PASS |
+| P05 Product Sales Long Tail | PASS |
+| P06 Season and Region Demand | PASS |
+| P07 Marketing Diminishing Returns | PASS |
+| P08 Promotion and Margin Trade-off | PASS |
+| P09 Refund, Review and Quality Relation | PASS |
+| Business Pattern Acceptance | 9/9 PASS |
+| Database writes during acceptance | 0 |
 
 当前状态：
 
@@ -474,21 +475,22 @@ V2 Schema Total：16 tables
 Fixed Dimensions & Identity Seed：completed（10 tables）
 Time-driven Transaction Seed：completed
 fact_membership_tier_history Seed：completed
-Day62 Foundation Validation：passed
-Day63 Transaction Facts Validation：passed
-Day64 Deterministic Seed Validation：passed
-Day65 Transaction Seed Validation：passed
-Full Acceptance Gates：not_run
+P01-P09 Observation & Calibration：completed
+Acceptance Contract：frozen（small Profile）
+P01-P09 Formal Business Pattern Acceptance：passed（9/9）
+Candidate Readiness Gates：not_run
 Metadata V2：not started
 Golden Cases V2：not started
+Performance Baseline：not started
+AI-chain Regression：not started
 Graph integration：disabled
 ```
 
-Beauty BI V1 继续作为 Latest Stable Baseline。Day65 写库成功不等于 Dataset V2 已成为 Candidate 或 Stable；P01–P09 正式 Acceptance、Metadata V2、Golden Cases V2 和 AI 主链路回归仍未完成。
+Beauty BI V1 继续作为 Latest Stable Baseline。P01-P09 正式业务规律验收通过，证明当前 small Profile、Manifest 合同和数据库事实一致；但 Metadata V2、Golden Cases V2、Performance Baseline 和 Dataset V2 AI 主链路回归尚未完成，因此 Dataset V2 不能标记为 Candidate 或 Stable。
 
 ---
 
-# 技术栈# 技术栈
+# 技术栈
 
 ## Backend
 
@@ -532,7 +534,8 @@ app/
 │       ├── db_check.py
 │       ├── manifest_loader.py
 │       ├── seed_dimensions.py
-│       └── seed_transactions.py
+│       ├── seed_transactions.py
+│       └── acceptance_observer.py
 ├── semantic_layer/
 ├── text_to_sql/
 └── evaluation/
@@ -712,20 +715,24 @@ Phase3 当前进展：
 - Day63 完成 Dataset V2 Transaction Facts DDL / Constraint Validation
 - Day64 完成 Dataset V2 Fixed Dimensions & Identity Seed
 - Day65 完成 Dataset V2 Time-driven Transaction Seed / Atomic Database Write
+- Day66 完成 Dataset V2 P01-P09 Acceptance Gates & Calibration
 
-Day61-Day65 Dataset V2 成果：
+Day61-Day66 Dataset V2 成果：
 - 完成 V1 Coverage Review 与 V2 P0 / P1 / P2 边界；
 - 确定 V1 `public` 与 V2 `beauty_bi_v2` schema 隔离；
 - 完成 Version Model、Candidate Schema Map、Generation Contract 和 Acceptance Gates 设计；
-- 建立 V2 Manifest，固定业务窗口、观察尾窗、活动日历、随机种子和生成合同；
+- 建立 V2 Manifest，固定业务窗口、观察尾窗、活动日历、随机种子、生成合同和 small Profile Acceptance Contract；
 - 完成 16 张 P0 Schema 表及数据库约束验证；
-- 完成 10 张固定维度与身份基础表的确定性 Seed；
+- 完成固定维度、身份关系和交易事实的确定性 Seed；
 - 完成 3412 条营销费用、40000 张订单、66889 条订单明细、5925 条退款、16535 条评价和 6564 条会员等级历史；
 - 完成订单、履约、退款、评价和会员等级的事件时间顺序；
 - 完成独立随机流、稳定业务键、原子写库和数据库逐行比较；
-- V2 当前仍为 `draft`，尚未执行 P01–P09 正式 Acceptance、Metadata V2、Golden Cases V2 或 Graph 接入。
+- 完成 P01-P09 observation、口径校准、阈值冻结和 formal acceptance；
+- `manifest_loader.py` Day66 校验通过；
+- `acceptance_observer.py` 正式验收 9/9 PASS，验收过程数据库写入为 0；
+- V2 当前仍为 `draft`，Metadata V2、Golden Cases V2、Performance Baseline、AI 主链路回归和 Graph 接入尚未完成。
 
-当前稳定依赖基线：当前稳定依赖基线：
+当前稳定依赖基线：
 - Python `3.10.3`
 - `langchain==0.3.30`
 - `langchain-core==0.3.86`
@@ -737,8 +744,8 @@ Day61-Day65 Dataset V2 成果：
 - 完整锁文件：`requirements-lock.txt`
 
 Phase3 后续重点：
-- Dataset V2 P01–P09 Acceptance Calibration 与正式 Gate
 - Governed Analytics / Permission / Audit
+- Metadata V2、Golden Cases V2、Performance Baseline 和 AI-chain Regression
 - Tool Calling / Tool Contract
 - Workflow、Single Agent 与 Multi-Agent 架构决策
 - Minimal Reflection Experiment 与 Phase3 端到端关闭
@@ -867,8 +874,8 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.36
-完成度：Day65 / 100
+Version: v0.37
+完成度：Day66 / 100
 
 当前实现：
 
@@ -890,7 +897,7 @@ Version: v0.36
 └─ Non-retryable → SQL Fail
 ```
 
-当前测试基线：
+当前 AI 主链路稳定测试基线：
 - `sql_cleaner_tests.py`：6/6 PASS
 - `sql_repair_graph_tests.py`：9/9 PASS
 - `analyst_graph_tests.py`：9/9 PASS
@@ -901,9 +908,18 @@ Version: v0.36
 - `ragas_eval.py --include-negative`：6/6 expectation passed
 - `pip check`：No broken requirements found
 
+Dataset V2 Day66 验证：
+- `manifest_loader.py`：Day66 Manifest validation PASS
+- `acceptance_observer.py`：P01-P09 Formal Acceptance 9/9 PASS
+- Business Pattern Acceptance：PASS
+- Database writes：0
+- Dataset Status：draft
+- Dataset Candidate：NO
+
 当前阶段：
 - Phase2 已完成
 - Phase3 第一里程碑已完成
+- Dataset V2 P01-P09 Acceptance 已完成
 - Phase3 继续进行
 
-下一步：Day66 Acceptance Gates & Calibration
+下一步：Day67 Access Context & Threat Model
