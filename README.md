@@ -281,6 +281,30 @@ Day60 清理结果：
 
 ---
 
+## Governed Analytics Contract
+
+Phase3 Day67 已完成 Access Context 与 Threat Model 基线，为后续确定性权限检查建立统一输入。
+
+当前已实现：
+- 建立不可变 `AccessContext`；
+- 建立 `scoped_analyst`、`executive_analyst` 和 `governance_auditor` 三个最小角色；
+- 固定当前 Dataset / Schema 边界为 `beauty_bi_v2`；
+- 固定 Agent 操作模式为只读 `observe_advise`；
+- 支持 Metric、Table、Column、Region 和 Channel Scope 的合同表达；
+- 支持 identifiers、free text、cost data 和 minimum group size 的敏感数据策略；
+- 建立 Prompt Injection、越权表列访问、cross-schema、row-scope bypass、repair bypass、标识符泄漏、自由文本泄漏和超大结果集 Threat Model；
+- `access_context_tests.py`：5/5 PASS。
+
+当前边界：
+- Access Context 尚未接入主 Graph；
+- Metric / Table / Column Scope 尚未执行；
+- Region / Channel Row Scope 尚未执行；
+- SQL Runner 的 read-only、timeout、max rows 和 Audit 尚未实现；
+- Dataset V2 仍为 `draft`，Graph integration 继续关闭。
+````
+
+---
+
 ## Answer Layer V1
 
 当前系统已支持将 SQL 查询结果转换为中文业务回答。
@@ -344,6 +368,7 @@ Day60 清理结果：
 | intent_resolver_tests.py | 5/5 PASS |
 | template_sql_tests.py | 15/15 PASS |
 | prompt_builder_tests.py | 5/5 PASS |
+| access_context_tests.py | 5/5 PASS |
 
 当前定位：
 - deterministic evaluator 负责业务结果正确性
@@ -716,6 +741,7 @@ Phase3 当前进展：
 - Day64 完成 Dataset V2 Fixed Dimensions & Identity Seed
 - Day65 完成 Dataset V2 Time-driven Transaction Seed / Atomic Database Write
 - Day66 完成 Dataset V2 P01-P09 Acceptance Gates & Calibration
+- Day67 完成 Governed Analytics Access Context / Threat Model / Contract Tests
 
 Day61-Day66 Dataset V2 成果：
 - 完成 V1 Coverage Review 与 V2 P0 / P1 / P2 边界；
@@ -744,11 +770,12 @@ Day61-Day66 Dataset V2 成果：
 - 完整锁文件：`requirements-lock.txt`
 
 Phase3 后续重点：
-- Governed Analytics / Permission / Audit
-- Metadata V2、Golden Cases V2、Performance Baseline 和 AI-chain Regression
-- Tool Calling / Tool Contract
-- Workflow、Single Agent 与 Multi-Agent 架构决策
-- Minimal Reflection Experiment 与 Phase3 端到端关闭
+- Day68：Metric / Table / Column Scope
+- Day69：Region / Channel Row Scope
+- Day70：Execution Governance
+- Day71：Sensitive Data Masking / Audit Event
+- Day72：Security Evaluation / 10、25、50 并发最小压测
+- Day73-Day75：Metadata V2、Query Plans V2、Golden Cases V2、Performance Baseline、AI-chain Regression 和 Graph Integration
 
 当前原则：
 - 不推翻 Phase2 主链路
@@ -874,8 +901,8 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.37
-完成度：Day66 / 100
+Version: v0.38
+完成度：Day67 / 100
 
 当前实现：
 
@@ -916,10 +943,20 @@ Dataset V2 Day66 验证：
 - Dataset Status：draft
 - Dataset Candidate：NO
 
+Governed Analytics Day67 验证：
+- `access_context_tests.py`：5/5 PASS
+- `analyst_graph_tests.py`：9/9 PASS
+- `sql_repair_graph_tests.py`：9/9 PASS
+- Access Context Contract：implemented
+- Threat Model：completed
+- Authorization Enforcement：not started
+- Graph Integration：not started
+
 当前阶段：
 - Phase2 已完成
 - Phase3 第一里程碑已完成
 - Dataset V2 P01-P09 Acceptance 已完成
+- Day67 Access Context & Threat Model 已完成
 - Phase3 继续进行
 
-下一步：Day67 Access Context & Threat Model
+下一步：Day68 Metric / Table / Column Scope
