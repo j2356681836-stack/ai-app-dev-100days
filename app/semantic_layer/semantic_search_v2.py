@@ -1,14 +1,15 @@
 from sentence_transformers import util
-from app.semantic_layer.metric_text_builder import (build_all_metric_texts,)
-from app.semantic_layer.embedding_service import (embed_text,)
+from app.semantic_layer.embedding_service import embed_text
 from app.semantic_layer.vector_store import load_metric_vectors
+
+from typing import Any, AbstractSet
 
 TOP1_THRESHOLD = 0.50
 GAP_THRESHOLD = 0.08
 
-reason = None
-
-def check_confidence(results: list[dict]) -> bool:
+def check_confidence(
+    results: list[dict[str, Any]],
+) -> tuple[bool, str | None]:
     if not results:
         return False, "no_result"
 
@@ -27,16 +28,40 @@ def check_confidence(results: list[dict]) -> bool:
     
     return True, None
 
-def search_metric_by_embedding(question: str,):
-    query_vector = embed_text(question) #转译向量
-    results = []
-    metric_vectors = load_metric_vectors()  #加载vector cache
+def search_metric_by_embedding(
+    question: str,
+    allowed_metric_names: AbstractSet[str] | None = None,
+) -> dict[str, Any]:
+    metric_vectors = load_metric_vectors()
 
-    for metric in metric_vectors:
+    authorized_vectors = [
+        metric
+        for metric in metric_vectors
+        if (
+            allowed_metric_names is None
+            or metric["name"] in allowed_metric_names
+        )
+    ]
+
+    if not authorized_vectors:
+        return {
+            "status": "no_candidates",
+            "reason": "no_authorized_metric_vectors",
+            "method": "embedding",
+            "question": question,
+            "top_metric": None,
+            "candidates": [],
+            "is_confident": False,
+        }
+
+    query_vector = embed_text(question)
+    results = []
+
+    for metric in authorized_vectors:
         score = util.cos_sim(
             query_vector,
-            metric["vector"]
-        )     # 计算问题和指标之间的相似度
+            metric["vector"],
+        )
 
         results.append(
             {
@@ -47,18 +72,22 @@ def search_metric_by_embedding(question: str,):
         )
 
     results.sort(
-        key=lambda x: x["score"],
+        key=lambda item: item["score"],
         reverse=True,
     )
 
     confident, reason = check_confidence(results)
 
     return {
-        "status": "matched" if confident else "needs_clarification",
+        "status": (
+            "matched"
+            if confident
+            else "needs_clarification"
+        ),
         "reason": reason,
         "method": "embedding",
         "question": question,
-        "top_metric": results[0] if results else None,
+        "top_metric": results[0],
         "candidates": results[:6],
         "is_confident": confident,
     }

@@ -1,10 +1,14 @@
 from app.semantic_layer.metric_loader import (search_metrics,)
 from app.semantic_layer.semantic_search_v2 import (search_metric_by_embedding,)
 from app.semantic_layer.clarification import (build_clarification,)
-
 from app.semantic_layer.clarification_reranker import rerank_candidates_for_clarification
 
-def search_metric(query: str) -> dict:
+from typing import AbstractSet
+
+def search_metric(
+    query: str,
+    allowed_metric_names: AbstractSet[str] | None = None,
+) -> dict:
     """
     Hybrid Search V1
 
@@ -15,7 +19,30 @@ def search_metric(query: str) -> dict:
     Clarification
     """
 
-    alias_results = search_metrics(query)
+    if (
+        allowed_metric_names is not None
+        and len(allowed_metric_names) == 0
+    ):
+        return {
+            "status": "access_denied",
+            "method": "authorization",
+            "question": query,
+            "message": "当前访问上下文没有可用的业务指标。",
+            "error_type": "authorization_error",
+            "reason_code": "no_authorized_metrics",
+            "retryable": False,
+            "metrics": [],
+            "options": [],
+            "trace": {
+                "search_type": "authorization",
+                "candidate_count": 0,
+            },
+        }
+
+    alias_results = search_metrics(
+        query,
+        allowed_metric_names=allowed_metric_names,
+    )
 
     if alias_results:
         return {
@@ -40,12 +67,40 @@ def search_metric(query: str) -> dict:
             ],
         }
 
-    embedding_result = search_metric_by_embedding(query)
-    candidates = embedding_result["candidates"]
+    embedding_result = search_metric_by_embedding(
+        query,
+        allowed_metric_names=allowed_metric_names,
+    )
+
+    candidates = embedding_result.get("candidates", [])
+
+    if not candidates:
+        return {
+            "status": "error",
+            "method": "embedding",
+            "question": query,
+            "message": "授权指标缺少可用的向量候选。",
+            "error_type": "metric_vector_consistency_error",
+            "reason_code": embedding_result.get(
+                "reason",
+                "no_authorized_metric_vectors",
+            ),
+            "retryable": False,
+            "metrics": [],
+            "options": [],
+            "trace": {
+                "search_type": "embedding",
+                "candidate_count": 0,
+            },
+        }
+
     top1 = candidates[0]
-    top2 = candidates[1]
-    score = top1["score"]
-    gap = top1["score"] - top2["score"]
+    top2 = candidates[1] if len(candidates) > 1 else None
+    gap = (
+        top1["score"] - top2["score"]
+        if top2 is not None
+        else None
+    )
     reason = embedding_result["reason"]
 
     if embedding_result["status"] == "matched":
@@ -65,9 +120,15 @@ def search_metric(query: str) -> dict:
                 "search_type": "embedding",
                 "top1": top1["chinese_name"],
                 "top1_score": round(top1["score"],4),
-                "top2": top2["chinese_name"],
-                "top2_score": round(top2["score"],4),
-                "gap": round(gap,4),
+                "top2": top2["chinese_name"] if top2 else None,
+                "top2_score": (
+                    round(top2["score"], 4)
+                    if top2 else None
+                ),
+                "gap": (
+                    round(gap, 4)
+                    if gap is not None else None
+                ),
                 "threshold": {
                     "top1": 0.50,
                     "gap": 0.08
@@ -114,9 +175,18 @@ def search_metric(query: str) -> dict:
             "embedding": {
                 "top1": top1["chinese_name"],
                 "top1_score": round(top1["score"], 4),
-                "top2": top2["chinese_name"],
-                "top2_score": round(top2["score"], 4),
-                "gap": round(gap, 4),
+                "top2": (
+                    top2["chinese_name"]
+                    if top2 else None
+                ),
+                "top2_score": (
+                    round(top2["score"], 4)
+                    if top2 else None
+                ),
+                "gap": (
+                    round(gap, 4)
+                    if gap is not None else None
+                ),
                 "reason": reason,
                 "threshold": {
                     "top1": 0.50,

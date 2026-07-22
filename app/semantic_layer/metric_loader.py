@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Any
+from typing import Any, AbstractSet
 
 import yaml
 
@@ -30,19 +30,31 @@ def get_metric_by_name(metric_name: str) -> dict | None:
             return metric
     return None
 
-def search_metrics(query: str) -> list[dict[str, Any]]:
+def search_metrics(
+    query: str,
+    allowed_metric_names: AbstractSet[str] | None = None,
+) -> list[dict[str, Any]]:
     """
     根据用户问题搜索业务指标。
-    支持：
-    - name / chinese_name / definition / formula / aliases 连续命中
-    - keyword_groups 非连续关键词组合命中
-    - 当多个规则命中时，优先保留更具体的命中
+
+    allowed_metric_names:
+    - None：兼容旧调用，搜索全部指标；
+    - 空集合：没有任何指标候选；
+    - 非空集合：只搜索集合内的指标技术名。
     """
 
     metrics = load_metrics()
     results = []
 
     for metric in metrics:
+        metric_name = metric.get("name")
+
+        if (
+            allowed_metric_names is not None
+            and metric_name not in allowed_metric_names
+        ):
+            continue
+
         matched = False
         match_type = None
         matched_text = ""
@@ -78,16 +90,19 @@ def search_metrics(query: str) -> list[dict[str, Any]]:
                     break
 
         if matched:
-            metric = metric.copy()
-            metric["_match_type"] = match_type
-            metric["_matched_text"] = matched_text
-            metric["_match_score"] = match_score
-            results.append(metric)
+            matched_metric = metric.copy()
+            matched_metric["_match_type"] = match_type
+            matched_metric["_matched_text"] = matched_text
+            matched_metric["_match_score"] = match_score
+            results.append(matched_metric)
 
     if len(results) <= 1:
         return results
 
-    max_score = max(metric["_match_score"] for metric in results)
+    max_score = max(
+        metric["_match_score"]
+        for metric in results
+    )
 
     return [
         metric
