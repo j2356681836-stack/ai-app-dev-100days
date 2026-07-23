@@ -283,7 +283,7 @@ Day60 清理结果：
 
 ## Governed Analytics Contract
 
-Phase3 Day67-Day68 已完成 Access Context、Threat Model 和 Metric / Table / Column Scope 独立治理原语。
+Phase3 Day67-Day69 已完成 Access Context、Threat Model、Metric / Table / Column Scope，以及 Region / Channel Row Scope 的独立治理原语。
 
 当前已实现：
 - 建立不可变 `AccessContext`；
@@ -301,7 +301,13 @@ Phase3 Day67-Day68 已完成 Access Context、Threat Model 和 Metric / Table / 
 - 使用 `table.column` 规范验证字段权限、字段来源表和显式禁止列；
 - `access_context_tests.py`：5/5 PASS；
 - `metric_scope_tests.py`：7/7 PASS；
-- `resource_scope_tests.py`：10/10 PASS。
+- `resource_scope_tests.py`：10/10 PASS；
+- 建立不可变 `RowScopePlan`，冻结 Region / Channel Anchor 与间接事实表 Scope Path；
+- 空 Region / Channel Scope fail-closed，不代表全量权限；
+- 建立 `ScopeTarget`、可信 SQL Alias、参数化 `ScopedPredicate` 与 `ScopedQueryContract`；
+- 建立 Plan / Contract Fingerprint，保护权限意图及其 SQL 落点；
+- `row_scope_tests.py`：13/13 PASS；
+- `row_scope_binding_tests.py`：13/13 PASS。
 
 当前治理结构：
 
@@ -310,9 +316,14 @@ Trusted Access Context
 ├─ allowed_metrics
 │  ↓
 │  Alias / Embedding Candidate Filter
-└─ allowed_tables / allowed_columns / denied_columns
+├─ allowed_tables / allowed_columns / denied_columns
+│  ↓
+│  AuthorizationDecision
+└─ allowed_region_codes / allowed_channel_codes
    ↓
-   AuthorizationDecision
+   RowScopePlan
+   ↓
+   ScopeTarget + Parameterized Predicate Contract
 ```
 
 当前边界：
@@ -320,7 +331,8 @@ Trusted Access Context
 - Role 到 Metric / Table / Column Policy 的解析尚未实现；
 - V1 Query Plan 尚未提供 Dataset V2 所需的完整 Resource Contract；
 - Generated SQL 和 Repaired SQL 尚未执行最终 Table / Column Authorization；
-- Region / Channel Row Scope 尚未执行；
+- Row Scope Planning 与参数化 Predicate Contract 已实现，但尚未自动进入最终 SQL；
+- 参数化 SQL Runner、最终 SQL AST Scope Validation、Graph Runtime Enforcement 和 Repair 后实际 Scope Enforcement 尚未实现；
 - SQL Runner 的 read-only、timeout、max rows 和 Audit 尚未实现；
 - Dataset V2 仍为 `draft`，Graph integration 继续关闭。
 
@@ -392,6 +404,8 @@ Trusted Access Context
 | access_context_tests.py | 5/5 PASS |
 | metric_scope_tests.py | 7/7 PASS |
 | resource_scope_tests.py | 10/10 PASS |
+| row_scope_tests.py | 13/13 PASS |
+| row_scope_binding_tests.py | 13/13 PASS |
 
 当前定位：
 - deterministic evaluator 负责业务结果正确性
@@ -575,7 +589,9 @@ app/
 ├── agents/
 ├── governance/
 │   ├── access_context.py
-│   └── authorization.py
+│   ├── authorization.py
+│   ├── row_scope.py
+│   └── row_scope_binding.py
 ├── db/
 │   └── beauty_bi_v2/
 │       ├── __init__.py
@@ -769,6 +785,7 @@ Phase3 当前进展：
 - Day66 完成 Dataset V2 P01-P09 Acceptance Gates & Calibration
 - Day67 完成 Governed Analytics Access Context / Threat Model / Contract Tests
 - Day68 完成 Metric Candidate Filtering / AuthorizationDecision / Table & Column Scope Tests
+- Day69 完成 Region / Channel Row Scope Planning / Scope Target Binding / Parameterized Predicate Contract
 
 Day61-Day66 Dataset V2 成果：
 - 完成 V1 Coverage Review 与 V2 P0 / P1 / P2 边界；
@@ -797,7 +814,6 @@ Day61-Day66 Dataset V2 成果：
 - 完整锁文件：`requirements-lock.txt`
 
 Phase3 后续重点：
-- Day69：Region / Channel Row Scope
 - Day70：Execution Governance
 - Day71：Sensitive Data Masking / Audit Event
 - Day72：Security Evaluation / 10、25、50 并发最小压测
@@ -927,8 +943,8 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.39
-完成度：Day68 / 100
+Version: v0.40
+完成度：Day69 / 100
 
 当前 Stable Graph：
 
@@ -950,7 +966,7 @@ Version: v0.39
 └─ Non-retryable → SQL Fail
 ```
 
-Day68 新增的独立治理原语：
+Day67-Day69 新增的独立治理原语：
 
 ```text
 allowed_metric_names
@@ -964,6 +980,16 @@ AccessContext
 required metric / tables / columns
 ↓
 AuthorizationDecision
+
+AccessContext
++
+trusted source tables / scope dimensions
+↓
+RowScopePlan
++
+ScopeTarget / SQL Alias
+↓
+Parameterized ScopedQueryContract
 ```
 
 当前 AI 主链路稳定测试基线：
@@ -985,10 +1011,12 @@ Dataset V2 Day66 验证：
 - Dataset Status：draft
 - Dataset Candidate：NO
 
-Governed Analytics Day67-Day68 验证：
+Governed Analytics Day67-Day69 验证：
 - `access_context_tests.py`：5/5 PASS
 - `metric_scope_tests.py`：7/7 PASS
 - `resource_scope_tests.py`：10/10 PASS
+- `row_scope_tests.py`：13/13 PASS
+- `row_scope_binding_tests.py`：13/13 PASS
 - `retrieval_evaluator.py --strict`：6/6 PASS
 - `analyst_graph_tests.py`：9/9 PASS
 - `sql_repair_graph_tests.py`：9/9 PASS
@@ -996,8 +1024,12 @@ Governed Analytics Day67-Day68 验证：
 - Metric Candidate Filtering：implemented
 - AuthorizationDecision：implemented
 - Metric / Table / Column Authorization Primitives：implemented
+- Row Scope Planning / Scope Path Resolution：implemented
+- Scope Target Binding / Parameterized Predicate Contract：implemented
+- Plan / Contract Fingerprint：implemented
 - AccessContext → Graph Integration：not started
-- Final SQL / Repaired SQL Authorization：not started
+- Parameterized SQL Runner：not started
+- Final SQL / Repaired SQL Scope Enforcement：not started
 
 当前阶段：
 - Phase2 已完成
@@ -1005,6 +1037,7 @@ Governed Analytics Day67-Day68 验证：
 - Dataset V2 P01-P09 Acceptance 已完成
 - Day67 Access Context & Threat Model 已完成
 - Day68 Metric / Table / Column Scope 独立治理原语已完成
+- Day69 Region / Channel Row Scope 独立治理合同已完成
 - Phase3 继续进行
 
-下一步：Day69 Region / Channel Row Scope
+下一步：Day70 Execution Governance
