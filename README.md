@@ -277,13 +277,13 @@ Day60 清理结果：
 当前边界：
 - 最多自动 repair 一次
 - 真实 LLM repair 准确率尚未进行大规模评估
-- Business Insight Layer 尚未实现；权限治理原语已独立实现，但尚未接入主 Graph，Row Scope、Execution Governance、Masking 和 Audit 仍未完成
+- Business Insight Layer 尚未实现；权限与执行治理原语已独立实现，但尚未接入主 Graph，Final SQL Enforcement、Masking 和 Audit 仍未完成
 
 ---
 
 ## Governed Analytics Contract
 
-Phase3 Day67-Day69 已完成 Access Context、Threat Model、Metric / Table / Column Scope，以及 Region / Channel Row Scope 的独立治理原语。
+Phase3 Day67-Day70 已完成 Access Context、Threat Model、Metric / Table / Column Scope、Region / Channel Row Scope，以及 Execution Governance / Agent Budget 的独立治理原语。
 
 当前已实现：
 - 建立不可变 `AccessContext`；
@@ -307,7 +307,17 @@ Phase3 Day67-Day69 已完成 Access Context、Threat Model、Metric / Table / Co
 - 建立 `ScopeTarget`、可信 SQL Alias、参数化 `ScopedPredicate` 与 `ScopedQueryContract`；
 - 建立 Plan / Contract Fingerprint，保护权限意图及其 SQL 落点；
 - `row_scope_tests.py`：13/13 PASS；
-- `row_scope_binding_tests.py`：13/13 PASS。
+- `row_scope_binding_tests.py`：13/13 PASS；
+- 建立不可变 `GovernedExecutionPolicy` 与结构化 `GovernedExecutionResult`；
+- 建立独立 `beauty_bi_query` PostgreSQL 查询 Role，固定非 Superuser、不可建库、不可建 Role、默认事务只读和连接上限；
+- 建立独立 Governed Engine，支持 `pool_size`、`max_overflow`、`pool_timeout` 与 `pool_recycle`；
+- 建立参数化 Governed SQL Runner，支持 read-only transaction、transaction-local `statement_timeout`、`search_path` 和 `fetchmany(max_rows + 1)`；
+- 超大结果 fail-closed，不返回静默截断的部分结果；
+- 真实 PostgreSQL 已验证 V2 SELECT、参数绑定、statement timeout、max rows、写权限拒绝、Public V1 隔离和连接池状态清理；
+- 建立 Step / Retry / Prompt Token / Completion Token / Total Token Budget 合同与 Policy Fingerprint；
+- `execution_governance_tests.py`：12/12 PASS；
+- `execution_governance_integration_tests.py`：9/9 PASS；
+- `execution_budget_tests.py`：16/16 PASS。
 
 当前治理结构：
 
@@ -324,6 +334,22 @@ Trusted Access Context
    RowScopePlan
    ↓
    ScopeTarget + Parameterized Predicate Contract
+
+GovernedExecutionPolicy
++
+SQL + Parameters
+↓
+Dedicated Query Role / Governed Engine
+↓
+Read-only Transaction
+↓
+Statement Timeout / Max Rows / Bounded Fetch
+↓
+GovernedExecutionResult
+
+ExecutionBudgetPolicy
+↓
+Step / Retry / Token Usage Budget
 ```
 
 当前边界：
@@ -332,8 +358,12 @@ Trusted Access Context
 - V1 Query Plan 尚未提供 Dataset V2 所需的完整 Resource Contract；
 - Generated SQL 和 Repaired SQL 尚未执行最终 Table / Column Authorization；
 - Row Scope Planning 与参数化 Predicate Contract 已实现，但尚未自动进入最终 SQL；
-- 参数化 SQL Runner、最终 SQL AST Scope Validation、Graph Runtime Enforcement 和 Repair 后实际 Scope Enforcement 尚未实现；
-- SQL Runner 的 read-only、timeout、max rows 和 Audit 尚未实现；
+- 参数化 Governed SQL Runner、read-only transaction、statement timeout、max rows 和连接池合同已独立实现并通过真实 PostgreSQL 验证；
+- Step / Retry / Token Budget 已形成独立合同，但尚未进入 `AnalystState`；
+- 当前 V1 Stable Graph 仍调用旧 SQL Runner，尚未使用专用查询 Role 或 Governed Runner；
+- 最终 SQL AST Scope Validation、Graph Runtime Enforcement 和 Repair 后实际 Scope Enforcement 尚未实现；
+- SQL Generation / Repair 尚未登记真实 Token Usage；
+- Masking 和 Audit 尚未实现；
 - Dataset V2 仍为 `draft`，Graph integration 继续关闭。
 
 ---
@@ -406,6 +436,9 @@ Trusted Access Context
 | resource_scope_tests.py | 10/10 PASS |
 | row_scope_tests.py | 13/13 PASS |
 | row_scope_binding_tests.py | 13/13 PASS |
+| execution_governance_tests.py | 12/12 PASS |
+| execution_governance_integration_tests.py | 9/9 PASS |
+| execution_budget_tests.py | 16/16 PASS |
 
 当前定位：
 - deterministic evaluator 负责业务结果正确性
@@ -591,8 +624,13 @@ app/
 │   ├── access_context.py
 │   ├── authorization.py
 │   ├── row_scope.py
-│   └── row_scope_binding.py
+│   ├── row_scope_binding.py
+│   ├── execution_policy.py
+│   └── execution_budget.py
 ├── db/
+│   ├── governed_database.py
+│   ├── governed_sql_runner.py
+│   ├── provision_query_role.py
 │   └── beauty_bi_v2/
 │       ├── __init__.py
 │       ├── dataset_manifest.yaml
@@ -786,6 +824,7 @@ Phase3 当前进展：
 - Day67 完成 Governed Analytics Access Context / Threat Model / Contract Tests
 - Day68 完成 Metric Candidate Filtering / AuthorizationDecision / Table & Column Scope Tests
 - Day69 完成 Region / Channel Row Scope Planning / Scope Target Binding / Parameterized Predicate Contract
+- Day70 完成 Dedicated Query Role / Governed SQL Runner / Execution Budget
 
 Day61-Day66 Dataset V2 成果：
 - 完成 V1 Coverage Review 与 V2 P0 / P1 / P2 边界；
@@ -814,7 +853,6 @@ Day61-Day66 Dataset V2 成果：
 - 完整锁文件：`requirements-lock.txt`
 
 Phase3 后续重点：
-- Day70：Execution Governance
 - Day71：Sensitive Data Masking / Audit Event
 - Day72：Security Evaluation / 10、25、50 并发最小压测
 - Day73-Day75：Metadata V2、Query Plans V2、Golden Cases V2、Performance Baseline、AI-chain Regression 和 Graph Integration
@@ -943,8 +981,8 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.40
-完成度：Day69 / 100
+Version: v0.41
+完成度：Day70 / 100
 
 当前 Stable Graph：
 
@@ -966,7 +1004,7 @@ Version: v0.40
 └─ Non-retryable → SQL Fail
 ```
 
-Day67-Day69 新增的独立治理原语：
+Day67-Day70 新增的独立治理原语：
 
 ```text
 allowed_metric_names
@@ -990,6 +1028,20 @@ RowScopePlan
 ScopeTarget / SQL Alias
 ↓
 Parameterized ScopedQueryContract
+
+GovernedExecutionPolicy
++
+SQL / Parameters
+↓
+Dedicated Query Role
+↓
+Read-only / Timeout / Max Rows
+↓
+GovernedExecutionResult
+
+ExecutionBudgetPolicy
+↓
+Step / Retry / Token Budget
 ```
 
 当前 AI 主链路稳定测试基线：
@@ -1011,12 +1063,15 @@ Dataset V2 Day66 验证：
 - Dataset Status：draft
 - Dataset Candidate：NO
 
-Governed Analytics Day67-Day69 验证：
+Governed Analytics Day67-Day70 验证：
 - `access_context_tests.py`：5/5 PASS
 - `metric_scope_tests.py`：7/7 PASS
 - `resource_scope_tests.py`：10/10 PASS
 - `row_scope_tests.py`：13/13 PASS
 - `row_scope_binding_tests.py`：13/13 PASS
+- `execution_governance_tests.py`：12/12 PASS
+- `execution_governance_integration_tests.py`：9/9 PASS
+- `execution_budget_tests.py`：16/16 PASS
 - `retrieval_evaluator.py --strict`：6/6 PASS
 - `analyst_graph_tests.py`：9/9 PASS
 - `sql_repair_graph_tests.py`：9/9 PASS
@@ -1027,8 +1082,14 @@ Governed Analytics Day67-Day69 验证：
 - Row Scope Planning / Scope Path Resolution：implemented
 - Scope Target Binding / Parameterized Predicate Contract：implemented
 - Plan / Contract Fingerprint：implemented
+- Dedicated PostgreSQL Query Role：implemented
+- Governed Database Engine / Connection Pool Contract：implemented
+- Parameterized Governed SQL Runner：implemented
+- Read-only Transaction / Statement Timeout / Max Rows：implemented
+- Step / Retry / Token Budget Contract：implemented
 - AccessContext → Graph Integration：not started
-- Parameterized SQL Runner：not started
+- Governed Runner → Graph Integration：not started
+- Execution Budget → AnalystState Integration：not started
 - Final SQL / Repaired SQL Scope Enforcement：not started
 
 当前阶段：
@@ -1038,6 +1099,7 @@ Governed Analytics Day67-Day69 验证：
 - Day67 Access Context & Threat Model 已完成
 - Day68 Metric / Table / Column Scope 独立治理原语已完成
 - Day69 Region / Channel Row Scope 独立治理合同已完成
+- Day70 Execution Governance 与 Agent Budget 独立治理原语已完成
 - Phase3 继续进行
 
-下一步：Day70 Execution Governance
+下一步：Day71 Sensitive Data Masking / Audit Event
