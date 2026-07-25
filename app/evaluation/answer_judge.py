@@ -11,10 +11,15 @@ from app.evaluation.answer_eval_cases import ANSWER_EVAL_CASES
 
 load_dotenv()
 
-client = OpenAI(
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url=os.getenv("DEEPSEEK_BASE_URL"),
-)
+DEEPSEEK_MODEL = os.getenv(
+    "DEEPSEEK_MODEL",
+    "deepseek-v4-pro",
+).strip()
+
+if not DEEPSEEK_MODEL:
+    raise RuntimeError(
+        "DEEPSEEK_MODEL cannot be empty."
+    )
 
 def build_judge_prompt(case: dict) -> str:
     """
@@ -205,7 +210,7 @@ def llm_judge_case(case: dict) -> dict:
 
     try:
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model=DEEPSEEK_MODEL,
             messages=[
                 {
                     "role": "user",

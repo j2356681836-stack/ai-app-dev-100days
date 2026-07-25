@@ -10,6 +10,17 @@ from app.text_to_sql.sql_cleaner import clean_sql
 load_dotenv()
 
 
+DEEPSEEK_MODEL = os.getenv(
+    "DEEPSEEK_MODEL",
+    "deepseek-v4-pro",
+).strip()
+
+if not DEEPSEEK_MODEL:
+    raise RuntimeError(
+        "DEEPSEEK_MODEL cannot be empty."
+    )
+
+
 client = OpenAI(
     api_key=os.getenv("DEEPSEEK_API_KEY"),
     base_url=os.getenv("DEEPSEEK_BASE_URL"),
@@ -20,7 +31,7 @@ def generate_sql(question: str, intent: dict | None = None) -> str:
     prompt = build_prompt(question, intent=intent)
 
     response = client.chat.completions.create(
-        model="deepseek-chat",
+        model = DEEPSEEK_MODEL,
         messages=[
             {"role": "user", "content": prompt},
         ],

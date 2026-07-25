@@ -15,6 +15,16 @@ from app.evaluation.answer_eval_cases import ANSWER_EVAL_CASES
 
 load_dotenv()
 
+DEEPSEEK_MODEL = os.getenv(
+    "DEEPSEEK_MODEL",
+    "deepseek-v4-pro",
+).strip()
+
+if not DEEPSEEK_MODEL:
+    raise RuntimeError(
+        "DEEPSEEK_MODEL cannot be empty."
+    )
+
 RAGAS_FAITHFULNESS_THRESHOLD = 0.8
 
 def infer_query_semantics(question: str) -> str:
@@ -169,7 +179,7 @@ def build_ragas_llm() -> ChatOpenAI:
     这里复用 DeepSeek 的 OpenAI-compatible API。
     """
     return ChatOpenAI(
-        model="deepseek-chat",
+        model=DEEPSEEK_MODEL,
         api_key=os.getenv("DEEPSEEK_API_KEY"),
         base_url=os.getenv("DEEPSEEK_BASE_URL"),
         temperature=0,

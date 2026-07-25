@@ -277,13 +277,13 @@ Day60 清理结果：
 当前边界：
 - 最多自动 repair 一次
 - 真实 LLM repair 准确率尚未进行大规模评估
-- Business Insight Layer 尚未实现；权限与执行治理原语已独立实现，但尚未接入主 Graph，Final SQL Enforcement、Masking 和 Audit 仍未完成
+- Business Insight Layer 尚未实现；权限、执行治理、Result Protection 和 Audit Finalization 原语已独立实现，但尚未接入主 Graph，Final SQL Enforcement 仍未完成
 
 ---
 
 ## Governed Analytics Contract
 
-Phase3 Day67-Day70 已完成 Access Context、Threat Model、Metric / Table / Column Scope、Region / Channel Row Scope，以及 Execution Governance / Agent Budget 的独立治理原语。
+Phase3 Day67-Day71 已完成 Access Context、Threat Model、Metric / Table / Column Scope、Region / Channel Row Scope、Execution Governance / Agent Budget，以及 Sensitive Data Protection / Audit Finalization 的独立治理原语。
 
 当前已实现：
 - 建立不可变 `AccessContext`；
@@ -317,7 +317,20 @@ Phase3 Day67-Day70 已完成 Access Context、Threat Model、Metric / Table / Co
 - 建立 Step / Retry / Prompt Token / Completion Token / Total Token Budget 合同与 Policy Fingerprint；
 - `execution_governance_tests.py`：12/12 PASS；
 - `execution_governance_integration_tests.py`：9/9 PASS；
-- `execution_budget_tests.py`：16/16 PASS。
+- `execution_budget_tests.py`：16/16 PASS；
+- 建立 Dataset V2 Sensitive Field Catalog 与可信 `ResultFieldBinding`；
+- 建立 HMAC-SHA256 + Secret + Namespace 的确定性标识符令牌化；
+- 建立 Direct Identifier、Free Text、Cost Data 与 Minimum Group Size 策略；
+- 建立 Exact Result Shape，额外或缺失字段 fail-closed；
+- 建立不复制原始问题、SQL、参数和结果行的 Structured Audit Event；
+- 建立 HMAC Actor Reference，以及 Question / Generated SQL / Executed SQL / Repair Fingerprint；
+- 建立 Governance Runtime Secret Contract；
+- 建立 append-only Hash-chain JSONL Audit Sink、并发锁、完整性验证与 fsync；
+- 建立 Governed Finalization，Audit Persistence 成功前不释放结果；
+- `sensitive_data_tests.py`：21/21 PASS；
+- `audit_event_tests.py`：20/20 PASS；
+- `audit_sink_tests.py`：16/16 PASS；
+- `governed_finalization_tests.py`：14/14 PASS。
 
 当前治理结构：
 
@@ -350,6 +363,20 @@ GovernedExecutionResult
 ExecutionBudgetPolicy
 ↓
 Step / Retry / Token Usage Budget
+
+GovernedExecutionResult
++
+Trusted ResultProtectionContract
+↓
+HMAC Tokenization / Sensitive Policy / Minimum Group Size
+↓
+Protected Rows / Blocked Result
+↓
+Structured Audit Event
+↓
+Hash-chain JSONL Audit Sink
+↓
+Governed Finalization
 ```
 
 当前边界：
@@ -363,7 +390,9 @@ Step / Retry / Token Usage Budget
 - 当前 V1 Stable Graph 仍调用旧 SQL Runner，尚未使用专用查询 Role 或 Governed Runner；
 - 最终 SQL AST Scope Validation、Graph Runtime Enforcement 和 Repair 后实际 Scope Enforcement 尚未实现；
 - SQL Generation / Repair 尚未登记真实 Token Usage；
-- Masking 和 Audit 尚未实现；
+- Query Plans V2 尚未提供正式 Result Field Binding 和 Minimum Group Size Control Field；
+- Langfuse 尚未接入安全 Audit 摘要；
+- Sensitive Data Protection、Audit Event、Audit Sink 和 Governed Finalization 已独立实现，但尚未接入在线 Graph；
 - Dataset V2 仍为 `draft`，Graph integration 继续关闭。
 
 ---
@@ -439,6 +468,10 @@ Step / Retry / Token Usage Budget
 | execution_governance_tests.py | 12/12 PASS |
 | execution_governance_integration_tests.py | 9/9 PASS |
 | execution_budget_tests.py | 16/16 PASS |
+| sensitive_data_tests.py | 21/21 PASS |
+| audit_event_tests.py | 20/20 PASS |
+| audit_sink_tests.py | 16/16 PASS |
+| governed_finalization_tests.py | 14/14 PASS |
 
 当前定位：
 - deterministic evaluator 负责业务结果正确性
@@ -600,7 +633,7 @@ Beauty BI V1 继续作为 Latest Stable Baseline。P01-P09 正式业务规律验
 
 ## AI
 
-- DeepSeek API
+- DeepSeek API（模型名通过 `DEEPSEEK_MODEL` 配置，当前验证为 `deepseek-v4-pro`）
 - BGE Small（用于 Embedding Search）
 - Pydantic V2
 - Langfuse
@@ -626,7 +659,12 @@ app/
 │   ├── row_scope.py
 │   ├── row_scope_binding.py
 │   ├── execution_policy.py
-│   └── execution_budget.py
+│   ├── execution_budget.py
+│   ├── sensitive_data.py
+│   ├── audit_event.py
+│   ├── governance_runtime.py
+│   ├── audit_sink.py
+│   └── governed_finalization.py
 ├── db/
 │   ├── governed_database.py
 │   ├── governed_sql_runner.py
@@ -825,6 +863,7 @@ Phase3 当前进展：
 - Day68 完成 Metric Candidate Filtering / AuthorizationDecision / Table & Column Scope Tests
 - Day69 完成 Region / Channel Row Scope Planning / Scope Target Binding / Parameterized Predicate Contract
 - Day70 完成 Dedicated Query Role / Governed SQL Runner / Execution Budget
+- Day71 完成 Sensitive Data Protection / Structured Audit Event / Hash-chain Audit Sink / Governed Finalization
 
 Day61-Day66 Dataset V2 成果：
 - 完成 V1 Coverage Review 与 V2 P0 / P1 / P2 边界；
@@ -853,7 +892,6 @@ Day61-Day66 Dataset V2 成果：
 - 完整锁文件：`requirements-lock.txt`
 
 Phase3 后续重点：
-- Day71：Sensitive Data Masking / Audit Event
 - Day72：Security Evaluation / 10、25、50 并发最小压测
 - Day73-Day75：Metadata V2、Query Plans V2、Golden Cases V2、Performance Baseline、AI-chain Regression 和 Graph Integration
 
@@ -981,8 +1019,8 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.41
-完成度：Day70 / 100
+Version: v0.42
+完成度：Day71 / 100
 
 当前 Stable Graph：
 
@@ -1004,7 +1042,7 @@ Version: v0.41
 └─ Non-retryable → SQL Fail
 ```
 
-Day67-Day70 新增的独立治理原语：
+Day67-Day71 新增的独立治理原语：
 
 ```text
 allowed_metric_names
@@ -1063,7 +1101,7 @@ Dataset V2 Day66 验证：
 - Dataset Status：draft
 - Dataset Candidate：NO
 
-Governed Analytics Day67-Day70 验证：
+Governed Analytics Day67-Day71 验证：
 - `access_context_tests.py`：5/5 PASS
 - `metric_scope_tests.py`：7/7 PASS
 - `resource_scope_tests.py`：10/10 PASS
@@ -1072,6 +1110,12 @@ Governed Analytics Day67-Day70 验证：
 - `execution_governance_tests.py`：12/12 PASS
 - `execution_governance_integration_tests.py`：9/9 PASS
 - `execution_budget_tests.py`：16/16 PASS
+- `sensitive_data_tests.py`：21/21 PASS
+- `audit_event_tests.py`：20/20 PASS
+- `audit_sink_tests.py`：16/16 PASS
+- `governed_finalization_tests.py`：14/14 PASS
+- Day71 新增专项：71/71 PASS
+- Day70 既有专项与回归 + Day71 新增专项：180/180 PASS
 - `retrieval_evaluator.py --strict`：6/6 PASS
 - `analyst_graph_tests.py`：9/9 PASS
 - `sql_repair_graph_tests.py`：9/9 PASS
@@ -1087,6 +1131,12 @@ Governed Analytics Day67-Day70 验证：
 - Parameterized Governed SQL Runner：implemented
 - Read-only Transaction / Statement Timeout / Max Rows：implemented
 - Step / Retry / Token Budget Contract：implemented
+- Sensitive Field Catalog / Result Protection Contract：implemented
+- HMAC Tokenization / Minimum Group Size / Exact Result Shape：implemented
+- Structured Audit Event：implemented
+- Governance Runtime Secret Contract：implemented
+- Hash-chain JSONL Audit Sink：implemented
+- Governed Finalization：implemented
 - AccessContext → Graph Integration：not started
 - Governed Runner → Graph Integration：not started
 - Execution Budget → AnalystState Integration：not started
@@ -1100,6 +1150,7 @@ Governed Analytics Day67-Day70 验证：
 - Day68 Metric / Table / Column Scope 独立治理原语已完成
 - Day69 Region / Channel Row Scope 独立治理合同已完成
 - Day70 Execution Governance 与 Agent Budget 独立治理原语已完成
+- Day71 Sensitive Data Protection、Audit Event、Audit Sink 与 Governed Finalization 独立治理原语已完成
 - Phase3 继续进行
 
-下一步：Day71 Sensitive Data Masking / Audit Event
+下一步：Day72 Security Evaluation / 10、25、50 并发最小压测

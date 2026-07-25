@@ -54,3 +54,5 @@ docs/evaluation/*.json
 
 # Private learning notes / AI-assisted drafts
 _private/
+_private/runtime/*.jsonl
+_private/runtime/*.jsonl.lock
