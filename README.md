@@ -283,7 +283,7 @@ Day60 清理结果：
 
 ## Governed Analytics Contract
 
-Phase3 Day67-Day71 已完成 Access Context、Threat Model、Metric / Table / Column Scope、Region / Channel Row Scope、Execution Governance / Agent Budget，以及 Sensitive Data Protection / Audit Finalization 的独立治理原语。
+Phase3 Day67-Day72 已完成 Access Context、Threat Model、Metric / Table / Column Scope、Region / Channel Row Scope、Execution Governance / Agent Budget、Sensitive Data Protection / Audit Finalization，以及 Security Evaluation / Minimum Load Baseline。
 
 当前已实现：
 - 建立不可变 `AccessContext`；
@@ -323,12 +323,12 @@ Phase3 Day67-Day71 已完成 Access Context、Threat Model、Metric / Table / Co
 - 建立 Direct Identifier、Free Text、Cost Data 与 Minimum Group Size 策略；
 - 建立 Exact Result Shape，额外或缺失字段 fail-closed；
 - 建立不复制原始问题、SQL、参数和结果行的 Structured Audit Event；
-- 建立 HMAC Actor Reference，以及 Question / Generated SQL / Executed SQL / Repair Fingerprint；
+- 建立 HMAC Actor Reference；Day72 将 Question / Generated SQL / Executed SQL / Repair Fingerprint 升级为 keyed HMAC-SHA256 + Audit Secret + Domain Separation；
 - 建立 Governance Runtime Secret Contract；
 - 建立 append-only Hash-chain JSONL Audit Sink、并发锁、完整性验证与 fsync；
 - 建立 Governed Finalization，Audit Persistence 成功前不释放结果；
 - `sensitive_data_tests.py`：21/21 PASS；
-- `audit_event_tests.py`：20/20 PASS；
+- `audit_event_tests.py`：当前 26/26 PASS（Day71 历史基线为 20/20，Day72 增加 HMAC confidentiality hardening tests）；
 - `audit_sink_tests.py`：16/16 PASS；
 - `governed_finalization_tests.py`：14/14 PASS。
 
@@ -390,12 +390,59 @@ Governed Finalization
 - 当前 V1 Stable Graph 仍调用旧 SQL Runner，尚未使用专用查询 Role 或 Governed Runner；
 - 最终 SQL AST Scope Validation、Graph Runtime Enforcement 和 Repair 后实际 Scope Enforcement 尚未实现；
 - SQL Generation / Repair 尚未登记真实 Token Usage；
-- Query Plans V2 尚未提供正式 Result Field Binding 和 Minimum Group Size Control Field；
+- Query Plans V2 已提供正式 Resource Contract、Scope Target、Result Field Binding 和 Minimum Group Size Control Field；当前仍未接入 Stable Graph；
 - Langfuse 尚未接入安全 Audit 摘要；
 - Sensitive Data Protection、Audit Event、Audit Sink 和 Governed Finalization 已独立实现，但尚未接入在线 Graph；
 - Dataset V2 仍为 `draft`，Graph integration 继续关闭。
 
 ---
+
+## Dataset V2 Semantic Contract
+
+Phase3 Day73 完成 Metadata V2 与 Query Plans V2，Dataset V2 从“数据已验收”推进到“业务语义与可信查询合同已冻结”。
+
+当前静态语义合同：
+
+```text
+Metadata V2
+→ 19 Metrics
+
+Query Plans V2
+→ 48 Static Plans
+→ 40 QueryLogic
+→ 8 StagedQueryLogic
+→ 3 Global History Plans
+
+Canonical Catalog Builder
+→ Deterministic YAML
+→ Semantic Equality Gate
+→ Canonical Byte Equality Gate
+```
+
+Query Plan V2 当前可显式声明：
+- `required_tables` / `required_columns`；
+- trusted physical aliases 与 `ScopeTarget`；
+- `ResultFieldBinding` 与敏感结果分类；
+- Exact Result Shape 与 Minimum Group Size；
+- Staged Query Logic 与 `StageJoin`；
+- Cross-fact shared time window；
+- Global History first-event identity；
+- pre-sequence / post-sequence Scope placement。
+
+复杂指标当前覆盖：
+- Refund Rate：退款事件先按 `order_item` 聚合，避免 GMV 分母 fan-out；
+- ROI：Sales 与 Marketing Spend 分别聚合后再组合；
+- CAC：`customer × channel` 完整历史首次支付 + 同窗营销费用；
+- Brand Paid New Customer：`customer` 品牌历史首次支付；
+- Channel Paid New Customer：`customer × channel` 渠道历史首次支付；
+- Repeat / Multi-order：保持跨日复购与两单客户语义分离；
+- Member GMV Share：使用 payment-time membership snapshot。
+
+当前边界：
+- 48 个 Plan 的 Resource Contract 已建立，不代表所有 Plan 在当前 Scope 下都允许执行；
+- ROI / CAC 因 `fact_marketing_spend` 无 Region Anchor 保持 fail-closed；
+- Brand / Channel New Customer / CAC 的 post-sequence Scope 当前仅形成结构合同，尚未接入在线 Runtime；
+- Dataset V2 仍为 `draft`，Graph integration 继续关闭。
 
 ## Answer Layer V1
 
@@ -469,9 +516,11 @@ Governed Finalization
 | execution_governance_integration_tests.py | 9/9 PASS |
 | execution_budget_tests.py | 16/16 PASS |
 | sensitive_data_tests.py | 21/21 PASS |
-| audit_event_tests.py | 20/20 PASS |
+| audit_event_tests.py | 26/26 PASS |
 | audit_sink_tests.py | 16/16 PASS |
 | governed_finalization_tests.py | 14/14 PASS |
+| query_plan_v2_catalog_builder_tests.py | 17/17 PASS |
+| query_plan_v2_tests.py | 22/22 PASS |
 
 当前定位：
 - deterministic evaluator 负责业务结果正确性
@@ -539,7 +588,7 @@ fact_reviews
 
 ## Beauty BI Dataset V2 当前状态
 
-Day61-Day66 已完成 Dataset V2 从设计、Schema、确定性 Seed 到 P01-P09 正式业务规律验收的第一阶段闭环。Dataset 当前仍保持 `draft`，尚未接入主 Graph。
+Day61-Day73 已完成 Dataset V2 从设计、Schema、确定性 Seed、P01-P09 正式业务规律验收到 Metadata V2 / Query Plans V2 静态语义合同的阶段闭环。Dataset 当前仍保持 `draft`，尚未接入主 Graph。
 
 当前已完成：
 - 建立独立目录 `app/db/beauty_bi_v2/`；
@@ -550,6 +599,11 @@ Day61-Day66 已完成 Dataset V2 从设计、Schema、确定性 Seed 到 P01-P09
 - 建立 `acceptance_observer.py`，同时保留 observation 模式和 formal acceptance 模式；
 - 完成 P01-P09 逐项观察、统计口径校准和正式阈值冻结；
 - 完成 Manifest Loader 校验与 P01-P09 Formal Acceptance；
+- 建立独立 `metadata/beauty_bi_v2/`；
+- 冻结 Metadata V2 的 19 个业务指标；
+- 建立 Query Plan V2 结构合同，覆盖 Resource、Scope、Result、Staged、Cross-fact 与 Global History 语义；
+- 建立 48-plan Canonical Static Catalog：40 QueryLogic / 8 StagedQueryLogic / 3 Global History Plans；
+- 建立唯一 Canonical Writer、Semantic Equality Gate 与 Canonical Byte Equality Gate；
 - 保持 V1 `public` Schema 不变，Graph integration 继续关闭。
 
 small Profile 当前入库规模：
@@ -590,6 +644,19 @@ Day66 正式验证结果：
 | Business Pattern Acceptance | 9/9 PASS |
 | Database writes during acceptance | 0 |
 
+Day73 Semantic Contract 验证：
+
+| 验证项 | 结果 |
+|---|---:|
+| Metadata V2 | 19 Metrics |
+| Query Plans V2 | 48 Plans |
+| QueryLogic / StagedQueryLogic | 40 / 8 |
+| Global History Plans | 3 |
+| Catalog Builder Tests | 17/17 PASS |
+| Static Runtime Tests | 22/22 PASS |
+| Dataset Status | draft |
+| Graph Integration | disabled |
+
 当前状态：
 
 ```text
@@ -606,17 +673,17 @@ fact_membership_tier_history Seed：completed
 P01-P09 Observation & Calibration：completed
 Acceptance Contract：frozen（small Profile）
 P01-P09 Formal Business Pattern Acceptance：passed（9/9）
-Candidate Readiness Gates：not_run
-Metadata V2：not started
+Candidate Readiness Gates：in_progress
+Metadata V2：completed（19 metrics）
+Query Plans V2：completed（48 plans）
 Golden Cases V2：not started
+Generalization Evaluation：not started
 Performance Baseline：not started
 AI-chain Regression：not started
 Graph integration：disabled
 ```
 
-Beauty BI V1 继续作为 Latest Stable Baseline。P01-P09 正式业务规律验收通过，证明当前 small Profile、Manifest 合同和数据库事实一致；但 Metadata V2、Golden Cases V2、Performance Baseline 和 Dataset V2 AI 主链路回归尚未完成，因此 Dataset V2 不能标记为 Candidate 或 Stable。
-
----
+Beauty BI V1 继续作为 Latest Stable Baseline。Day73 已证明 V2 Metadata / Query Contract 形成可信静态基线，但 Golden Cases V2、Generalization Evaluation、Performance Baseline 和 Dataset V2 AI 主链路回归尚未完成，因此 Dataset V2 仍不能标记为 Candidate 或 Stable。
 
 # 技术栈
 
@@ -864,6 +931,8 @@ Phase3 当前进展：
 - Day69 完成 Region / Channel Row Scope Planning / Scope Target Binding / Parameterized Predicate Contract
 - Day70 完成 Dedicated Query Role / Governed SQL Runner / Execution Budget
 - Day71 完成 Sensitive Data Protection / Structured Audit Event / Hash-chain Audit Sink / Governed Finalization
+- Day72 完成 21-case Security Evaluation / Audit Event v2 HMAC Hardening / 10、25、50 并发 Minimum Load Test
+- Day73 完成 Metadata V2 / 48-plan Query Plans V2 / Staged & Global History Contracts / Canonical Catalog Regression
 
 Day61-Day66 Dataset V2 成果：
 - 完成 V1 Coverage Review 与 V2 P0 / P1 / P2 边界；
@@ -878,7 +947,7 @@ Day61-Day66 Dataset V2 成果：
 - 完成 P01-P09 observation、口径校准、阈值冻结和 formal acceptance；
 - `manifest_loader.py` Day66 校验通过；
 - `acceptance_observer.py` 正式验收 9/9 PASS，验收过程数据库写入为 0；
-- V2 当前仍为 `draft`，Metadata V2、Golden Cases V2、Performance Baseline、AI 主链路回归和 Graph 接入尚未完成。
+- V2 当前仍为 `draft`；Metadata V2 与 Query Plans V2 已完成，Golden Cases V2、Generalization Evaluation、Performance Baseline、AI 主链路回归和 Graph 接入尚未完成。
 
 当前稳定依赖基线：
 - Python `3.10.3`
@@ -892,8 +961,8 @@ Day61-Day66 Dataset V2 成果：
 - 完整锁文件：`requirements-lock.txt`
 
 Phase3 后续重点：
-- Day72：Security Evaluation / 10、25、50 并发最小压测
-- Day73-Day75：Metadata V2、Query Plans V2、Golden Cases V2、Performance Baseline、AI-chain Regression 和 Graph Integration
+- Day74：Golden Cases V2 + Generalization Evaluation
+- Day75：AI-chain Regression + Performance Baseline + Graph Integration
 
 当前原则：
 - 不推翻 Phase2 主链路
@@ -1019,8 +1088,8 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.42
-完成度：Day71 / 100
+Version: v0.44
+完成度：Day73 / 100
 
 当前 Stable Graph：
 
@@ -1042,7 +1111,7 @@ Version: v0.42
 └─ Non-retryable → SQL Fail
 ```
 
-Day67-Day71 新增的独立治理原语：
+Day67-Day72 Governed Analytics 能力：
 
 ```text
 allowed_metric_names
@@ -1082,6 +1151,54 @@ ExecutionBudgetPolicy
 Step / Retry / Token Budget
 ```
 
+Day72 进一步建立：
+
+```text
+Adversarial Security Cases
+↓
+18 Controlled PASS / 0 Unexpected Fail
+↓
+3 Known Gap → Day75
+
+Audit Event v2
+↓
+Keyed HMAC-SHA256 Text Fingerprints
+↓
+Domain Separation / Safe Validation Error
+
+Governed SQL Runtime
+↓
+10 / 25 / 50 Concurrent Requests
+↓
+p50 / p95 / Error Rate / Peak Connections
+```
+
+Day73 进一步建立：
+
+```text
+Metadata V2
+→ 19 Metrics
+→ Independent beauty_bi_v2 Metadata Version
+
+Query Plan V2
+→ 48 Static Plans
+→ 40 QueryLogic
+→ 8 StagedQueryLogic
+→ 3 Global History Plans
+
+Canonical Catalog Builder
+→ Deterministic YAML
+→ Semantic Equality Gate
+→ Canonical Byte Equality Gate
+
+Governance-aware Query Contract
+→ Resource Authorization
+→ Scope Target / Trusted Alias
+→ Result Field Binding
+→ Minimum Group Size
+→ Cross-fact / Global History fail-closed semantics
+```
+
 当前 AI 主链路稳定测试基线：
 - `sql_cleaner_tests.py`：6/6 PASS
 - `sql_repair_graph_tests.py`：9/9 PASS
@@ -1093,6 +1210,15 @@ Step / Retry / Token Budget
 - `ragas_eval.py --include-negative`：6/6 expectation passed
 - `pip check`：No broken requirements found
 
+Dataset V2 Day73 Semantic Contract 验证：
+- `query_plan_v2_catalog_builder_tests.py`：17/17 PASS
+- `query_plan_v2_tests.py`：22/22 PASS
+- Static Query Plan Catalog：48 Plans / 19 Metrics
+- QueryLogic / StagedQueryLogic：40 / 8
+- Global History Plans：3
+- Dataset Status：draft
+- Graph Integration：disabled
+
 Dataset V2 Day66 验证：
 - `manifest_loader.py`：Day66 Manifest validation PASS
 - `acceptance_observer.py`：P01-P09 Formal Acceptance 9/9 PASS
@@ -1101,7 +1227,7 @@ Dataset V2 Day66 验证：
 - Dataset Status：draft
 - Dataset Candidate：NO
 
-Governed Analytics Day67-Day71 验证：
+Governed Analytics Day67-Day72 当前验证：
 - `access_context_tests.py`：5/5 PASS
 - `metric_scope_tests.py`：7/7 PASS
 - `resource_scope_tests.py`：10/10 PASS
@@ -1111,36 +1237,26 @@ Governed Analytics Day67-Day71 验证：
 - `execution_governance_integration_tests.py`：9/9 PASS
 - `execution_budget_tests.py`：16/16 PASS
 - `sensitive_data_tests.py`：21/21 PASS
-- `audit_event_tests.py`：20/20 PASS
+- `audit_event_tests.py`：26/26 PASS
 - `audit_sink_tests.py`：16/16 PASS
 - `governed_finalization_tests.py`：14/14 PASS
-- Day71 新增专项：71/71 PASS
-- Day70 既有专项与回归 + Day71 新增专项：180/180 PASS
 - `retrieval_evaluator.py --strict`：6/6 PASS
+- Core Governance + Retrieval：168/168 PASS
 - `analyst_graph_tests.py`：9/9 PASS
 - `sql_repair_graph_tests.py`：9/9 PASS
-- Access Context Contract：implemented
-- Metric Candidate Filtering：implemented
-- AuthorizationDecision：implemented
-- Metric / Table / Column Authorization Primitives：implemented
-- Row Scope Planning / Scope Path Resolution：implemented
-- Scope Target Binding / Parameterized Predicate Contract：implemented
-- Plan / Contract Fingerprint：implemented
-- Dedicated PostgreSQL Query Role：implemented
-- Governed Database Engine / Connection Pool Contract：implemented
-- Parameterized Governed SQL Runner：implemented
-- Read-only Transaction / Statement Timeout / Max Rows：implemented
-- Step / Retry / Token Budget Contract：implemented
-- Sensitive Field Catalog / Result Protection Contract：implemented
-- HMAC Tokenization / Minimum Group Size / Exact Result Shape：implemented
-- Structured Audit Event：implemented
-- Governance Runtime Secret Contract：implemented
-- Hash-chain JSONL Audit Sink：implemented
-- Governed Finalization：implemented
-- AccessContext → Graph Integration：not started
-- Governed Runner → Graph Integration：not started
-- Execution Budget → AnalystState Integration：not started
-- Final SQL / Repaired SQL Scope Enforcement：not started
+- Stable Graph Regression：18/18 PASS
+- Security Evaluation：21 cases / 18 Controlled PASS / 0 Unexpected FAIL / 3 Known Gap
+- Minimum Load Test：255/255 requests succeeded / 0% error rate
+- 50 concurrency：p50 100.53 ms / p95 141.34 ms / max 147.30 ms / peak connections 10
+- `pip check`：No broken requirements found
+
+Day72 当前安全边界：
+- Graph-level Prompt Injection Enforcement：Known Gap / Day75
+- Final SQL Region Predicate Validation：Known Gap / Day75
+- Repaired SQL Actual Predicate Preservation：Known Gap / Day75
+- Audit Text Fingerprint Confidentiality：已通过 `audit_event_v2` HMAC hardening 关闭
+- AccessContext / Governed Runner / Budget / Result Protection / Audit 仍未接入在线 Stable Graph
+- Dataset V2 仍为 `draft`，Graph Integration 继续 disabled
 
 当前阶段：
 - Phase2 已完成
@@ -1151,6 +1267,8 @@ Governed Analytics Day67-Day71 验证：
 - Day69 Region / Channel Row Scope 独立治理合同已完成
 - Day70 Execution Governance 与 Agent Budget 独立治理原语已完成
 - Day71 Sensitive Data Protection、Audit Event、Audit Sink 与 Governed Finalization 独立治理原语已完成
+- Day72 Security Evaluation、Audit HMAC Hardening 与 Minimum Load Baseline 已完成
+- Day73 Metadata V2 与 48-plan Query Plans V2 Static Catalog 已完成
 - Phase3 继续进行
 
-下一步：Day72 Security Evaluation / 10、25、50 并发最小压测
+下一步：Day74 Golden Cases V2 + Generalization Evaluation

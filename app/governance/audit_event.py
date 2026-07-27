@@ -283,7 +283,7 @@ class AuditEvent(BaseModel):
 
     event_fingerprint: str
     retryable: bool = False
-    audit_schema_version: str = "audit_event_v1"
+    audit_schema_version: str = "audit_event_v2"
 
     @field_validator("occurred_at_utc")
     @classmethod
@@ -415,11 +415,32 @@ def fingerprint_text(
     value: str,
     *,
     namespace: str,
+    audit_secret: str,
 ) -> str:
-    canonical = _canonicalize_text(value)
-    payload = f"{namespace}\x1f{canonical}".encode("utf-8")
+    """
+    对审计中的敏感文本生成 keyed fingerprint。
 
-    return hashlib.sha256(payload).hexdigest()
+    目的：
+    - 不保存原始 question / SQL / repair error；
+    - 避免低熵文本的普通 SHA-256 fingerprint 被离线字典枚举；
+    - 通过 namespace 做 domain separation。
+
+    注意：
+    - 这不是加密；Audit Secret 泄漏后仍可能被枚举；
+    - Event Fingerprint 继续使用普通 SHA-256，因为其输入已经是
+      受保护的结构化 Audit Event payload。
+    """
+
+    canonical = _canonicalize_text(value)
+    payload = (
+        f"audit_text_hmac_v1\x1f{namespace}\x1f{canonical}"
+    ).encode("utf-8")
+
+    return hmac.new(
+        audit_secret.encode("utf-8"),
+        payload,
+        hashlib.sha256,
+    ).hexdigest()
 
 
 def build_actor_ref(
@@ -555,6 +576,8 @@ def _protection_summary(
 
 def _repair_summary(
     repair_history: Sequence[Mapping[str, Any]],
+    *,
+    audit_secret: str,
 ) -> RepairAuditSummary:
     attempts = []
 
@@ -587,15 +610,18 @@ def _repair_summary(
                 source_sql_fingerprint=fingerprint_text(
                     source_sql,
                     namespace="repair_source_sql",
+                    audit_secret=audit_secret,
                 ),
                 repaired_sql_fingerprint=fingerprint_text(
                     repaired_sql,
                     namespace="repair_output_sql",
+                    audit_secret=audit_secret,
                 ),
                 execution_error_fingerprint=(
                     fingerprint_text(
                         execution_error,
                         namespace="repair_execution_error",
+                        audit_secret=audit_secret,
                     )
                 ),
             )
@@ -871,12 +897,14 @@ def build_audit_event(
         question_fingerprint = fingerprint_text(
             question,
             namespace="question",
+            audit_secret=audit_secret,
         )
 
         generated_sql_fingerprint = (
             fingerprint_text(
                 generated_sql,
                 namespace="generated_sql",
+                audit_secret=audit_secret,
             )
             if generated_sql is not None
             else None
@@ -886,6 +914,7 @@ def build_audit_event(
             fingerprint_text(
                 executed_sql,
                 namespace="executed_sql",
+                audit_secret=audit_secret,
             )
             if executed_sql is not None
             else None
@@ -900,10 +929,11 @@ def build_audit_event(
             _protection_summary(protection)
         )
         repair_summary = _repair_summary(
-            repair_history
+            repair_history,
+            audit_secret=audit_secret,
         )
 
-        audit_schema_version = "audit_event_v1"
+        audit_schema_version = "audit_event_v2"
 
         payload = _event_payload_for_fingerprint(
             event_id=current_event_id,
@@ -964,7 +994,9 @@ def build_audit_event(
             reason_code=(
                 AuditBuildReason.INVALID_AUDIT_INPUT
             ),
-            message=str(error),
+            message=(
+                "Audit event input failed structural validation."
+            ),
             retryable=False,
         )
 

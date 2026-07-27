@@ -1,0 +1,4652 @@
+query_plan_version: beauty_bi_query_plan_v2_0
+dataset_name: beauty_bi_v2
+metadata_version: beauty_bi_metadata_v2_0
+target_schema: beauty_bi_v2
+status: draft
+query_plans:
+- name: gmv_overall_v2
+  metric: gmv
+  chinese_name: 整体GMV
+  query_type: aggregate_metric
+  result_grain: overall
+  description: 按 整体 Grain 计算 GMV。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    group_by: []
+    outputs:
+    - field: gmv
+      expression: SUM(foi.item_paid_amount)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gmv_overall_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: gmv
+      source_columns:
+      - fact_order_items.item_paid_amount
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gmv
+    direction: desc
+- name: gmv_channel_v2
+  metric: gmv
+  chinese_name: 渠道GMV
+  query_type: aggregate_metric
+  result_grain: channel
+  description: 按 渠道 Grain 计算 GMV。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_channel
+      alias: dc
+      join_type: inner
+      conditions:
+      - left: fo.channel_id
+        right: dc.channel_id
+    group_by:
+    - dc.channel_id
+    - dc.channel_name
+    outputs:
+    - field: channel_name
+      expression: dc.channel_name
+    - field: gmv
+      expression: SUM(foi.item_paid_amount)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_channel.channel_name
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gmv_channel_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: channel_name
+      source_columns:
+      - dim_channel.channel_name
+      category: ordinary
+      token_namespace: null
+    - output_field: gmv
+      source_columns:
+      - fact_order_items.item_paid_amount
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gmv
+    direction: desc
+- name: gmv_region_v2
+  metric: gmv
+  chinese_name: 地区GMV
+  query_type: aggregate_metric
+  result_grain: region
+  description: 按 地区 Grain 计算 GMV。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_region
+      alias: dr
+      join_type: inner
+      conditions:
+      - left: fo.shipping_region_id
+        right: dr.region_id
+    group_by:
+    - dr.region_id
+    - dr.region_name
+    outputs:
+    - field: region_name
+      expression: dr.region_name
+    - field: gmv
+      expression: SUM(foi.item_paid_amount)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - dim_region.region_name
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gmv_region_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: region_name
+      source_columns:
+      - dim_region.region_name
+      category: ordinary
+      token_namespace: null
+    - output_field: gmv
+      source_columns:
+      - fact_order_items.item_paid_amount
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gmv
+    direction: desc
+- name: gmv_category_v2
+  metric: gmv
+  chinese_name: 品类GMV
+  query_type: aggregate_metric
+  result_grain: category
+  description: 按 品类 Grain 计算 GMV。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_product
+      alias: dp
+      join_type: inner
+      conditions:
+      - left: foi.product_id
+        right: dp.product_id
+    group_by:
+    - dp.category
+    outputs:
+    - field: category
+      expression: dp.category
+    - field: gmv
+      expression: SUM(foi.item_paid_amount)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_product
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_product.category
+    - dim_product.product_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_order_items.product_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gmv_category_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: category
+      source_columns:
+      - dim_product.category
+      category: ordinary
+      token_namespace: null
+    - output_field: gmv
+      source_columns:
+      - fact_order_items.item_paid_amount
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gmv
+    direction: desc
+- name: gross_margin_overall_v2
+  metric: gross_margin
+  chinese_name: 整体毛利额
+  query_type: aggregate_metric
+  result_grain: overall
+  description: 按 整体 Grain 计算 毛利额。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount - foi.item_cost_amount)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    group_by: []
+    outputs:
+    - field: gross_margin
+      expression: SUM(foi.item_paid_amount - foi.item_cost_amount)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_cost_amount
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gross_margin_overall_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: gross_margin
+      source_columns:
+      - fact_order_items.item_cost_amount
+      - fact_order_items.item_paid_amount
+      category: business_confidential
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gross_margin
+    direction: desc
+- name: gross_margin_channel_v2
+  metric: gross_margin
+  chinese_name: 渠道毛利额
+  query_type: aggregate_metric
+  result_grain: channel
+  description: 按 渠道 Grain 计算 毛利额。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount - foi.item_cost_amount)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_channel
+      alias: dc
+      join_type: inner
+      conditions:
+      - left: fo.channel_id
+        right: dc.channel_id
+    group_by:
+    - dc.channel_id
+    - dc.channel_name
+    outputs:
+    - field: channel_name
+      expression: dc.channel_name
+    - field: gross_margin
+      expression: SUM(foi.item_paid_amount - foi.item_cost_amount)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_channel.channel_name
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_cost_amount
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gross_margin_channel_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: channel_name
+      source_columns:
+      - dim_channel.channel_name
+      category: ordinary
+      token_namespace: null
+    - output_field: gross_margin
+      source_columns:
+      - fact_order_items.item_cost_amount
+      - fact_order_items.item_paid_amount
+      category: business_confidential
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gross_margin
+    direction: desc
+- name: gross_margin_region_v2
+  metric: gross_margin
+  chinese_name: 地区毛利额
+  query_type: aggregate_metric
+  result_grain: region
+  description: 按 地区 Grain 计算 毛利额。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount - foi.item_cost_amount)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_region
+      alias: dr
+      join_type: inner
+      conditions:
+      - left: fo.shipping_region_id
+        right: dr.region_id
+    group_by:
+    - dr.region_id
+    - dr.region_name
+    outputs:
+    - field: region_name
+      expression: dr.region_name
+    - field: gross_margin
+      expression: SUM(foi.item_paid_amount - foi.item_cost_amount)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - dim_region.region_name
+    - fact_order_items.item_cost_amount
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gross_margin_region_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: region_name
+      source_columns:
+      - dim_region.region_name
+      category: ordinary
+      token_namespace: null
+    - output_field: gross_margin
+      source_columns:
+      - fact_order_items.item_cost_amount
+      - fact_order_items.item_paid_amount
+      category: business_confidential
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gross_margin
+    direction: desc
+- name: gross_margin_category_v2
+  metric: gross_margin
+  chinese_name: 品类毛利额
+  query_type: aggregate_metric
+  result_grain: category
+  description: 按 品类 Grain 计算 毛利额。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount - foi.item_cost_amount)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_product
+      alias: dp
+      join_type: inner
+      conditions:
+      - left: foi.product_id
+        right: dp.product_id
+    group_by:
+    - dp.category
+    outputs:
+    - field: category
+      expression: dp.category
+    - field: gross_margin
+      expression: SUM(foi.item_paid_amount - foi.item_cost_amount)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_product
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_product.category
+    - dim_product.product_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_cost_amount
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_order_items.product_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gross_margin_category_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: category
+      source_columns:
+      - dim_product.category
+      category: ordinary
+      token_namespace: null
+    - output_field: gross_margin
+      source_columns:
+      - fact_order_items.item_cost_amount
+      - fact_order_items.item_paid_amount
+      category: business_confidential
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gross_margin
+    direction: desc
+- name: gross_margin_rate_overall_v2
+  metric: gross_margin_rate
+  chinese_name: 整体毛利率
+  query_type: aggregate_metric
+  result_grain: overall
+  description: 按 整体 Grain 计算 毛利率。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount - foi.item_cost_amount) / NULLIF(SUM(foi.item_paid_amount), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    group_by: []
+    outputs:
+    - field: gross_margin_rate
+      expression: SUM(foi.item_paid_amount - foi.item_cost_amount) / NULLIF(SUM(foi.item_paid_amount), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_cost_amount
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gross_margin_rate_overall_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: gross_margin_rate
+      source_columns:
+      - fact_order_items.item_cost_amount
+      - fact_order_items.item_paid_amount
+      category: business_confidential
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gross_margin_rate
+    direction: desc
+- name: gross_margin_rate_channel_v2
+  metric: gross_margin_rate
+  chinese_name: 渠道毛利率
+  query_type: aggregate_metric
+  result_grain: channel
+  description: 按 渠道 Grain 计算 毛利率。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount - foi.item_cost_amount) / NULLIF(SUM(foi.item_paid_amount), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_channel
+      alias: dc
+      join_type: inner
+      conditions:
+      - left: fo.channel_id
+        right: dc.channel_id
+    group_by:
+    - dc.channel_id
+    - dc.channel_name
+    outputs:
+    - field: channel_name
+      expression: dc.channel_name
+    - field: gross_margin_rate
+      expression: SUM(foi.item_paid_amount - foi.item_cost_amount) / NULLIF(SUM(foi.item_paid_amount), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_channel.channel_name
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_cost_amount
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gross_margin_rate_channel_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: channel_name
+      source_columns:
+      - dim_channel.channel_name
+      category: ordinary
+      token_namespace: null
+    - output_field: gross_margin_rate
+      source_columns:
+      - fact_order_items.item_cost_amount
+      - fact_order_items.item_paid_amount
+      category: business_confidential
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gross_margin_rate
+    direction: desc
+- name: gross_margin_rate_region_v2
+  metric: gross_margin_rate
+  chinese_name: 地区毛利率
+  query_type: aggregate_metric
+  result_grain: region
+  description: 按 地区 Grain 计算 毛利率。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount - foi.item_cost_amount) / NULLIF(SUM(foi.item_paid_amount), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_region
+      alias: dr
+      join_type: inner
+      conditions:
+      - left: fo.shipping_region_id
+        right: dr.region_id
+    group_by:
+    - dr.region_id
+    - dr.region_name
+    outputs:
+    - field: region_name
+      expression: dr.region_name
+    - field: gross_margin_rate
+      expression: SUM(foi.item_paid_amount - foi.item_cost_amount) / NULLIF(SUM(foi.item_paid_amount), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - dim_region.region_name
+    - fact_order_items.item_cost_amount
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gross_margin_rate_region_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: region_name
+      source_columns:
+      - dim_region.region_name
+      category: ordinary
+      token_namespace: null
+    - output_field: gross_margin_rate
+      source_columns:
+      - fact_order_items.item_cost_amount
+      - fact_order_items.item_paid_amount
+      category: business_confidential
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gross_margin_rate
+    direction: desc
+- name: gross_margin_rate_category_v2
+  metric: gross_margin_rate
+  chinese_name: 品类毛利率
+  query_type: aggregate_metric
+  result_grain: category
+  description: 按 品类 Grain 计算 毛利率。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount - foi.item_cost_amount) / NULLIF(SUM(foi.item_paid_amount), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_product
+      alias: dp
+      join_type: inner
+      conditions:
+      - left: foi.product_id
+        right: dp.product_id
+    group_by:
+    - dp.category
+    outputs:
+    - field: category
+      expression: dp.category
+    - field: gross_margin_rate
+      expression: SUM(foi.item_paid_amount - foi.item_cost_amount) / NULLIF(SUM(foi.item_paid_amount), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_product
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_product.category
+    - dim_product.product_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_cost_amount
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_order_items.product_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gross_margin_rate_category_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: category
+      source_columns:
+      - dim_product.category
+      category: ordinary
+      token_namespace: null
+    - output_field: gross_margin_rate
+      source_columns:
+      - fact_order_items.item_cost_amount
+      - fact_order_items.item_paid_amount
+      category: business_confidential
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gross_margin_rate
+    direction: desc
+- name: buyer_count_overall_v2
+  metric: buyer_count
+  chinese_name: 整体购买人数
+  query_type: aggregate_metric
+  result_grain: overall
+  description: 按 整体 Grain 计算 购买人数。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(DISTINCT fo.customer_id)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_orders
+      alias: fo
+    joins: []
+    group_by: []
+    outputs:
+    - field: buyer_count
+      expression: COUNT(DISTINCT fo.customer_id)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_orders
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: buyer_count_overall_v2_source
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: buyer_count
+      source_columns:
+      - fact_orders.customer_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: buyer_count
+    direction: desc
+- name: buyer_count_channel_v2
+  metric: buyer_count
+  chinese_name: 渠道购买人数
+  query_type: aggregate_metric
+  result_grain: channel
+  description: 按 渠道 Grain 计算 购买人数。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(DISTINCT fo.customer_id)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_orders
+      alias: fo
+    joins:
+    - table: dim_channel
+      alias: dc
+      join_type: inner
+      conditions:
+      - left: fo.channel_id
+        right: dc.channel_id
+    group_by:
+    - dc.channel_id
+    - dc.channel_name
+    outputs:
+    - field: channel_name
+      expression: dc.channel_name
+    - field: buyer_count
+      expression: COUNT(DISTINCT fo.customer_id)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_channel.channel_name
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_orders
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: buyer_count_channel_v2_source
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: channel_name
+      source_columns:
+      - dim_channel.channel_name
+      category: ordinary
+      token_namespace: null
+    - output_field: buyer_count
+      source_columns:
+      - fact_orders.customer_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: buyer_count
+    direction: desc
+- name: buyer_count_region_v2
+  metric: buyer_count
+  chinese_name: 地区购买人数
+  query_type: aggregate_metric
+  result_grain: region
+  description: 按 地区 Grain 计算 购买人数。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(DISTINCT fo.customer_id)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_orders
+      alias: fo
+    joins:
+    - table: dim_region
+      alias: dr
+      join_type: inner
+      conditions:
+      - left: fo.shipping_region_id
+        right: dr.region_id
+    group_by:
+    - dr.region_id
+    - dr.region_name
+    outputs:
+    - field: region_name
+      expression: dr.region_name
+    - field: buyer_count
+      expression: COUNT(DISTINCT fo.customer_id)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - dim_region.region_name
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_orders
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: buyer_count_region_v2_source
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: region_name
+      source_columns:
+      - dim_region.region_name
+      category: ordinary
+      token_namespace: null
+    - output_field: buyer_count
+      source_columns:
+      - fact_orders.customer_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: buyer_count
+    direction: desc
+- name: buyer_count_category_v2
+  metric: buyer_count
+  chinese_name: 品类购买人数
+  query_type: aggregate_metric
+  result_grain: category
+  description: 按 品类 Grain 计算 购买人数。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(DISTINCT fo.customer_id)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_product
+      alias: dp
+      join_type: inner
+      conditions:
+      - left: foi.product_id
+        right: dp.product_id
+    group_by:
+    - dp.category
+    outputs:
+    - field: category
+      expression: dp.category
+    - field: buyer_count
+      expression: COUNT(DISTINCT fo.customer_id)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_product
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_product.category
+    - dim_product.product_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.order_id
+    - fact_order_items.product_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: buyer_count_category_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: category
+      source_columns:
+      - dim_product.category
+      category: ordinary
+      token_namespace: null
+    - output_field: buyer_count
+      source_columns:
+      - fact_orders.customer_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: buyer_count
+    direction: desc
+- name: order_count_overall_v2
+  metric: order_count
+  chinese_name: 整体交易量
+  query_type: aggregate_metric
+  result_grain: overall
+  description: 按 整体 Grain 计算 交易量。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(DISTINCT fo.order_id)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_orders
+      alias: fo
+    joins: []
+    group_by: []
+    outputs:
+    - field: order_count
+      expression: COUNT(DISTINCT fo.order_id)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_orders
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: order_count_overall_v2_source
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: order_count
+      source_columns:
+      - fact_orders.order_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: order_count
+    direction: desc
+- name: order_count_channel_v2
+  metric: order_count
+  chinese_name: 渠道交易量
+  query_type: aggregate_metric
+  result_grain: channel
+  description: 按 渠道 Grain 计算 交易量。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(DISTINCT fo.order_id)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_orders
+      alias: fo
+    joins:
+    - table: dim_channel
+      alias: dc
+      join_type: inner
+      conditions:
+      - left: fo.channel_id
+        right: dc.channel_id
+    group_by:
+    - dc.channel_id
+    - dc.channel_name
+    outputs:
+    - field: channel_name
+      expression: dc.channel_name
+    - field: order_count
+      expression: COUNT(DISTINCT fo.order_id)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_channel.channel_name
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_orders
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: order_count_channel_v2_source
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: channel_name
+      source_columns:
+      - dim_channel.channel_name
+      category: ordinary
+      token_namespace: null
+    - output_field: order_count
+      source_columns:
+      - fact_orders.order_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: order_count
+    direction: desc
+- name: order_count_region_v2
+  metric: order_count
+  chinese_name: 地区交易量
+  query_type: aggregate_metric
+  result_grain: region
+  description: 按 地区 Grain 计算 交易量。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(DISTINCT fo.order_id)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_orders
+      alias: fo
+    joins:
+    - table: dim_region
+      alias: dr
+      join_type: inner
+      conditions:
+      - left: fo.shipping_region_id
+        right: dr.region_id
+    group_by:
+    - dr.region_id
+    - dr.region_name
+    outputs:
+    - field: region_name
+      expression: dr.region_name
+    - field: order_count
+      expression: COUNT(DISTINCT fo.order_id)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - dim_region.region_name
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_orders
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: order_count_region_v2_source
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: region_name
+      source_columns:
+      - dim_region.region_name
+      category: ordinary
+      token_namespace: null
+    - output_field: order_count
+      source_columns:
+      - fact_orders.order_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: order_count
+    direction: desc
+- name: order_count_category_v2
+  metric: order_count
+  chinese_name: 品类交易量
+  query_type: aggregate_metric
+  result_grain: category
+  description: 按 品类 Grain 计算 交易量。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(DISTINCT fo.order_id)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_product
+      alias: dp
+      join_type: inner
+      conditions:
+      - left: foi.product_id
+        right: dp.product_id
+    group_by:
+    - dp.category
+    outputs:
+    - field: category
+      expression: dp.category
+    - field: order_count
+      expression: COUNT(DISTINCT fo.order_id)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_product
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_product.category
+    - dim_product.product_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.order_id
+    - fact_order_items.product_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: order_count_category_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: category
+      source_columns:
+      - dim_product.category
+      category: ordinary
+      token_namespace: null
+    - output_field: order_count
+      source_columns:
+      - fact_orders.order_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: order_count
+    direction: desc
+- name: units_sold_overall_v2
+  metric: units_sold
+  chinese_name: 整体交易件数
+  query_type: aggregate_metric
+  result_grain: overall
+  description: 按 整体 Grain 计算 交易件数。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.quantity)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    group_by: []
+    outputs:
+    - field: units_sold
+      expression: SUM(foi.quantity)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.order_id
+    - fact_order_items.quantity
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: units_sold_overall_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: units_sold
+      source_columns:
+      - fact_order_items.quantity
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: units_sold
+    direction: desc
+- name: units_sold_channel_v2
+  metric: units_sold
+  chinese_name: 渠道交易件数
+  query_type: aggregate_metric
+  result_grain: channel
+  description: 按 渠道 Grain 计算 交易件数。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.quantity)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_channel
+      alias: dc
+      join_type: inner
+      conditions:
+      - left: fo.channel_id
+        right: dc.channel_id
+    group_by:
+    - dc.channel_id
+    - dc.channel_name
+    outputs:
+    - field: channel_name
+      expression: dc.channel_name
+    - field: units_sold
+      expression: SUM(foi.quantity)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_channel.channel_name
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.order_id
+    - fact_order_items.quantity
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: units_sold_channel_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: channel_name
+      source_columns:
+      - dim_channel.channel_name
+      category: ordinary
+      token_namespace: null
+    - output_field: units_sold
+      source_columns:
+      - fact_order_items.quantity
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: units_sold
+    direction: desc
+- name: units_sold_region_v2
+  metric: units_sold
+  chinese_name: 地区交易件数
+  query_type: aggregate_metric
+  result_grain: region
+  description: 按 地区 Grain 计算 交易件数。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.quantity)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_region
+      alias: dr
+      join_type: inner
+      conditions:
+      - left: fo.shipping_region_id
+        right: dr.region_id
+    group_by:
+    - dr.region_id
+    - dr.region_name
+    outputs:
+    - field: region_name
+      expression: dr.region_name
+    - field: units_sold
+      expression: SUM(foi.quantity)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - dim_region.region_name
+    - fact_order_items.order_id
+    - fact_order_items.quantity
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: units_sold_region_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: region_name
+      source_columns:
+      - dim_region.region_name
+      category: ordinary
+      token_namespace: null
+    - output_field: units_sold
+      source_columns:
+      - fact_order_items.quantity
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: units_sold
+    direction: desc
+- name: units_sold_category_v2
+  metric: units_sold
+  chinese_name: 品类交易件数
+  query_type: aggregate_metric
+  result_grain: category
+  description: 按 品类 Grain 计算 交易件数。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.quantity)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_product
+      alias: dp
+      join_type: inner
+      conditions:
+      - left: foi.product_id
+        right: dp.product_id
+    group_by:
+    - dp.category
+    outputs:
+    - field: category
+      expression: dp.category
+    - field: units_sold
+      expression: SUM(foi.quantity)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_product
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_product.category
+    - dim_product.product_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.order_id
+    - fact_order_items.product_id
+    - fact_order_items.quantity
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: units_sold_category_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: category
+      source_columns:
+      - dim_product.category
+      category: ordinary
+      token_namespace: null
+    - output_field: units_sold
+      source_columns:
+      - fact_order_items.quantity
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: units_sold
+    direction: desc
+- name: spending_per_buyer_overall_v2
+  metric: spending_per_buyer
+  chinese_name: 整体人均消费金额
+  query_type: aggregate_metric
+  result_grain: overall
+  description: 按 整体 Grain 计算 人均消费金额。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    group_by: []
+    outputs:
+    - field: spending_per_buyer
+      expression: SUM(foi.item_paid_amount) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: spending_per_buyer_overall_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: spending_per_buyer
+      source_columns:
+      - fact_order_items.item_paid_amount
+      - fact_orders.customer_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: spending_per_buyer
+    direction: desc
+- name: spending_per_buyer_channel_v2
+  metric: spending_per_buyer
+  chinese_name: 渠道人均消费金额
+  query_type: aggregate_metric
+  result_grain: channel
+  description: 按 渠道 Grain 计算 人均消费金额。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_channel
+      alias: dc
+      join_type: inner
+      conditions:
+      - left: fo.channel_id
+        right: dc.channel_id
+    group_by:
+    - dc.channel_id
+    - dc.channel_name
+    outputs:
+    - field: channel_name
+      expression: dc.channel_name
+    - field: spending_per_buyer
+      expression: SUM(foi.item_paid_amount) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_channel.channel_name
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: spending_per_buyer_channel_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: channel_name
+      source_columns:
+      - dim_channel.channel_name
+      category: ordinary
+      token_namespace: null
+    - output_field: spending_per_buyer
+      source_columns:
+      - fact_order_items.item_paid_amount
+      - fact_orders.customer_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: spending_per_buyer
+    direction: desc
+- name: spending_per_buyer_region_v2
+  metric: spending_per_buyer
+  chinese_name: 地区人均消费金额
+  query_type: aggregate_metric
+  result_grain: region
+  description: 按 地区 Grain 计算 人均消费金额。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_region
+      alias: dr
+      join_type: inner
+      conditions:
+      - left: fo.shipping_region_id
+        right: dr.region_id
+    group_by:
+    - dr.region_id
+    - dr.region_name
+    outputs:
+    - field: region_name
+      expression: dr.region_name
+    - field: spending_per_buyer
+      expression: SUM(foi.item_paid_amount) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - dim_region.region_name
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: spending_per_buyer_region_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: region_name
+      source_columns:
+      - dim_region.region_name
+      category: ordinary
+      token_namespace: null
+    - output_field: spending_per_buyer
+      source_columns:
+      - fact_order_items.item_paid_amount
+      - fact_orders.customer_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: spending_per_buyer
+    direction: desc
+- name: spending_per_buyer_category_v2
+  metric: spending_per_buyer
+  chinese_name: 品类人均消费金额
+  query_type: aggregate_metric
+  result_grain: category
+  description: 按 品类 Grain 计算 人均消费金额。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_product
+      alias: dp
+      join_type: inner
+      conditions:
+      - left: foi.product_id
+        right: dp.product_id
+    group_by:
+    - dp.category
+    outputs:
+    - field: category
+      expression: dp.category
+    - field: spending_per_buyer
+      expression: SUM(foi.item_paid_amount) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_product
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_product.category
+    - dim_product.product_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_order_items.product_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: spending_per_buyer_category_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: category
+      source_columns:
+      - dim_product.category
+      category: ordinary
+      token_namespace: null
+    - output_field: spending_per_buyer
+      source_columns:
+      - fact_order_items.item_paid_amount
+      - fact_orders.customer_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: spending_per_buyer
+    direction: desc
+- name: ipt_overall_v2
+  metric: ipt
+  chinese_name: 整体IPT
+  query_type: aggregate_metric
+  result_grain: overall
+  description: 按 整体 Grain 计算 IPT。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.quantity) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    group_by: []
+    outputs:
+    - field: ipt
+      expression: SUM(foi.quantity) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.order_id
+    - fact_order_items.quantity
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: ipt_overall_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: ipt
+      source_columns:
+      - fact_order_items.quantity
+      - fact_orders.order_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: ipt
+    direction: desc
+- name: ipt_channel_v2
+  metric: ipt
+  chinese_name: 渠道IPT
+  query_type: aggregate_metric
+  result_grain: channel
+  description: 按 渠道 Grain 计算 IPT。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.quantity) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_channel
+      alias: dc
+      join_type: inner
+      conditions:
+      - left: fo.channel_id
+        right: dc.channel_id
+    group_by:
+    - dc.channel_id
+    - dc.channel_name
+    outputs:
+    - field: channel_name
+      expression: dc.channel_name
+    - field: ipt
+      expression: SUM(foi.quantity) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_channel.channel_name
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.order_id
+    - fact_order_items.quantity
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: ipt_channel_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: channel_name
+      source_columns:
+      - dim_channel.channel_name
+      category: ordinary
+      token_namespace: null
+    - output_field: ipt
+      source_columns:
+      - fact_order_items.quantity
+      - fact_orders.order_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: ipt
+    direction: desc
+- name: ipt_region_v2
+  metric: ipt
+  chinese_name: 地区IPT
+  query_type: aggregate_metric
+  result_grain: region
+  description: 按 地区 Grain 计算 IPT。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.quantity) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_region
+      alias: dr
+      join_type: inner
+      conditions:
+      - left: fo.shipping_region_id
+        right: dr.region_id
+    group_by:
+    - dr.region_id
+    - dr.region_name
+    outputs:
+    - field: region_name
+      expression: dr.region_name
+    - field: ipt
+      expression: SUM(foi.quantity) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - dim_region.region_name
+    - fact_order_items.order_id
+    - fact_order_items.quantity
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: ipt_region_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: region_name
+      source_columns:
+      - dim_region.region_name
+      category: ordinary
+      token_namespace: null
+    - output_field: ipt
+      source_columns:
+      - fact_order_items.quantity
+      - fact_orders.order_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: ipt
+    direction: desc
+- name: ipt_category_v2
+  metric: ipt
+  chinese_name: 品类IPT
+  query_type: aggregate_metric
+  result_grain: category
+  description: 按 品类 Grain 计算 IPT。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.quantity) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_product
+      alias: dp
+      join_type: inner
+      conditions:
+      - left: foi.product_id
+        right: dp.product_id
+    group_by:
+    - dp.category
+    outputs:
+    - field: category
+      expression: dp.category
+    - field: ipt
+      expression: SUM(foi.quantity) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_product
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_product.category
+    - dim_product.product_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.order_id
+    - fact_order_items.product_id
+    - fact_order_items.quantity
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: ipt_category_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: category
+      source_columns:
+      - dim_product.category
+      category: ordinary
+      token_namespace: null
+    - output_field: ipt
+      source_columns:
+      - fact_order_items.quantity
+      - fact_orders.order_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: ipt
+    direction: desc
+- name: aus_overall_v2
+  metric: aus
+  chinese_name: 整体AUS
+  query_type: aggregate_metric
+  result_grain: overall
+  description: 按 整体 Grain 计算 AUS。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    group_by: []
+    outputs:
+    - field: aus
+      expression: SUM(foi.item_paid_amount) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: aus_overall_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: aus
+      source_columns:
+      - fact_order_items.item_paid_amount
+      - fact_orders.order_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: aus
+    direction: desc
+- name: aus_channel_v2
+  metric: aus
+  chinese_name: 渠道AUS
+  query_type: aggregate_metric
+  result_grain: channel
+  description: 按 渠道 Grain 计算 AUS。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_channel
+      alias: dc
+      join_type: inner
+      conditions:
+      - left: fo.channel_id
+        right: dc.channel_id
+    group_by:
+    - dc.channel_id
+    - dc.channel_name
+    outputs:
+    - field: channel_name
+      expression: dc.channel_name
+    - field: aus
+      expression: SUM(foi.item_paid_amount) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_channel.channel_name
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: aus_channel_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: channel_name
+      source_columns:
+      - dim_channel.channel_name
+      category: ordinary
+      token_namespace: null
+    - output_field: aus
+      source_columns:
+      - fact_order_items.item_paid_amount
+      - fact_orders.order_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: aus
+    direction: desc
+- name: aus_region_v2
+  metric: aus
+  chinese_name: 地区AUS
+  query_type: aggregate_metric
+  result_grain: region
+  description: 按 地区 Grain 计算 AUS。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_region
+      alias: dr
+      join_type: inner
+      conditions:
+      - left: fo.shipping_region_id
+        right: dr.region_id
+    group_by:
+    - dr.region_id
+    - dr.region_name
+    outputs:
+    - field: region_name
+      expression: dr.region_name
+    - field: aus
+      expression: SUM(foi.item_paid_amount) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - dim_region.region_name
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: aus_region_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: region_name
+      source_columns:
+      - dim_region.region_name
+      category: ordinary
+      token_namespace: null
+    - output_field: aus
+      source_columns:
+      - fact_order_items.item_paid_amount
+      - fact_orders.order_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: aus
+    direction: desc
+- name: purchase_frequency_overall_v2
+  metric: purchase_frequency
+  chinese_name: 整体FREQ
+  query_type: aggregate_metric
+  result_grain: overall
+  description: 按 整体 Grain 计算 FREQ。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(DISTINCT fo.order_id) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_orders
+      alias: fo
+    joins: []
+    group_by: []
+    outputs:
+    - field: purchase_frequency
+      expression: COUNT(DISTINCT fo.order_id) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_orders
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: purchase_frequency_overall_v2_source
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: purchase_frequency
+      source_columns:
+      - fact_orders.customer_id
+      - fact_orders.order_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: purchase_frequency
+    direction: desc
+- name: purchase_frequency_channel_v2
+  metric: purchase_frequency
+  chinese_name: 渠道FREQ
+  query_type: aggregate_metric
+  result_grain: channel
+  description: 按 渠道 Grain 计算 FREQ。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(DISTINCT fo.order_id) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_orders
+      alias: fo
+    joins:
+    - table: dim_channel
+      alias: dc
+      join_type: inner
+      conditions:
+      - left: fo.channel_id
+        right: dc.channel_id
+    group_by:
+    - dc.channel_id
+    - dc.channel_name
+    outputs:
+    - field: channel_name
+      expression: dc.channel_name
+    - field: purchase_frequency
+      expression: COUNT(DISTINCT fo.order_id) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_channel.channel_name
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_orders
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: purchase_frequency_channel_v2_source
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: channel_name
+      source_columns:
+      - dim_channel.channel_name
+      category: ordinary
+      token_namespace: null
+    - output_field: purchase_frequency
+      source_columns:
+      - fact_orders.customer_id
+      - fact_orders.order_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: purchase_frequency
+    direction: desc
+- name: purchase_frequency_region_v2
+  metric: purchase_frequency
+  chinese_name: 地区FREQ
+  query_type: aggregate_metric
+  result_grain: region
+  description: 按 地区 Grain 计算 FREQ。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(DISTINCT fo.order_id) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_orders
+      alias: fo
+    joins:
+    - table: dim_region
+      alias: dr
+      join_type: inner
+      conditions:
+      - left: fo.shipping_region_id
+        right: dr.region_id
+    group_by:
+    - dr.region_id
+    - dr.region_name
+    outputs:
+    - field: region_name
+      expression: dr.region_name
+    - field: purchase_frequency
+      expression: COUNT(DISTINCT fo.order_id) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - dim_region.region_name
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_orders
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: purchase_frequency_region_v2_source
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: region_name
+      source_columns:
+      - dim_region.region_name
+      category: ordinary
+      token_namespace: null
+    - output_field: purchase_frequency
+      source_columns:
+      - fact_orders.customer_id
+      - fact_orders.order_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: purchase_frequency
+    direction: desc
+- name: purchase_frequency_category_v2
+  metric: purchase_frequency
+  chinese_name: 品类FREQ
+  query_type: aggregate_metric
+  result_grain: category
+  description: 按 品类 Grain 计算 FREQ。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(DISTINCT fo.order_id) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_product
+      alias: dp
+      join_type: inner
+      conditions:
+      - left: foi.product_id
+        right: dp.product_id
+    group_by:
+    - dp.category
+    outputs:
+    - field: category
+      expression: dp.category
+    - field: purchase_frequency
+      expression: COUNT(DISTINCT fo.order_id) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_product
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_product.category
+    - dim_product.product_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.order_id
+    - fact_order_items.product_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: purchase_frequency_category_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: category
+      source_columns:
+      - dim_product.category
+      category: ordinary
+      token_namespace: null
+    - output_field: purchase_frequency
+      source_columns:
+      - fact_orders.customer_id
+      - fact_orders.order_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: purchase_frequency
+    direction: desc
+- name: repeat_customer_count_overall_v2
+  metric: repeat_customer_count
+  chinese_name: 整体跨日复购人数
+  query_type: staged_aggregate_metric
+  result_grain: overall
+  description: 在指定分析范围内，统计至少在两个不同支付日期完成成功购买的 customer 数量。同一 customer 同日多单只视为一个购买日。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(*) FILTER (WHERE cps.purchase_day_count >= 2)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    stages:
+    - stage_id: customer_purchase_summary
+      stage_type: aggregate
+      source:
+        table: fact_orders
+        stage_id: null
+        alias: fo
+      joins: []
+      filters:
+      - fo.paid_at IS NOT NULL
+      group_by:
+      - fo.customer_id
+      having: []
+      outputs:
+      - field: customer_id
+        expression: fo.customer_id
+      - field: purchase_day_count
+        expression: COUNT(DISTINCT CAST(fo.paid_at AS DATE))
+      - field: paid_order_count
+        expression: COUNT(DISTINCT fo.order_id)
+      hidden_control_fields: []
+    - stage_id: final
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: customer_purchase_summary
+        alias: cps
+      joins: []
+      filters: []
+      group_by: []
+      having: []
+      outputs:
+      - field: repeat_customer_count
+        expression: COUNT(*) FILTER (WHERE cps.purchase_day_count >= 2)
+      hidden_control_fields:
+      - field: __group_size
+        expression: COUNT(*)
+        semantics: distinct_buyers_in_analysis_period
+    final_stage: final
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_orders
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: repeat_customer_count_overall_v2_orders
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: repeat_customer_count
+      source_columns:
+      - fact_orders.customer_id
+      - fact_orders.order_id
+      - fact_orders.paid_at
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: repeat_customer_count
+    direction: desc
+- name: multi_order_customer_count_overall_v2
+  metric: multi_order_customer_count
+  chinese_name: 整体两单及以上购买人数
+  query_type: staged_aggregate_metric
+  result_grain: overall
+  description: 在指定分析范围内，统计产生至少两张成功支付订单的 customer 数量。同一 customer 同日多单仍分别计入订单数量。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(*) FILTER (WHERE cps.paid_order_count >= 2)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    stages:
+    - stage_id: customer_purchase_summary
+      stage_type: aggregate
+      source:
+        table: fact_orders
+        stage_id: null
+        alias: fo
+      joins: []
+      filters:
+      - fo.paid_at IS NOT NULL
+      group_by:
+      - fo.customer_id
+      having: []
+      outputs:
+      - field: customer_id
+        expression: fo.customer_id
+      - field: purchase_day_count
+        expression: COUNT(DISTINCT CAST(fo.paid_at AS DATE))
+      - field: paid_order_count
+        expression: COUNT(DISTINCT fo.order_id)
+      hidden_control_fields: []
+    - stage_id: final
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: customer_purchase_summary
+        alias: cps
+      joins: []
+      filters: []
+      group_by: []
+      having: []
+      outputs:
+      - field: multi_order_customer_count
+        expression: COUNT(*) FILTER (WHERE cps.paid_order_count >= 2)
+      hidden_control_fields:
+      - field: __group_size
+        expression: COUNT(*)
+        semantics: distinct_buyers_in_analysis_period
+    final_stage: final
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_orders
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: multi_order_customer_count_overall_v2_orders
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: multi_order_customer_count
+      source_columns:
+      - fact_orders.customer_id
+      - fact_orders.order_id
+      - fact_orders.paid_at
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: multi_order_customer_count
+    direction: desc
+- name: repeat_customer_rate_overall_v2
+  metric: repeat_customer_rate
+  chinese_name: 整体跨日复购率
+  query_type: staged_aggregate_metric
+  result_grain: overall
+  description: 在指定分析范围内，跨日复购客户数占同期所有成功支付购买客户数的比例。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(*) FILTER (WHERE cps.purchase_day_count >= 2) / NULLIF(COUNT(*), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    stages:
+    - stage_id: customer_purchase_summary
+      stage_type: aggregate
+      source:
+        table: fact_orders
+        stage_id: null
+        alias: fo
+      joins: []
+      filters:
+      - fo.paid_at IS NOT NULL
+      group_by:
+      - fo.customer_id
+      having: []
+      outputs:
+      - field: customer_id
+        expression: fo.customer_id
+      - field: purchase_day_count
+        expression: COUNT(DISTINCT CAST(fo.paid_at AS DATE))
+      - field: paid_order_count
+        expression: COUNT(DISTINCT fo.order_id)
+      hidden_control_fields: []
+    - stage_id: final
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: customer_purchase_summary
+        alias: cps
+      joins: []
+      filters: []
+      group_by: []
+      having: []
+      outputs:
+      - field: repeat_customer_rate
+        expression: COUNT(*) FILTER (WHERE cps.purchase_day_count >= 2) / NULLIF(COUNT(*), 0)
+      hidden_control_fields:
+      - field: __group_size
+        expression: COUNT(*)
+        semantics: distinct_buyers_in_analysis_period
+    final_stage: final
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_orders
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: repeat_customer_rate_overall_v2_orders
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: repeat_customer_rate
+      source_columns:
+      - fact_orders.customer_id
+      - fact_orders.order_id
+      - fact_orders.paid_at
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: repeat_customer_rate
+    direction: desc
+- name: member_gmv_share_overall_v2
+  metric: member_gmv_share
+  chinese_name: 整体会员GMV贡献率
+  query_type: aggregate_metric
+  result_grain: overall
+  description: 支付时点具有会员身份的订单 GMV 占同期全部成功支付 GMV 的比例。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(CASE WHEN fo.member_level_at_order IS NOT NULL THEN foi.item_paid_amount ELSE 0 END) / NULLIF(SUM(foi.item_paid_amount), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    group_by: []
+    outputs:
+    - field: member_gmv_share
+      expression: SUM(CASE WHEN fo.member_level_at_order IS NOT NULL THEN foi.item_paid_amount ELSE 0 END) / NULLIF(SUM(foi.item_paid_amount), 0)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_in_analysis_period
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.member_level_at_order
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: member_gmv_share_items
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: member_gmv_share
+      source_columns:
+      - fact_order_items.item_paid_amount
+      - fact_orders.member_level_at_order
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: member_gmv_share
+    direction: desc
+- name: refund_rate_overall_v2
+  metric: refund_rate
+  chinese_name: 整体退款率
+  query_type: staged_aggregate_metric
+  result_grain: overall
+  description: 指定销售分析范围内，原订单支付 cohort 最终已完成退款金额 占对应原始支付 GMV 的比例。多次部分退款先按 order_item 汇总，避免重复销售分母。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(item_refund_summary.completed_refund_amount) / NULLIF(SUM(item_refund_summary.item_paid_amount), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    - only fact_refunds.refund_status = 'completed' contributes to completed_refund_amount
+    time_window_columns: []
+  query_logic:
+    stages:
+    - stage_id: item_refund_summary
+      stage_type: aggregate
+      source:
+        table: fact_order_items
+        stage_id: null
+        alias: foi
+      joins:
+      - table: fact_orders
+        alias: fo
+        join_type: inner
+        conditions:
+        - left: foi.order_id
+          right: fo.order_id
+      - table: fact_refunds
+        alias: fr
+        join_type: left
+        conditions:
+        - left: foi.order_item_id
+          right: fr.order_item_id
+        - left: foi.order_id
+          right: fr.order_id
+      filters:
+      - fo.paid_at IS NOT NULL
+      group_by:
+      - foi.order_item_id
+      - foi.item_paid_amount
+      - fo.customer_id
+      having: []
+      outputs:
+      - field: order_item_id
+        expression: foi.order_item_id
+      - field: customer_id
+        expression: fo.customer_id
+      - field: item_paid_amount
+        expression: foi.item_paid_amount
+      - field: completed_refund_amount
+        expression: COALESCE(SUM(fr.refund_amount) FILTER (WHERE fr.refund_status = 'completed'), 0)
+      hidden_control_fields: []
+    - stage_id: final
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: item_refund_summary
+        alias: irs
+      joins: []
+      filters: []
+      group_by: []
+      having: []
+      outputs:
+      - field: refund_rate
+        expression: SUM(irs.completed_refund_amount) / NULLIF(SUM(irs.item_paid_amount), 0)
+      hidden_control_fields:
+      - field: __group_size
+        expression: COUNT(DISTINCT irs.customer_id)
+        semantics: distinct_buyers_in_sales_cohort
+    final_stage: final
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    - fact_refunds
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_order_items.order_item_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+    - fact_refunds.order_id
+    - fact_refunds.order_item_id
+    - fact_refunds.refund_amount
+    - fact_refunds.refund_status
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: refund_rate_sales_items
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: refund_rate
+      source_columns:
+      - fact_order_items.item_paid_amount
+      - fact_refunds.refund_amount
+      - fact_refunds.refund_status
+      category: business_confidential
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: refund_rate
+    direction: desc
+- name: roi_channel_v2
+  metric: roi
+  chinese_name: 渠道ROI
+  query_type: cross_fact_staged_metric
+  result_grain: channel
+  description: 按渠道计算同一分析时间窗内的 GMV / 营销投放金额。ROI 为倍数，不乘以 100。仅比较同时具备销售和营销能力的启用渠道。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: channel_gmv / marketing_spend_amount
+    base_filters:
+    - the same analysis_start_date and analysis_end_date apply to paid_at and spend_date
+    - dim_channel.is_active = TRUE
+    - dim_channel.is_sales_channel = TRUE
+    - dim_channel.is_marketing_channel = TRUE
+    time_window_columns:
+    - fact_orders.paid_at
+    - fact_marketing_spend.spend_date
+  query_logic:
+    stages:
+    - stage_id: channel_sales
+      stage_type: aggregate
+      source:
+        table: fact_order_items
+        stage_id: null
+        alias: foi
+      joins:
+      - table: fact_orders
+        alias: fo
+        join_type: inner
+        conditions:
+        - left: foi.order_id
+          right: fo.order_id
+      filters:
+      - fo.paid_at IS NOT NULL
+      - CAST(fo.paid_at AS DATE) BETWEEN :analysis_start_date AND :analysis_end_date
+      group_by:
+      - fo.channel_id
+      having: []
+      outputs:
+      - field: channel_id
+        expression: fo.channel_id
+      - field: channel_gmv
+        expression: SUM(foi.item_paid_amount)
+      - field: buyer_count
+        expression: COUNT(DISTINCT fo.customer_id)
+      hidden_control_fields: []
+    - stage_id: channel_spend
+      stage_type: aggregate
+      source:
+        table: fact_marketing_spend
+        stage_id: null
+        alias: fms
+      joins: []
+      filters:
+      - fms.spend_date BETWEEN :analysis_start_date AND :analysis_end_date
+      group_by:
+      - fms.channel_id
+      having: []
+      outputs:
+      - field: channel_id
+        expression: fms.channel_id
+      - field: marketing_spend_amount
+        expression: SUM(fms.spend_amount)
+      hidden_control_fields: []
+    - stage_id: final
+      stage_type: project
+      source:
+        table: null
+        stage_id: channel_sales
+        alias: cs
+      joins:
+      - stage_id: channel_spend
+        alias: csp
+        join_type: inner
+        conditions:
+        - left: cs.channel_id
+          right: csp.channel_id
+      - table: dim_channel
+        alias: dc
+        join_type: inner
+        conditions:
+        - left: cs.channel_id
+          right: dc.channel_id
+      filters:
+      - dc.is_active = TRUE
+      - dc.is_sales_channel = TRUE
+      - dc.is_marketing_channel = TRUE
+      group_by: []
+      having: []
+      outputs:
+      - field: channel_name
+        expression: dc.channel_name
+      - field: roi
+        expression: cs.channel_gmv / NULLIF(csp.marketing_spend_amount, 0)
+      hidden_control_fields:
+      - field: __group_size
+        expression: cs.buyer_count
+        semantics: distinct_buyers_per_channel
+    final_stage: final
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_marketing_spend
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_channel.channel_name
+    - dim_channel.is_active
+    - dim_channel.is_marketing_channel
+    - dim_channel.is_sales_channel
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_marketing_spend.channel_id
+    - fact_marketing_spend.spend_amount
+    - fact_marketing_spend.spend_date
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_marketing_spend
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: roi_channel_sales
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    - target_id: roi_channel_spend
+      source_table: fact_marketing_spend
+      table_aliases:
+      - table_name: fact_marketing_spend
+        alias: fms
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: channel_name
+      source_columns:
+      - dim_channel.channel_name
+      category: ordinary
+      token_namespace: null
+    - output_field: roi
+      source_columns:
+      - fact_marketing_spend.spend_amount
+      - fact_order_items.item_paid_amount
+      category: business_confidential
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: roi
+    direction: desc
+- name: cac_channel_v2
+  metric: cac
+  chinese_name: 渠道CAC
+  query_type: global_history_cross_fact_metric
+  result_grain: channel
+  description: 按渠道计算同一分析时间窗内营销投放金额 除以渠道支付新客数。渠道支付新客以 customer × channel 的完整历史第一次成功支付为准。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: marketing_spend_amount / channel_paid_new_customer_count
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    - channel first successful payment is determined before the analysis date filter
+    - the same analysis_start_date and analysis_end_date apply to first_channel_paid_at and spend_date
+    - dim_channel.is_active = TRUE
+    - dim_channel.is_sales_channel = TRUE
+    - dim_channel.is_marketing_channel = TRUE
+    time_window_columns:
+    - fact_orders.paid_at
+    - fact_marketing_spend.spend_date
+  query_logic:
+    stages:
+    - stage_id: channel_first_paid_history
+      stage_type: aggregate
+      source:
+        table: fact_orders
+        stage_id: null
+        alias: fo
+      joins: []
+      filters:
+      - fo.paid_at IS NOT NULL
+      group_by:
+      - fo.customer_id
+      - fo.channel_id
+      having: []
+      outputs:
+      - field: customer_id
+        expression: fo.customer_id
+      - field: channel_id
+        expression: fo.channel_id
+      - field: first_channel_paid_at
+        expression: MIN(fo.paid_at)
+      hidden_control_fields: []
+    - stage_id: windowed_channel_acquisition
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: channel_first_paid_history
+        alias: cfp
+      joins: []
+      filters:
+      - CAST(cfp.first_channel_paid_at AS DATE) BETWEEN :analysis_start_date AND :analysis_end_date
+      group_by:
+      - cfp.channel_id
+      having: []
+      outputs:
+      - field: channel_id
+        expression: cfp.channel_id
+      - field: channel_paid_new_customer_count
+        expression: COUNT(DISTINCT cfp.customer_id)
+      hidden_control_fields: []
+    - stage_id: channel_spend
+      stage_type: aggregate
+      source:
+        table: fact_marketing_spend
+        stage_id: null
+        alias: fms
+      joins: []
+      filters:
+      - fms.spend_date BETWEEN :analysis_start_date AND :analysis_end_date
+      group_by:
+      - fms.channel_id
+      having: []
+      outputs:
+      - field: channel_id
+        expression: fms.channel_id
+      - field: marketing_spend_amount
+        expression: SUM(fms.spend_amount)
+      hidden_control_fields: []
+    - stage_id: final
+      stage_type: project
+      source:
+        table: null
+        stage_id: windowed_channel_acquisition
+        alias: wca
+      joins:
+      - stage_id: channel_spend
+        alias: csp
+        join_type: inner
+        conditions:
+        - left: wca.channel_id
+          right: csp.channel_id
+      - table: dim_channel
+        alias: dc
+        join_type: inner
+        conditions:
+        - left: wca.channel_id
+          right: dc.channel_id
+      filters:
+      - dc.is_active = TRUE
+      - dc.is_sales_channel = TRUE
+      - dc.is_marketing_channel = TRUE
+      group_by: []
+      having: []
+      outputs:
+      - field: channel_name
+        expression: dc.channel_name
+      - field: cac
+        expression: csp.marketing_spend_amount / NULLIF(wca.channel_paid_new_customer_count, 0)
+      hidden_control_fields:
+      - field: __group_size
+        expression: wca.channel_paid_new_customer_count
+        semantics: channel_paid_new_customers_per_channel
+    final_stage: final
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_marketing_spend
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_channel.channel_name
+    - dim_channel.is_active
+    - dim_channel.is_marketing_channel
+    - dim_channel.is_sales_channel
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_marketing_spend.channel_id
+    - fact_marketing_spend.spend_amount
+    - fact_marketing_spend.spend_date
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: global_history_required
+    source_tables:
+    - fact_marketing_spend
+    - fact_orders
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: cac_channel_acquisition
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: fo
+    - target_id: cac_channel_spend
+      source_table: fact_marketing_spend
+      table_aliases:
+      - table_name: fact_marketing_spend
+        alias: fms
+    history_contract:
+      history_stage_id: channel_first_paid_history
+      analysis_window_stage_id: windowed_channel_acquisition
+      history_source_tables:
+      - fact_orders
+      sequence_partition_by:
+      - fo.customer_id
+      - fo.channel_id
+      sequence_order_by:
+      - fo.paid_at
+      - fo.order_id
+      pre_sequence_scope_bindings:
+      - dimension: channel
+        partition_reference: fo.channel_id
+      post_sequence_scope_dimensions:
+      - region
+      analysis_window_parameters:
+      - analysis_start_date
+      - analysis_end_date
+  result_contract:
+    field_bindings:
+    - output_field: channel_name
+      source_columns:
+      - dim_channel.channel_name
+      category: ordinary
+      token_namespace: null
+    - output_field: cac
+      source_columns:
+      - fact_marketing_spend.spend_amount
+      - fact_orders.channel_id
+      - fact_orders.customer_id
+      - fact_orders.paid_at
+      category: business_confidential
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: cac
+    direction: asc
+- name: brand_paid_new_customer_count_overall_v2
+  metric: brand_paid_new_customer_count
+  chinese_name: 品牌支付新客数
+  query_type: global_history_first_event_metric
+  result_grain: overall
+  description: 统计真实品牌首单支付时间落入分析窗口的 customer 数量。品牌首单从完整成功支付历史中按 customer 确定，每个 customer 在品牌生命周期中最多成为一次品牌新客。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(DISTINCT customer_id whose true brand-first paid order falls within the analysis window)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    - brand first successful payment is determined before the analysis date filter
+    time_window_columns:
+    - fact_orders.paid_at
+  query_logic:
+    stages:
+    - stage_id: brand_order_sequence
+      stage_type: project
+      source:
+        table: fact_orders
+        stage_id: null
+        alias: fo
+      joins: []
+      filters:
+      - fo.paid_at IS NOT NULL
+      group_by: []
+      having: []
+      outputs:
+      - field: customer_id
+        expression: fo.customer_id
+      - field: order_id
+        expression: fo.order_id
+      - field: paid_at
+        expression: fo.paid_at
+      - field: channel_id
+        expression: fo.channel_id
+      - field: shipping_region_id
+        expression: fo.shipping_region_id
+      - field: event_rank
+        expression: ROW_NUMBER() OVER (PARTITION BY fo.customer_id ORDER BY fo.paid_at ASC, fo.order_id ASC)
+      hidden_control_fields: []
+    - stage_id: true_brand_first_paid
+      stage_type: filter
+      source:
+        table: null
+        stage_id: brand_order_sequence
+        alias: bos
+      joins: []
+      filters:
+      - bos.event_rank = 1
+      group_by: []
+      having: []
+      outputs:
+      - field: customer_id
+        expression: bos.customer_id
+      - field: first_paid_at
+        expression: bos.paid_at
+      - field: first_channel_id
+        expression: bos.channel_id
+      - field: first_shipping_region_id
+        expression: bos.shipping_region_id
+      hidden_control_fields: []
+    - stage_id: windowed_brand_acquisition
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: true_brand_first_paid
+        alias: bfp
+      joins: []
+      filters:
+      - CAST(bfp.first_paid_at AS DATE) BETWEEN :analysis_start_date AND :analysis_end_date
+      group_by: []
+      having: []
+      outputs:
+      - field: brand_paid_new_customer_count
+        expression: COUNT(DISTINCT bfp.customer_id)
+      hidden_control_fields:
+      - field: __group_size
+        expression: COUNT(DISTINCT bfp.customer_id)
+        semantics: brand_paid_new_customers_in_analysis_period
+    final_stage: windowed_brand_acquisition
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: global_history_required
+    source_tables:
+    - fact_orders
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: brand_first_paid_orders
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: fo
+    history_contract:
+      history_stage_id: brand_order_sequence
+      analysis_window_stage_id: windowed_brand_acquisition
+      history_source_tables:
+      - fact_orders
+      sequence_partition_by:
+      - fo.customer_id
+      sequence_order_by:
+      - fo.paid_at
+      - fo.order_id
+      pre_sequence_scope_bindings: []
+      post_sequence_scope_dimensions:
+      - channel
+      - region
+      analysis_window_parameters:
+      - analysis_start_date
+      - analysis_end_date
+  result_contract:
+    field_bindings:
+    - output_field: brand_paid_new_customer_count
+      source_columns:
+      - fact_orders.customer_id
+      - fact_orders.order_id
+      - fact_orders.paid_at
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: brand_paid_new_customer_count
+    direction: desc
+- name: channel_paid_new_customer_count_channel_v2
+  metric: channel_paid_new_customer_count
+  chinese_name: 渠道支付新客数
+  query_type: global_history_first_event_metric
+  result_grain: channel
+  description: 按渠道统计 customer 在该 channel 的第一次成功支付事件。同一 customer 可以分别成为多个渠道的新客，但在同一 channel 中最多一次。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(customer-channel whose first_channel_paid_at falls within the analysis window)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    - channel first successful payment is determined before the analysis date filter
+    time_window_columns:
+    - fact_orders.paid_at
+  query_logic:
+    stages:
+    - stage_id: channel_first_paid_history
+      stage_type: aggregate
+      source:
+        table: fact_orders
+        stage_id: null
+        alias: fo
+      joins: []
+      filters:
+      - fo.paid_at IS NOT NULL
+      group_by:
+      - fo.customer_id
+      - fo.channel_id
+      having: []
+      outputs:
+      - field: customer_id
+        expression: fo.customer_id
+      - field: channel_id
+        expression: fo.channel_id
+      - field: first_channel_paid_at
+        expression: MIN(fo.paid_at)
+      hidden_control_fields: []
+    - stage_id: windowed_channel_acquisition
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: channel_first_paid_history
+        alias: cfp
+      joins: []
+      filters:
+      - CAST(cfp.first_channel_paid_at AS DATE) BETWEEN :analysis_start_date AND :analysis_end_date
+      group_by:
+      - cfp.channel_id
+      having: []
+      outputs:
+      - field: channel_id
+        expression: cfp.channel_id
+      - field: channel_paid_new_customer_count
+        expression: COUNT(DISTINCT cfp.customer_id)
+      hidden_control_fields: []
+    - stage_id: final
+      stage_type: project
+      source:
+        table: null
+        stage_id: windowed_channel_acquisition
+        alias: wca
+      joins:
+      - table: dim_channel
+        alias: dc
+        join_type: inner
+        conditions:
+        - left: wca.channel_id
+          right: dc.channel_id
+      filters: []
+      group_by: []
+      having: []
+      outputs:
+      - field: channel_name
+        expression: dc.channel_name
+      - field: channel_paid_new_customer_count
+        expression: wca.channel_paid_new_customer_count
+      hidden_control_fields:
+      - field: __group_size
+        expression: wca.channel_paid_new_customer_count
+        semantics: channel_paid_new_customers_per_channel
+    final_stage: final
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_channel.channel_name
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: global_history_required
+    source_tables:
+    - fact_orders
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: channel_first_paid_orders
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: fo
+    history_contract:
+      history_stage_id: channel_first_paid_history
+      analysis_window_stage_id: windowed_channel_acquisition
+      history_source_tables:
+      - fact_orders
+      sequence_partition_by:
+      - fo.customer_id
+      - fo.channel_id
+      sequence_order_by:
+      - fo.paid_at
+      - fo.order_id
+      pre_sequence_scope_bindings:
+      - dimension: channel
+        partition_reference: fo.channel_id
+      post_sequence_scope_dimensions:
+      - region
+      analysis_window_parameters:
+      - analysis_start_date
+      - analysis_end_date
+  result_contract:
+    field_bindings:
+    - output_field: channel_name
+      source_columns:
+      - dim_channel.channel_name
+      category: ordinary
+      token_namespace: null
+    - output_field: channel_paid_new_customer_count
+      source_columns:
+      - fact_orders.channel_id
+      - fact_orders.customer_id
+      - fact_orders.paid_at
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: channel_paid_new_customer_count
+    direction: desc

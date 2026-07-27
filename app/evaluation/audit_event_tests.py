@@ -15,6 +15,7 @@ from app.governance.audit_event import (
     AuditStage,
     build_actor_ref,
     build_audit_event,
+    fingerprint_text,
     serialize_audit_event,
 )
 from app.governance.authorization import (
@@ -42,6 +43,7 @@ from app.governance.sensitive_data import (
 
 
 AUDIT_SECRET = "day71-audit-secret-32-characters"
+ALT_AUDIT_SECRET = "day72-alt-audit-secret-32-chars"
 FIXED_TIME = datetime(
     2026,
     7,
@@ -710,6 +712,154 @@ def test_input_repair_history_is_not_mutated() -> None:
     )
 
 
+
+def test_sensitive_fingerprint_is_deterministic() -> None:
+    first = fingerprint_text(
+        "SELECT 1",
+        namespace="executed_sql",
+        audit_secret=AUDIT_SECRET,
+    )
+    second = fingerprint_text(
+        "SELECT 1",
+        namespace="executed_sql",
+        audit_secret=AUDIT_SECRET,
+    )
+
+    assert_equal(
+        first,
+        second,
+        "Same secret, namespace and text must be deterministic.",
+    )
+
+
+def test_sensitive_fingerprint_changes_with_secret() -> None:
+    first = fingerprint_text(
+        "SELECT 1",
+        namespace="executed_sql",
+        audit_secret=AUDIT_SECRET,
+    )
+    second = fingerprint_text(
+        "SELECT 1",
+        namespace="executed_sql",
+        audit_secret=ALT_AUDIT_SECRET,
+    )
+
+    assert_true(
+        first != second,
+        "Sensitive fingerprint must change when the Audit Secret changes.",
+    )
+
+
+def test_sensitive_fingerprint_is_domain_separated() -> None:
+    question_fp = fingerprint_text(
+        "SELECT 1",
+        namespace="question",
+        audit_secret=AUDIT_SECRET,
+    )
+    sql_fp = fingerprint_text(
+        "SELECT 1",
+        namespace="executed_sql",
+        audit_secret=AUDIT_SECRET,
+    )
+
+    assert_true(
+        question_fp != sql_fp,
+        "The same text in different audit domains must not share a fingerprint.",
+    )
+
+
+def test_repair_fingerprints_follow_hmac_contract() -> None:
+    source_sql = "SELECT bad_column FROM fact_orders"
+    repaired_sql = "SELECT order_id FROM fact_orders"
+    error_text = "column bad_column does not exist"
+
+    event = build_success_event(
+        executed_sql=repaired_sql,
+        repair_history=(
+            {
+                "attempt": 1,
+                "source_sql": source_sql,
+                "repaired_sql": repaired_sql,
+                "execution_error": error_text,
+            },
+        ),
+    ).event
+
+    attempt = event.repair.attempts[0]
+
+    assert_equal(
+        attempt.source_sql_fingerprint,
+        fingerprint_text(
+            source_sql,
+            namespace="repair_source_sql",
+            audit_secret=AUDIT_SECRET,
+        ),
+        "Repair source SQL must use the keyed fingerprint contract.",
+    )
+
+    assert_equal(
+        attempt.repaired_sql_fingerprint,
+        fingerprint_text(
+            repaired_sql,
+            namespace="repair_output_sql",
+            audit_secret=AUDIT_SECRET,
+        ),
+        "Repaired SQL must use the keyed fingerprint contract.",
+    )
+
+    assert_equal(
+        attempt.execution_error_fingerprint,
+        fingerprint_text(
+            error_text,
+            namespace="repair_execution_error",
+            audit_secret=AUDIT_SECRET,
+        ),
+        "Repair error must use the keyed fingerprint contract.",
+    )
+
+
+def test_invalid_audit_input_message_does_not_echo_supplied_value() -> None:
+    malicious_value = "TOP_SECRET_RAW_VALUE_SHOULD_NOT_ECHO"
+
+    result = build_audit_event(
+        context=build_context(),
+        question="test",
+        authorization=allowed_authorization(),
+        execution=successful_execution(),
+        protection=successful_protection(),
+        metric_name={"payload": malicious_value},  # type: ignore[arg-type]
+        audit_secret=AUDIT_SECRET,
+        event_id="audit-event-invalid-input",
+        occurred_at_utc=FIXED_TIME,
+    )
+
+    assert_equal(
+        result.success,
+        False,
+        "Invalid audit input must fail closed.",
+    )
+
+    assert_equal(
+        result.reason_code,
+        AuditBuildReason.INVALID_AUDIT_INPUT,
+        "Invalid input must use a stable audit reason.",
+    )
+
+    assert_true(
+        malicious_value not in result.message,
+        "Audit build failure message must not echo supplied raw values.",
+    )
+
+
+def test_hardened_audit_event_uses_v2_schema_version() -> None:
+    event = build_success_event().event
+
+    assert_equal(
+        event.audit_schema_version,
+        "audit_event_v2",
+        "HMAC fingerprint semantics require a versioned audit schema.",
+    )
+
 def run_tests() -> None:
     tests = [
         test_actor_ref_is_deterministic,
@@ -732,6 +882,12 @@ def run_tests() -> None:
         test_protection_summary_contains_no_rows,
         test_naive_timestamp_is_rejected_structurally,
         test_input_repair_history_is_not_mutated,
+        test_sensitive_fingerprint_is_deterministic,
+        test_sensitive_fingerprint_changes_with_secret,
+        test_sensitive_fingerprint_is_domain_separated,
+        test_repair_fingerprints_follow_hmac_contract,
+        test_invalid_audit_input_message_does_not_echo_supplied_value,
+        test_hardened_audit_event_uses_v2_schema_version,
     ]
 
     passed = 0
