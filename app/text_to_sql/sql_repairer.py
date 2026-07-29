@@ -1,32 +1,11 @@
-import os
-
-from dotenv import load_dotenv
-from openai import OpenAI
-
+from app.llm.deepseek_client import (
+    DEEPSEEK_MODEL,
+    chat_completion,
+)
 from app.semantic_layer.context_builder import build_context
 from app.text_to_sql.prompt_builder import (
     build_intent_context,
     build_sql_generation_rules,
-)
-
-
-load_dotenv()
-
-
-DEEPSEEK_MODEL = os.getenv(
-    "DEEPSEEK_MODEL",
-    "deepseek-v4-pro",
-).strip()
-
-if not DEEPSEEK_MODEL:
-    raise RuntimeError(
-        "DEEPSEEK_MODEL cannot be empty."
-    )
-
-
-client = OpenAI(
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url=os.getenv("DEEPSEEK_BASE_URL"),
 )
 
 
@@ -112,15 +91,16 @@ def repair_sql(
         context=context,
     )
 
-    response = client.chat.completions.create(
+    return chat_completion(
         model=DEEPSEEK_MODEL,
         messages=[
-            {"role": "user", "content": prompt},
+            {
+                "role": "user",
+                "content": prompt,
+            }
         ],
         temperature=0,
     )
-
-    return response.choices[0].message.content or ""
 
 
 if __name__ == "__main__":

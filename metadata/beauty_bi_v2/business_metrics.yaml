@@ -71,7 +71,8 @@ metrics:
   definition: '在指定分析范围内，成功支付订单产生的商品毛利额 占对应 GMV 的比例。 该指标衡量每单位支付销售额中有多少比例形成商品毛利， 不等同于净利润率或其他经营利润率。
 
     '
-  formula: "SUM(\n  fact_order_items.item_paid_amount\n  - fact_order_items.item_cost_amount\n) / NULLIF(\n  SUM(fact_order_items.item_paid_amount),\n  0\n)\n"
+  formula: "SUM(\n  fact_order_items.item_paid_amount\n  - fact_order_items.item_cost_amount\n) / NULLIF(\n  SUM(fact_order_items.item_paid_amount),\n\
+    \  0\n)\n"
   tables:
   - fact_orders
   - fact_order_items
@@ -96,7 +97,8 @@ metrics:
   - 成交退款率
   - 退款金额占比
   grain: paid_order_items
-  definition: '在指定销售分析范围内，成功支付订单最终已完成退款的金额 占对应原始支付销售金额的比例。 仅 refund_status 为 completed 的退款进入退款金额； rejected、cancelled 和尚未完成的 requested 退款不计入分子。 退款归属原订单的 paid_at，用于衡量对应销售 cohort 的退款程度， 不表示按 refund_completed_at 统计的售后退款发生趋势。
+  definition: '在指定销售分析范围内，成功支付订单最终已完成退款的金额 占对应原始支付销售金额的比例。 仅 refund_status 为 completed 的退款进入退款金额； rejected、cancelled 和尚未完成的
+    requested 退款不计入分子。 退款归属原订单的 paid_at，用于衡量对应销售 cohort 的退款程度， 不表示按 refund_completed_at 统计的售后退款发生趋势。
 
     '
   formula: "SUM(completed_refund_amount) / NULLIF(\n  SUM(fact_order_items.item_paid_amount),\n  0\n)\n"
@@ -129,7 +131,8 @@ metrics:
   - 投产比
   - 投放产出比
   grain: channel
-  definition: '在指定分析时间范围内，直接响应渠道产生的成功支付 GMV 与该渠道同期营销投入金额的比值。 本项目 ROI 定义为 GMV / Marketing Spend，结果表示倍率而非百分比， 不扣除商品成本、退款及其他经营费用。 没有直接销售归因能力的 marketing-only 渠道不纳入直接响应 ROI 比较。
+  definition: '在指定分析时间范围内，直接响应渠道产生的成功支付 GMV 与该渠道同期营销投入金额的比值。 本项目 ROI 定义为 GMV / Marketing Spend，结果表示倍率而非百分比， 不扣除商品成本、退款及其他经营费用。
+    没有直接销售归因能力的 marketing-only 渠道不纳入直接响应 ROI 比较。
 
     '
   formula: "SUM(channel_gmv) / NULLIF(\n  SUM(fact_marketing_spend.spend_amount),\n  0\n)\n"
@@ -163,7 +166,8 @@ metrics:
   - 渠道获客成本
   - 拉新成本
   grain: channel
-  definition: '在指定分析时间范围内，直接响应渠道的营销投入金额 除以该渠道同期产生的渠道支付新客数。 渠道支付新客指 customer 在该 channel 的第一次成功支付， 首次支付必须基于完整历史订单确定，再判断该首次支付事件 是否落入当前分析时间范围。 后续退款不改变已经发生的首次成功支付事件。 本指标不等同于渠道贡献品牌新客的获客成本。
+  definition: '在指定分析时间范围内，直接响应渠道的营销投入金额 除以该渠道同期产生的渠道支付新客数。 渠道支付新客指 customer 在该 channel 的第一次成功支付， 首次支付必须基于完整历史订单确定，再判断该首次支付事件
+    是否落入当前分析时间范围。 后续退款不改变已经发生的首次成功支付事件。 本指标不等同于渠道贡献品牌新客的获客成本。
 
     '
   formula: "SUM(fact_marketing_spend.spend_amount) / NULLIF(\n  channel_paid_new_customer_count,\n  0\n)\n"
@@ -199,10 +203,12 @@ metrics:
   - 品牌首次购买客户数
   - 首购客户数
   grain: customer_first_paid_event
-  definition: '在指定分析时间范围内，首次完成品牌成功支付的 customer 数量。 每个 customer 在整个品牌生命周期中最多只会成为一次品牌支付新客。 首次支付必须基于完整历史成功支付订单确定， 再判断该首次支付事件是否落入当前分析时间范围。 客户后续发生退款、再次购买或进入其他渠道， 都不会改变已经发生的品牌首次支付事件。
+  definition: '在指定分析时间范围内，首次完成品牌成功支付的 customer 数量。 每个 customer 在整个品牌生命周期中最多只会成为一次品牌支付新客。 首次支付必须基于完整历史成功支付订单确定， 再判断该首次支付事件是否落入当前分析时间范围。
+    客户后续发生退款、再次购买或进入其他渠道， 都不会改变已经发生的品牌首次支付事件。
 
     '
-  formula: "COUNT(\n  customer where global_brand_paid_sequence = 1\n  and first_brand_paid_at is within analysis date range\n)\n"
+  formula: "COUNT(\n  customer where global_brand_paid_sequence = 1\n  and first_brand_paid_at is within analysis date range\n\
+    )\n"
   tables:
   - fact_orders
   filters:
@@ -229,10 +235,12 @@ metrics:
   - 首次进入渠道客户数
   - 渠道拉新人数
   grain: customer_channel_first_paid_event
-  definition: '在指定分析时间范围内，customer 在某个 channel 首次完成成功支付所形成的渠道支付新客数量。 同一个 customer 可以分别成为多个渠道的渠道支付新客， 但在同一个 channel 中最多只会成为一次渠道支付新客。 渠道首次支付必须基于该 customer 在该 channel 的完整历史成功支付订单确定， 再判断首次支付事件是否落入当前分析时间范围。 后续退款不改变已经发生的渠道首次支付事件。
+  definition: '在指定分析时间范围内，customer 在某个 channel 首次完成成功支付所形成的渠道支付新客数量。 同一个 customer 可以分别成为多个渠道的渠道支付新客， 但在同一个 channel 中最多只会成为一次渠道支付新客。
+    渠道首次支付必须基于该 customer 在该 channel 的完整历史成功支付订单确定， 再判断首次支付事件是否落入当前分析时间范围。 后续退款不改变已经发生的渠道首次支付事件。
 
     '
-  formula: "COUNT(\n  customer-channel where channel_paid_sequence = 1\n  and first_channel_paid_at is within analysis date range\n)\n"
+  formula: "COUNT(\n  customer-channel where channel_paid_sequence = 1\n  and first_channel_paid_at is within analysis date\
+    \ range\n)\n"
   tables:
   - fact_orders
   - dim_channel
@@ -258,7 +266,8 @@ metrics:
   - 跨购买日复购率
   - 同日多单计一次复购率
   grain: customer_purchase_period
-  definition: '在指定分析时间范围内，至少在两个不同支付日期发生成功购买的 customer 数，占同期所有成功支付购买客户数的比例。 同一个 customer 在同一天产生多张支付订单时，该日期只视为一个购买日。 本指标用于衡量报告周期内客户再次发生购买行为的比例， 不等同于两单及以上客户占比，也不等同于首购后30日、90日等 Cohort 新客复购率。
+  definition: '在指定分析时间范围内，至少在两个不同支付日期发生成功购买的 customer 数，占同期所有成功支付购买客户数的比例。 同一个 customer 在同一天产生多张支付订单时，该日期只视为一个购买日。 本指标用于衡量报告周期内客户再次发生购买行为的比例，
+    不等同于两单及以上客户占比，也不等同于首购后30日、90日等 Cohort 新客复购率。
 
     '
   formula: "repeat_customer_count / NULLIF(\n  buyer_count,\n  0\n)\n"
@@ -287,7 +296,8 @@ metrics:
   - 会员消费贡献率
   - 会员销售金额占比
   grain: paid_order_items
-  definition: '在指定分析时间范围内，支付时点具有会员身份的订单所产生的 GMV， 占同期全部成功支付 GMV 的比例。 会员身份使用 fact_orders.member_level_at_order 的支付时点快照判断， 不使用客户当前会员状态回溯历史交易。 本指标衡量会员销售对整体 GMV 的贡献程度， 不代表会员人数占比、会员增量贡献或利润贡献。
+  definition: '在指定分析时间范围内，支付时点具有会员身份的订单所产生的 GMV， 占同期全部成功支付 GMV 的比例。 会员身份使用 fact_orders.member_level_at_order 的支付时点快照判断， 不使用客户当前会员状态回溯历史交易。
+    本指标衡量会员销售对整体 GMV 的贡献程度， 不代表会员人数占比、会员增量贡献或利润贡献。
 
     '
   formula: "SUM(\n  member_order_item_paid_amount\n) / NULLIF(\n  SUM(fact_order_items.item_paid_amount),\n  0\n)\n"
@@ -517,10 +527,10 @@ metrics:
   - fact_orders.paid_at IS NOT NULL
   - purchase days are determined by distinct fact_orders.paid_at dates
   examples:
-  - 2025年复购人数是多少
+  - 2025年跨日复购人数是多少
   - 今年跨日复购客户数
-  - 每月复购人数趋势
-  - 2024年和2025年复购客户数对比
+  - 每月跨日复购人数趋势
+  - 2024年和2025年跨日复购客户数对比
   negative_examples:
   - 两单及以上购买人数是多少
   - 2025年复购率是多少
