@@ -18,6 +18,9 @@ from app.semantic_layer.question_signature_v2 import (
 
 ExtractorFn = Callable[[str], QuestionSemanticSignatureV2]
 
+FIRST_FRESH_ADVERSARIAL_FINGERPRINT_V2 = (
+    "eda72cdc4762054ba2bfaa007b56ee422f0c99cdc2145a1eaea54f65e739a929"
+)
 
 def _compare_scalar(
     *,
@@ -171,6 +174,22 @@ def run_question_signature_adversarial_eval_v2(
     *,
     extractor: ExtractorFn = extract_question_semantic_signature_v2,
 ) -> dict[str, Any]:
+    current_fingerprint = (
+        question_signature_adversarial_fingerprint_v2()
+    )
+
+    if (
+        current_fingerprint
+        != FIRST_FRESH_ADVERSARIAL_FINGERPRINT_V2
+    ):
+        raise ValueError(
+            "This evaluator is reserved for the original Day74 "
+            "first-fresh adversarial dataset and must not run "
+            "against a migrated or observed case contract. "
+            f"Expected={FIRST_FRESH_ADVERSARIAL_FINGERPRINT_V2}; "
+            f"Actual={current_fingerprint}"
+        )
+        
     results = [
         evaluate_question_signature_adversarial_case_v2(
             case,

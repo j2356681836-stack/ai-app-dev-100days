@@ -17,7 +17,7 @@ from app.semantic_layer.question_signature_v2 import (
 
 
 QUESTION_SIGNATURE_ADVERSARIAL_VERSION_V2 = (
-    "beauty_bi_v2_question_signature_adversarial_1"
+    "beauty_bi_v2_question_signature_adversarial_2"
 )
 
 
@@ -184,7 +184,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         operator=QuestionOperator.DIVIDE,
         left=SemanticOperand.COMPLETED_REFUND_AMOUNT,
         right=SemanticOperand.PAID_AMOUNT,
-        qualifiers=(SemanticQualifier.COMPLETED_REFUND_ONLY,),
         note="Refund amount ratio.",
     ),
     _case(
@@ -196,7 +195,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         left=SemanticOperand.COMPLETED_REFUND_AMOUNT,
         right=SemanticOperand.PAID_AMOUNT,
         qualifiers=(
-            SemanticQualifier.COMPLETED_REFUND_ONLY,
             SemanticQualifier.SALES_COHORT_ATTRIBUTION,
         ),
         note="Refund cohort attribution phrased differently.",
@@ -233,7 +231,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         left=SemanticOperand.MARKETING_SPEND,
         right=SemanticOperand.CHANNEL_FIRST_PAID_CUSTOMER,
         partition=IntrinsicPartition.CHANNEL,
-        qualifiers=(SemanticQualifier.FULL_HISTORY_CHANNEL_FIRST_PAID,),
         note="CAC using per-channel first-paid customer basis.",
     ),
     _case(
@@ -245,7 +242,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         left=SemanticOperand.MARKETING_SPEND,
         right=SemanticOperand.CHANNEL_FIRST_PAID_CUSTOMER,
         partition=IntrinsicPartition.CHANNEL,
-        qualifiers=(SemanticQualifier.FULL_HISTORY_CHANNEL_FIRST_PAID,),
         note="CAC direct quotient phrasing.",
     ),
     _case(
@@ -255,7 +251,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         "全品牌历史里，本期才第一次成交的客户共有多少？",
         operator=QuestionOperator.COUNT,
         left=SemanticOperand.GLOBAL_FIRST_PAID_CUSTOMER,
-        qualifiers=(SemanticQualifier.FULL_HISTORY_BRAND_FIRST_PAID,),
         note="Brand first-paid count.",
     ),
     _case(
@@ -265,7 +260,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         "先找每位客户在品牌内最早的成交，再数最早成交落在本期的人",
         operator=QuestionOperator.COUNT,
         left=SemanticOperand.GLOBAL_FIRST_PAID_CUSTOMER,
-        qualifiers=(SemanticQualifier.FULL_HISTORY_BRAND_FIRST_PAID,),
         note="Brand first-paid procedural paraphrase.",
     ),
     _case(
@@ -276,7 +270,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         operator=QuestionOperator.COUNT,
         left=SemanticOperand.CHANNEL_FIRST_PAID_CUSTOMER,
         partition=IntrinsicPartition.CHANNEL,
-        qualifiers=(SemanticQualifier.FULL_HISTORY_CHANNEL_FIRST_PAID,),
         note="Channel first-paid count.",
     ),
     _case(
@@ -287,7 +280,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         operator=QuestionOperator.COUNT,
         left=SemanticOperand.CHANNEL_FIRST_PAID_CUSTOMER,
         partition=IntrinsicPartition.CHANNEL,
-        qualifiers=(SemanticQualifier.FULL_HISTORY_CHANNEL_FIRST_PAID,),
         note="Channel first-paid procedural paraphrase.",
     ),
     _case(
@@ -298,7 +290,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         operator=QuestionOperator.DIVIDE,
         left=SemanticOperand.REPEAT_DISTINCT_PAID_DATE_CUSTOMER,
         right=SemanticOperand.PAID_BUYER,
-        qualifiers=(SemanticQualifier.DISTINCT_PAID_DATES_GE_2,),
         note="Cross-date repeat rate.",
     ),
     _case(
@@ -309,7 +300,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         operator=QuestionOperator.DIVIDE,
         left=SemanticOperand.REPEAT_DISTINCT_PAID_DATE_CUSTOMER,
         right=SemanticOperand.PAID_BUYER,
-        qualifiers=(SemanticQualifier.DISTINCT_PAID_DATES_GE_2,),
         note="Cross-date repeat share.",
     ),
     _case(
@@ -320,7 +310,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         operator=QuestionOperator.DIVIDE,
         left=SemanticOperand.PAYMENT_TIME_MEMBER_PAID_AMOUNT,
         right=SemanticOperand.PAID_AMOUNT,
-        qualifiers=(SemanticQualifier.PAYMENT_TIME_MEMBERSHIP_SNAPSHOT,),
         note="Payment-time membership share.",
     ),
     _case(
@@ -331,7 +320,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         operator=QuestionOperator.DIVIDE,
         left=SemanticOperand.PAYMENT_TIME_MEMBER_PAID_AMOUNT,
         right=SemanticOperand.PAID_AMOUNT,
-        qualifiers=(SemanticQualifier.PAYMENT_TIME_MEMBERSHIP_SNAPSHOT,),
         note="Payment-time member basis, colloquial.",
     ),
     _case(
@@ -475,7 +463,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         "本期有多少买家至少在两个不同成交日期买过？",
         operator=QuestionOperator.COUNT,
         left=SemanticOperand.REPEAT_DISTINCT_PAID_DATE_CUSTOMER,
-        qualifiers=(SemanticQualifier.DISTINCT_PAID_DATES_GE_2,),
         note="Cross-date repeat buyer count.",
     ),
     _case(
@@ -485,7 +472,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         "不同成交日达到两个及以上的客户人数",
         operator=QuestionOperator.COUNT,
         left=SemanticOperand.REPEAT_DISTINCT_PAID_DATE_CUSTOMER,
-        qualifiers=(SemanticQualifier.DISTINCT_PAID_DATES_GE_2,),
         note="Repeat count structural definition.",
     ),
     _case(
@@ -495,7 +481,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         "本期成交订单达到两单及以上的客户有多少？",
         operator=QuestionOperator.COUNT,
         left=SemanticOperand.MULTI_PAID_ORDER_CUSTOMER,
-        qualifiers=(SemanticQualifier.PAID_ORDERS_GE_2,),
         note="Multi-order customer count.",
     ),
     _case(
@@ -505,7 +490,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         "不管是不是同一天，只要成交两单以上就算，这样的客户人数",
         operator=QuestionOperator.COUNT,
         left=SemanticOperand.MULTI_PAID_ORDER_CUSTOMER,
-        qualifiers=(SemanticQualifier.PAID_ORDERS_GE_2,),
         note="Multi-order explicitly contrasted with cross-date repeat.",
     ),
 
@@ -679,7 +663,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         "同一天成交两单也算，统计达到两单以上的客户人数",
         operator=QuestionOperator.COUNT,
         left=SemanticOperand.MULTI_PAID_ORDER_CUSTOMER,
-        qualifiers=(SemanticQualifier.PAID_ORDERS_GE_2,),
         note="Same-day two orders => multi-order, not cross-date repeat.",
     ),
     _case(
@@ -689,7 +672,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         "必须至少两个不同成交日才算，符合条件的客户数",
         operator=QuestionOperator.COUNT,
         left=SemanticOperand.REPEAT_DISTINCT_PAID_DATE_CUSTOMER,
-        qualifiers=(SemanticQualifier.DISTINCT_PAID_DATES_GE_2,),
         note="Explicit cross-date repeat.",
     ),
     _case(
@@ -699,7 +681,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         "只按品牌全历史判断第一次成交的客户人数",
         operator=QuestionOperator.COUNT,
         left=SemanticOperand.GLOBAL_FIRST_PAID_CUSTOMER,
-        qualifiers=(SemanticQualifier.FULL_HISTORY_BRAND_FIRST_PAID,),
         note="Explicit brand-first basis.",
     ),
     _case(
@@ -710,7 +691,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         operator=QuestionOperator.COUNT,
         left=SemanticOperand.CHANNEL_FIRST_PAID_CUSTOMER,
         partition=IntrinsicPartition.CHANNEL,
-        qualifiers=(SemanticQualifier.FULL_HISTORY_CHANNEL_FIRST_PAID,),
         note="Explicit channel-first basis.",
     ),
     _case(
@@ -721,7 +701,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         operator=QuestionOperator.DIVIDE,
         left=SemanticOperand.PAYMENT_TIME_MEMBER_PAID_AMOUNT,
         right=SemanticOperand.PAID_AMOUNT,
-        qualifiers=(SemanticQualifier.PAYMENT_TIME_MEMBERSHIP_SNAPSHOT,),
         note="Payment-time snapshot explicit.",
     ),
     _case(
@@ -733,7 +712,6 @@ QUESTION_SIGNATURE_ADVERSARIAL_CASES_V2 = (
         left=SemanticOperand.COMPLETED_REFUND_AMOUNT,
         right=SemanticOperand.PAID_AMOUNT,
         qualifiers=(
-            SemanticQualifier.COMPLETED_REFUND_ONLY,
             SemanticQualifier.SALES_COHORT_ATTRIBUTION,
         ),
         note="Refund sales-cohort attribution explicit.",

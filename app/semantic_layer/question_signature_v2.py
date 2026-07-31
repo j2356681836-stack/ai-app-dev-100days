@@ -839,17 +839,6 @@ def _detect_qualifiers_v2(
             )
         )
 
-    if (
-        SemanticOperand.COMPLETED_REFUND_AMOUNT
-        in operands
-    ):
-        rules.append(
-            (
-                SemanticQualifier.COMPLETED_REFUND_ONLY,
-                r"完成退款|完成退回|已完成退回|最终被完成退款|最终被退回",
-            )
-        )
-
     if re.search(
         r"原购买期归属|购买期归属|销售期归属",
         text,
@@ -858,61 +847,6 @@ def _detect_qualifiers_v2(
             (
                 SemanticQualifier.SALES_COHORT_ATTRIBUTION,
                 r"原购买期归属|购买期归属|销售期归属",
-            )
-        )
-
-    if (
-        SemanticOperand.GLOBAL_FIRST_PAID_CUSTOMER
-        in operands
-    ):
-        rules.append(
-            (
-                SemanticQualifier.FULL_HISTORY_BRAND_FIRST_PAID,
-                r"全历史|全品牌历史|整个品牌|全品牌|第一次|首次|第一笔",
-            )
-        )
-
-    if (
-        SemanticOperand.CHANNEL_FIRST_PAID_CUSTOMER
-        in operands
-    ):
-        rules.append(
-            (
-                SemanticQualifier.FULL_HISTORY_CHANNEL_FIRST_PAID,
-                r"历史|第一次|首次|第一笔",
-            )
-        )
-
-    if (
-        SemanticOperand.REPEAT_DISTINCT_PAID_DATE_CUSTOMER
-        in operands
-    ):
-        rules.append(
-            (
-                SemanticQualifier.DISTINCT_PAID_DATES_GE_2,
-                r"两个.*?不同|两.*?不同|另一个日期再次|两个以上|至少为二",
-            )
-        )
-
-    if (
-        SemanticOperand.MULTI_PAID_ORDER_CUSTOMER
-        in operands
-    ):
-        rules.append(
-            (
-                SemanticQualifier.PAID_ORDERS_GE_2,
-                r"两笔|两次|至少两次|两笔或更多|不小于二",
-            )
-        )
-
-    if (
-        SemanticOperand.PAYMENT_TIME_MEMBER_PAID_AMOUNT
-        in operands
-    ):
-        rules.append(
-            (
-                SemanticQualifier.PAYMENT_TIME_MEMBERSHIP_SNAPSHOT,
-                r"付款当时|支付瞬间|下单付款时",
             )
         )
 
@@ -926,6 +860,7 @@ def _detect_qualifiers_v2(
                 r"同期",
             )
         )
+
     qualifiers: list[
         SemanticQualifier
     ] = []

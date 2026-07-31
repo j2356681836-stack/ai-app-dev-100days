@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from app.semantic_layer.metric_loader_v2 import load_metrics_v2
 
 
-METRIC_SIGNATURE_VERSION_V2 = "beauty_bi_v2_metric_signature_1"
+METRIC_SIGNATURE_VERSION_V2 = "beauty_bi_v2_metric_signature_2"
 
 
 class SignatureOperator(str, Enum):
@@ -49,28 +49,11 @@ class IntrinsicPartition(str, Enum):
 
 
 class SemanticQualifier(str, Enum):
-    PAID_ONLY = "paid_only"
     PRODUCT_COST_BASIS = "product_cost_basis"
-
-    COMPLETED_REFUND_ONLY = "completed_refund_only"
     SALES_COHORT_ATTRIBUTION = "sales_cohort_attribution"
 
     DIRECT_RESPONSE_CHANNEL = "direct_response_channel"
     SAME_WINDOW_SALES_SPEND = "same_window_sales_spend"
-
-    FULL_HISTORY_BRAND_FIRST_PAID = (
-        "full_history_brand_first_paid"
-    )
-    FULL_HISTORY_CHANNEL_FIRST_PAID = (
-        "full_history_channel_first_paid"
-    )
-
-    DISTINCT_PAID_DATES_GE_2 = "distinct_paid_dates_ge_2"
-    PAID_ORDERS_GE_2 = "paid_orders_ge_2"
-
-    PAYMENT_TIME_MEMBERSHIP_SNAPSHOT = (
-        "payment_time_membership_snapshot"
-    )
 
 
 class MetricSemanticSignatureV2(BaseModel):
@@ -147,65 +130,6 @@ class MetricSemanticSignatureV2(BaseModel):
             raise ValueError(
                 "marketing/channel-first-paid structures "
                 "require intrinsic_partition=channel."
-            )
-
-        if (
-            SemanticQualifier.FULL_HISTORY_BRAND_FIRST_PAID
-            in self.qualifiers
-            and self.left_operand
-            != SemanticOperand.GLOBAL_FIRST_PAID_CUSTOMER
-        ):
-            raise ValueError(
-                "brand-first-paid qualifier requires "
-                "global_first_paid_customer operand."
-            )
-
-        if (
-            SemanticQualifier.FULL_HISTORY_CHANNEL_FIRST_PAID
-            in self.qualifiers
-            and (
-                self.left_operand
-                != SemanticOperand.CHANNEL_FIRST_PAID_CUSTOMER
-                and self.right_operand
-                != SemanticOperand.CHANNEL_FIRST_PAID_CUSTOMER
-            )
-        ):
-            raise ValueError(
-                "channel-first-paid qualifier requires "
-                "channel_first_paid_customer operand."
-            )
-
-        if (
-            SemanticQualifier.DISTINCT_PAID_DATES_GE_2
-            in self.qualifiers
-            and self.left_operand
-            != SemanticOperand.REPEAT_DISTINCT_PAID_DATE_CUSTOMER
-        ):
-            raise ValueError(
-                "distinct-paid-dates qualifier requires "
-                "repeat_distinct_paid_date_customer numerator."
-            )
-
-        if (
-            SemanticQualifier.PAID_ORDERS_GE_2
-            in self.qualifiers
-            and self.left_operand
-            != SemanticOperand.MULTI_PAID_ORDER_CUSTOMER
-        ):
-            raise ValueError(
-                "paid-orders-ge-2 qualifier requires "
-                "multi_paid_order_customer operand."
-            )
-
-        if (
-            SemanticQualifier.PAYMENT_TIME_MEMBERSHIP_SNAPSHOT
-            in self.qualifiers
-            and self.left_operand
-            != SemanticOperand.PAYMENT_TIME_MEMBER_PAID_AMOUNT
-        ):
-            raise ValueError(
-                "payment-time-membership qualifier requires "
-                "payment_time_member_paid_amount numerator."
             )
 
         return self

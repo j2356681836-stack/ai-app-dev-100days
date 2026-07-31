@@ -161,16 +161,16 @@ def test_repeat_and_multi_order_are_structurally_distinct() -> None:
         "多单客户结构错误。",
     )
 
-    assert_true(
-        SemanticQualifier.DISTINCT_PAID_DATES_GE_2
-        in repeat_signature.qualifiers,
-        "跨日结构缺 qualifier。",
+    assert_equal(
+        repeat_signature.qualifiers,
+        (),
+        "跨不同付款日期条件已内生于 operand，不应重复声明 qualifier。",
     )
 
-    assert_true(
-        SemanticQualifier.PAID_ORDERS_GE_2
-        in multi_signature.qualifiers,
-        "多单结构缺 qualifier。",
+    assert_equal(
+        multi_signature.qualifiers,
+        (),
+        "至少两笔付款订单条件已内生于 operand，不应重复声明 qualifier。",
     )
 
 
@@ -193,10 +193,10 @@ def test_member_snapshot_structure() -> None:
         "会员支付时点结构错误。",
     )
 
-    assert_true(
-        SemanticQualifier.PAYMENT_TIME_MEMBERSHIP_SNAPSHOT
-        in signature.qualifiers,
-        "支付时点会员 qualifier 缺失。",
+    assert_equal(
+        signature.qualifiers,
+        (),
+        "支付时点会员快照已内生于 operand，不应重复声明 qualifier。",
     )
 
 

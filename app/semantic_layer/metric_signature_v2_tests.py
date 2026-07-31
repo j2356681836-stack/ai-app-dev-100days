@@ -235,25 +235,25 @@ def test_repeat_customer_count_and_multi_order_are_structurally_distinct() -> No
     assert_equal(
         repeat.left_operand,
         SemanticOperand.REPEAT_DISTINCT_PAID_DATE_CUSTOMER,
-        "跨日复购人数必须基于 distinct paid dates。",
+        "跨日复购人数必须由 repeat-distinct-paid-date operand 表达。",
     )
 
     assert_equal(
         multi.left_operand,
         SemanticOperand.MULTI_PAID_ORDER_CUSTOMER,
-        "两单及以上人数必须基于 paid order count。",
+        "两单及以上人数必须由 multi-paid-order operand 表达。",
     )
 
-    assert_true(
-        SemanticQualifier.DISTINCT_PAID_DATES_GE_2
-        in repeat.qualifiers,
-        "跨日复购人数缺少 distinct-paid-dates qualifier。",
+    assert_equal(
+        repeat.qualifiers,
+        (),
+        "跨日条件已内生于 operand，不应重复声明 qualifier。",
     )
 
-    assert_true(
-        SemanticQualifier.PAID_ORDERS_GE_2
-        in multi.qualifiers,
-        "多单人数缺少 paid-orders qualifier。",
+    assert_equal(
+        multi.qualifiers,
+        (),
+        "两单及以上条件已内生于 operand，不应重复声明 qualifier。",
     )
 
 
@@ -290,10 +290,26 @@ def test_member_share_carries_payment_time_snapshot() -> None:
         "会员 GMV Share numerator 必须是支付时点会员金额。",
     )
 
-    assert_true(
-        SemanticQualifier.PAYMENT_TIME_MEMBERSHIP_SNAPSHOT
-        in signature.qualifiers,
-        "会员 GMV Share 必须声明 payment-time snapshot。",
+    assert_equal(
+        signature.qualifiers,
+        (),
+        "支付时点会员快照已内生于 operand，不应重复声明 qualifier。",
+    )
+
+
+def test_qualifier_contract_contains_only_orthogonal_semantics() -> None:
+    assert_equal(
+        {
+            qualifier.value
+            for qualifier in SemanticQualifier
+        },
+        {
+            "product_cost_basis",
+            "sales_cohort_attribution",
+            "direct_response_channel",
+            "same_window_sales_spend",
+        },
+        "Qualifier Contract 只能保留独立于 operand 的业务语义。",
     )
 
 
@@ -408,6 +424,7 @@ def run_tests() -> None:
         test_repeat_customer_count_and_multi_order_are_structurally_distinct,
         test_refund_rate_carries_amount_and_cohort_semantics,
         test_member_share_carries_payment_time_snapshot,
+        test_qualifier_contract_contains_only_orthogonal_semantics,
         test_channel_marketing_metrics_require_channel_partition,
         test_no_duplicate_business_structures,
         test_signature_catalog_contains_no_retrieval_keywords,

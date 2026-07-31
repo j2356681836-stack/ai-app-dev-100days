@@ -36,9 +36,10 @@ class DeterministicQuestionEvidenceV2(BaseModel):
     )
 
     operator: QuestionOperator | None = None
+    left_operand: SemanticOperand | None = None
     intrinsic_partition: IntrinsicPartition | None = None
     evidence: tuple[str, ...] = ()
-
+    qualifiers: tuple[SemanticQualifier, ...,] = ()
 
 class QuestionSemanticParseResultV2(BaseModel):
     model_config = ConfigDict(
@@ -92,9 +93,12 @@ _OPERAND_DESCRIPTIONS = {
     SemanticOperand.PAID_BUYER:
         "至少发生过一次成功成交/付款的去重客户/买家。",
     SemanticOperand.GLOBAL_FIRST_PAID_CUSTOMER:
-        "客户在整个品牌全历史中的首次成功成交/付款。",
+        "客户在整个品牌全历史中的首次成功成交/付款；"
+        "品牌内最早一笔、品牌历史首笔、品牌全历史第一次成交均属于该结构。",
     SemanticOperand.CHANNEL_FIRST_PAID_CUSTOMER:
-        "客户在某一渠道/平台历史中的首次成功成交/付款。",
+        "客户在某一渠道/平台自己的历史中的首次成功成交/付款；"
+        "包括按各渠道/各平台分别寻找客户历史首笔成交、首次成交客户、"
+        "历史首笔成交人数等表达。",
     SemanticOperand.REPEAT_DISTINCT_PAID_DATE_CUSTOMER:
         "至少在两个不同成交/付款日期发生过成功交易的客户。",
     SemanticOperand.MULTI_PAID_ORDER_CUSTOMER:
@@ -107,26 +111,12 @@ _OPERAND_DESCRIPTIONS = {
 _QUALIFIER_DESCRIPTIONS = {
     SemanticQualifier.PRODUCT_COST_BASIS:
         "明确按商品成本扣减口径。",
-    SemanticQualifier.COMPLETED_REFUND_ONLY:
-        "只计算完成状态的退款金额。",
     SemanticQualifier.SALES_COHORT_ATTRIBUTION:
         "退款按原销售/成交期归属。",
-    SemanticQualifier.FULL_HISTORY_BRAND_FIRST_PAID:
-        "首次成交按品牌全历史判断。",
-    SemanticQualifier.FULL_HISTORY_CHANNEL_FIRST_PAID:
-        "首次成交按渠道/平台全历史判断。",
-    SemanticQualifier.DISTINCT_PAID_DATES_GE_2:
-        "至少两个不同成功成交/付款日期。",
-    SemanticQualifier.PAID_ORDERS_GE_2:
-        "至少两笔成功成交/付款订单。",
-    SemanticQualifier.PAYMENT_TIME_MEMBERSHIP_SNAPSHOT:
-        "会员身份按支付/成交时点快照判断。",
-    SemanticQualifier.SAME_WINDOW_SALES_SPEND:
-        "销售与营销投入使用同一分析时间窗口。",
     SemanticQualifier.DIRECT_RESPONSE_CHANNEL:
         "直接响应型渠道口径。",
-    SemanticQualifier.PAID_ONLY:
-        "只考虑成功付款/成交记录。",
+    SemanticQualifier.SAME_WINDOW_SALES_SPEND:
+        "销售与营销投入使用同一分析时间窗口。",
 }
 
 
@@ -168,6 +158,9 @@ def build_question_semantic_parser_prompt_v2(
 3. 不要调用外部业务上下文；这里只分析用户原句。
 4. 如果字段无法从问题中可靠确定，返回 null。
 5. qualifiers 只放问题中明确表达的附加业务合同。
+6. “怎么样”“如何”“情况”“表现”等泛化分析请求，只表示用户关注某个业务对象，
+   不足以证明 sum、count 或 divide；如果原句没有明确的求和、计数、比例、平均等运算关系，
+   operator 返回 null。
 
 operator 允许值：
 - sum: 求和/累计总量
@@ -350,6 +343,104 @@ def parse_question_signature_payload_v2(
     )
 
 
+def _apply_semantic_specificity_guard_v2(
+    *,
+    question: str,
+    signature: LLMQuestionSemanticSignaturePayloadV2,
+) -> LLMQuestionSemanticSignaturePayloadV2:
+    """
+    Prevent the LLM from making a semantic operand more specific
+    than the user's wording supports.
+
+    In particular, generic "new customer" wording does not prove
+    whether the user means brand-global first paid or channel-local
+    first paid.
+    """
+    text = str(
+        question
+    )
+
+    left_operand = (
+        signature.left_operand
+    )
+
+    right_operand = (
+        signature.right_operand
+    )
+
+    global_first_paid_explicit = bool(
+        re.search(
+            (
+                r"全品牌|整个品牌|品牌全历史|品牌内"
+                r"|品牌.*(?:历史|最早|首次|第一次|首笔)"
+            ),
+            text,
+        )
+    )
+
+    channel_first_paid_explicit = bool(
+        re.search(
+            (
+                r"(?:渠道|平台).*(?:历史|最早|首次|第一次|首笔)"
+                r"|(?:历史|最早|首次|第一次|首笔).*(?:渠道|平台)"
+            ),
+            text,
+        )
+    )
+
+    normalized_text = re.sub(
+        r"\s+",
+        "",
+        text,
+    )
+
+    generic_average_underspecified = bool(
+        re.fullmatch(
+            (
+                r"(?:平均|均值)"
+                r"(?:消费|消费金额|金额)"
+                r"(?:大概|大约|大致)?"
+                r"(?:是|有)?"
+                r"多少"
+                r"[？?]?"
+            ),
+            normalized_text,
+        )
+    )
+
+    if (
+        left_operand
+        == SemanticOperand.GLOBAL_FIRST_PAID_CUSTOMER
+        and not global_first_paid_explicit
+    ):
+        left_operand = None
+
+    elif (
+        left_operand
+        == SemanticOperand.CHANNEL_FIRST_PAID_CUSTOMER
+        and not channel_first_paid_explicit
+    ):
+        left_operand = None
+    if generic_average_underspecified:
+        left_operand = None
+        right_operand = None
+    if (
+        left_operand
+        == signature.left_operand
+        and right_operand
+        == signature.right_operand
+    ):
+        return signature
+
+
+    return signature.model_copy(
+        update={
+            "left_operand": left_operand,
+            "right_operand": right_operand,
+        }
+    )
+
+
 def detect_multiple_intents_v2(
     question: str,
 ) -> tuple[bool, str | None]:
@@ -369,7 +460,7 @@ def detect_multiple_intents_v2(
             "simultaneous_marker",
         ),
         (
-            r"分别",
+            r"分别.*(?:以及|并且|和|与|、)",
             "separate_requests_marker",
         ),
         (
@@ -408,6 +499,19 @@ def extract_deterministic_question_evidence_v2(
 
     evidence: list[str] = []
     operator: QuestionOperator | None = None
+    qualifiers: list[SemanticQualifier] = []
+
+    total_amount_explicit = bool(
+        re.search(
+            (
+                r"(?:总共|一共|合计|总计)"
+                r".{0,12}"
+                r"(?:多少钱|金额|成交额|销售额|收入|收款|"
+                r"花费|费用|成本|毛利)"
+            ),
+            text,
+        )
+    )
 
     if "除以" in text:
         operator = (
@@ -429,6 +533,17 @@ def extract_deterministic_question_evidence_v2(
         )
 
     elif re.search(
+        r"平均|均值|人均",
+        text,
+    ):
+        operator = (
+            QuestionOperator.DIVIDE
+        )
+        evidence.append(
+            "explicit_average_token"
+        )
+
+    elif re.search(
         r"汇总|累计|加总|求和",
         text,
     ):
@@ -437,6 +552,29 @@ def extract_deterministic_question_evidence_v2(
         )
         evidence.append(
             "explicit_sum_token"
+        )
+
+    elif total_amount_explicit:
+        operator = (
+            QuestionOperator.SUM
+        )
+        evidence.append(
+            "explicit_total_amount_token"
+        )
+
+    elif re.search(
+        (
+            r"人数|客户数|买家数|订单数|单量|件数"
+            r"|(?:新客|客户|买家|订单)(?:有)?多少(?:人|位|个|单|笔|件)?"
+            r"|多少(?:人|位|个|单|笔|件)?(?:新客|客户|买家|订单)"
+        ),
+        text,
+    ):
+        operator = (
+            QuestionOperator.COUNT
+        )
+        evidence.append(
+            "explicit_count_token"
         )
 
     partition = None
@@ -452,9 +590,170 @@ def extract_deterministic_question_evidence_v2(
             "explicit_channel_token"
         )
 
+    explicit_product_cost = bool(
+        re.search(
+            r"商品成本",
+            text,
+        )
+    )
+
+    marketing_cost_explicit = bool(
+        re.search(
+            (
+                r"广告成本"
+                r"|推广成本"
+                r"|投放成本"
+                r"|获客成本"
+                r"|营销成本"
+                r"|营销费用"
+                r"|推广费用"
+                r"|投放费用"
+                r"|渠道投入"
+            ),
+            text,
+        )
+    )
+
+    revenue_minus_cost = bool(
+        re.search(
+            (
+                r"(?:成交收入|收入|收款|成交金额)"
+                r".{0,10}"
+                r"(?:扣(?:掉|除)?|减去|减)"
+                r".{0,6}"
+                r"成本"
+            ),
+            text,
+        )
+    )
+
+    revenue_cost_difference = bool(
+        re.search(
+            (
+                r"(?:成交收入|收入|收款|成交金额)"
+                r".{0,8}"
+                r"(?:和|与)"
+                r".{0,6}"
+                r"成本"
+                r".{0,8}"
+                r"(?:做差|差额)"
+            ),
+            text,
+        )
+    )
+
+    same_window_explicit = bool(
+        re.search(
+            (
+                r"同期"
+                r"|同周期"
+                r"|同一周期"
+                r"|同期间"
+                r"|同一期间"
+                r"|同时间窗口"
+                r"|同一时间窗口"
+            ),
+            text,
+        )
+    )
+
+    sales_amount_explicit = bool(
+        re.search(
+            (
+                r"成交金额"
+                r"|成交额"
+                r"|成交付款"
+                r"|付款金额"
+                r"|销售金额"
+                r"|销售额"
+                r"|成交收入"
+                r"|销售收入"
+                r"|收款"
+            ),
+            text,
+        )
+    )
+
+    marketing_spend_window_explicit = bool(
+        re.search(
+            (
+                r"推广花费"
+                r"|推广费用"
+                r"|推广成本"
+                r"|广告花费"
+                r"|广告费用"
+                r"|广告成本"
+                r"|营销花费"
+                r"|营销费用"
+                r"|营销投入"
+                r"|投放花费"
+                r"|投放费用"
+                r"|投放成本"
+                r"|渠道投入"
+                r"|获客投入"
+            ),
+            text,
+        )
+    )
+
+    same_window_sales_spend_explicit = (
+        same_window_explicit
+        and sales_amount_explicit
+        and marketing_spend_window_explicit
+    )
+    
+    product_cost_basis_explicit = (
+        explicit_product_cost
+        or (
+            (
+                revenue_minus_cost
+                or revenue_cost_difference
+            )
+            and not marketing_cost_explicit
+        )
+    )
+
+    left_operand = None
+
+    gross_margin_amount_explicit = (
+        (
+            revenue_minus_cost
+            or revenue_cost_difference
+        )
+        and not marketing_cost_explicit
+    )
+
+    if gross_margin_amount_explicit:
+        left_operand = (
+            SemanticOperand.GROSS_MARGIN_AMOUNT
+        )
+        evidence.append(
+            "explicit_gross_margin_amount"
+        )
+
+    if product_cost_basis_explicit:
+        qualifiers.append(
+            SemanticQualifier.PRODUCT_COST_BASIS
+        )
+        evidence.append(
+            "explicit_product_cost_basis"
+        )
+
+    if same_window_sales_spend_explicit:
+        qualifiers.append(
+            SemanticQualifier.SAME_WINDOW_SALES_SPEND
+        )
+        evidence.append(
+            "explicit_same_window_sales_spend"
+        )
+
     return DeterministicQuestionEvidenceV2(
         operator=operator,
+        left_operand=left_operand,
         intrinsic_partition=partition,
+        qualifiers=tuple(
+            qualifiers
+        ),
         evidence=tuple(
             evidence
         ),
@@ -484,6 +783,27 @@ def _merge_and_validate_evidence_v2(
                 "operator_conflict: "
                 f"llm={operator.value}; "
                 f"deterministic={evidence.operator.value}"
+            )
+
+    left_operand = (
+        signature.left_operand
+    )
+
+    if evidence.left_operand is not None:
+        if left_operand is None:
+            left_operand = (
+                evidence.left_operand
+            )
+
+        elif (
+            left_operand
+            != evidence.left_operand
+        ):
+            conflicts.append(
+                "left_operand_conflict: "
+                f"llm={left_operand.value}; "
+                "deterministic="
+                f"{evidence.left_operand.value}"
             )
 
     partition = (
@@ -518,13 +838,26 @@ def _merge_and_validate_evidence_v2(
             ),
         )
 
+    qualifiers = set(
+        signature.qualifiers
+    )
+
+    qualifiers.update(
+        evidence.qualifiers
+    )
+
     merged = (
         QuestionSemanticSignatureV2(
             operator=operator,
-            left_operand=signature.left_operand,
+            left_operand=left_operand,
             right_operand=signature.right_operand,
             intrinsic_partition=partition,
-            qualifiers=signature.qualifiers,
+            qualifiers=tuple(
+                sorted(
+                    qualifiers,
+                    key=lambda item: item.value,
+                )
+            ),
             evidence=(),
         )
     )
@@ -582,6 +915,13 @@ def parse_question_semantics_v2(
         signature = (
             parse_question_signature_payload_v2(
                 raw_text
+            )
+        )
+
+        signature = (
+            _apply_semantic_specificity_guard_v2(
+                question=question,
+                signature=signature,
             )
         )
 

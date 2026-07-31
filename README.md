@@ -522,8 +522,17 @@ Query Plan V2 当前可显式声明：
 | query_plan_v2_catalog_builder_tests.py | 17/17 PASS |
 | query_plan_v2_tests.py | 22/22 PASS |
 | deepseek_client_tests.py | 3/3 PASS |
-| question_semantic_parser_v2_tests.py | 9/9 PASS |
-| question_semantic_parser_regression_v2_tests.py | 3/3 PASS |
+| question_semantic_parser_v2_tests.py | 41/41 PASS |
+| question_semantic_parser_regression_v2_tests.py | 7/7 PASS |
+| candidate_decision_v2_tests.py | 18/18 PASS |
+| candidate_decision_v2_catalog_tests.py | 7/7 PASS |
+| candidate_decision_ranking_v2_tests.py | 6/6 PASS |
+| candidate_decision_narrowing_v2_tests.py | 3/3 PASS |
+| candidate_decision_narrowing_average_v2_tests.py | 3/3 PASS |
+| candidate_decision_pipeline_v2_tests.py | 5/5 PASS |
+| candidate_decision_parser_pipeline_v2_tests.py | 6/6 PASS |
+| semantic_decision_service_v2_tests.py | 6/6 PASS |
+| semantic_decision_acceptance_v2.py | 8/8 PASS |
 | llm_transport_migration_tests.py | 2/2 PASS |
 
 ### Day74 Dataset V2 Generalization Evidence
@@ -544,6 +553,25 @@ Query Plan V2 当前可显式声明：
 - Structured Semantic Parser 显著改善自然语言结构理解；
 - Initial Locked Holdout 和 60-case Signature Adversarial 均已被观察，后续只作为 Regression Evidence；
 - Final Fresh Generalization Gate 必须在 Structured Parser / Candidate Decision 冻结后使用新的未见数据。
+
+### Day75 Semantic Decision Finalization Evidence
+
+| Evidence | 结果 | 定位 |
+|---|---:|---|
+| Structured Parser Static Contract | 41/41 | Finalized Parser Contract |
+| Structured Parser Observed Regression Core Exact | 60/60 | Regression，不是 Fresh |
+| Structured Parser Observed Regression Full Exact | 59/60 | QSADV-053 为 intentional multi-intent collision |
+| Structured Parser Acceptance | 60/60 | Observed Regression Acceptance |
+| Candidate / Semantic Decision Regression | 62/62 | Structural / Narrowing / Ranking / Pipeline / Service |
+| Final Semantic Decision Acceptance | 8/8 | 集成验收，不是 End-to-End SQL Answer Gate |
+
+当前结论：
+- Candidate Decision 已冻结为 `MATCHED / NEEDS_CLARIFICATION / UNSUPPORTED` 三态；
+- Authorization 必须在结构候选判断前过滤，未授权指标不得进入候选池；
+- Clarification Narrowing 只在有可靠 family-level evidence 时缩小候选，不能凭空增加 Metric；
+- Embedding 只排序 `NEEDS_CLARIFICATION` 的已有候选，不能修改最终状态或越权注入候选；
+- Day75 证明的是 Semantic Decision Readiness，不等于 V2 End-to-End Answer Correctness；
+- Final Fresh Generalization、Query Plan / SQL / Governance / Database Result / Final Answer 的完整 V2 证据链仍待后续 Gate。
 
 当前定位：
 - deterministic evaluator 负责业务结果正确性
@@ -611,7 +639,7 @@ fact_reviews
 
 ## Beauty BI Dataset V2 当前状态
 
-Day61-Day74 已完成 Dataset V2 从设计、Schema、确定性 Seed、P01-P09 正式业务规律验收、Metadata V2 / Query Plans V2 静态语义合同，到 Golden Cases V2、Generalization Baseline、Semantic Signature 与 Structured Semantic Parser 架构验证。Dataset 当前仍保持 `draft`，尚未接入主 Graph。
+Day61-Day75 已完成 Dataset V2 从设计、Schema、确定性 Seed、P01-P09 正式业务规律验收、Metadata V2 / Query Plans V2 静态语义合同，到 Golden Cases V2、Semantic Signature、Structured Semantic Parser 与 Candidate / Semantic Decision Layer 的候选实现。Dataset 当前仍保持 `draft`，尚未接入主 Graph。
 
 当前已完成：
 - 建立独立目录 `app/db/beauty_bi_v2/`；
@@ -633,7 +661,10 @@ Day61-Day74 已完成 Dataset V2 从设计、Schema、确定性 Seed、P01-P09 �
 - 建立 19 Metric Semantic Signatures 与 Question Semantic Signature Contract；
 - 完成 Fresh Regex Signature Baseline，并据此重构为 Structured Semantic Parser + Deterministic Evidence + Contract Validator；
 - 建立最小 Shared DeepSeek LLM Transport，并迁移 SQL Generator / Repairer；
-- Structured Parser 在已观察 60-case Regression 上达到 56/60 Core Exact；Final Fresh Generalization 仍待新 Holdout 验证；
+- Day75 收束 Question Signature Qualifier Contract，并冻结 Structured Parser；同一已观察 60-case Regression 达到 60/60 Core Exact、59/60 Full Exact、60/60 Acceptance，Multi-intent 60/60；
+- 建立 Structural Compatibility、`MATCHED / NEEDS_CLARIFICATION / UNSUPPORTED` Candidate Decision、授权前置过滤、Clarification Narrowing 与 Embedding Ranking Boundary；
+- 建立统一 Candidate Decision Pipeline 与 Semantic Decision Service，Candidate / Semantic Decision 回归合计 62/62 PASS，Final Acceptance 8/8 PASS；
+- Final Fresh Generalization、V2 AI-chain Regression、Performance Baseline、Graph Runtime Governance Enforcement 与 Graph Integration 仍待完成；
 - 保持 V1 `public` Schema 不变，Graph integration 继续关闭。
 
 small Profile 当前入库规模：
@@ -687,6 +718,20 @@ Day73 Semantic Contract 验证：
 | Dataset Status | draft |
 | Graph Integration | disabled |
 
+Day75 Semantic Decision 验证：
+
+| 验证项 | 结果 |
+|---|---:|
+| Structured Parser Static Contract | 41/41 PASS |
+| Structured Parser Regression Contract | 7/7 PASS |
+| Observed 60-case Core Exact | 60/60 |
+| Observed 60-case Full Exact | 59/60 |
+| Observed 60-case Acceptance | 60/60 |
+| Candidate / Semantic Decision Regression | 62/62 PASS |
+| Final Semantic Decision Acceptance | 8/8 PASS |
+| Final Fresh Generalization | pending |
+| Graph Integration | disabled |
+
 当前状态：
 
 ```text
@@ -711,14 +756,15 @@ Generalization Evaluation：in_progress（Initial Holdout / Adversarial / Parser
 Semantic Retrieval V2：completed
 Metric Semantic Signature：completed
 Question Semantic Signature：completed
-Structured Semantic Parser：implemented / regression validated
-Candidate Decision：not started
+Structured Semantic Parser：frozen / observed regression validated
+Candidate Decision：implemented / frozen
+Semantic Decision Service：implemented / final acceptance passed
 Performance Baseline：not started
 AI-chain Regression：not started
 Graph integration：disabled
 ```
 
-Beauty BI V1 继续作为 Latest Stable Baseline。Day74 已完成 Golden Cases V2、Initial Generalization Evidence、Semantic Retrieval、Metric / Question Semantic Signature 与 Structured Parser Regression Evidence，但 Candidate Decision、Final Fresh Generalization、Performance Baseline 和 Dataset V2 AI 主链路回归尚未完成，因此 Dataset V2 仍不能标记为 Candidate 或 Stable。
+Beauty BI V1 继续作为 Latest Stable Baseline。Day75 已完成 Structured Parser Finalization 与 Candidate / Semantic Decision Layer 的候选实现和回归验收，但 Final Fresh Generalization、Performance Baseline、Dataset V2 AI-chain Regression、Graph Runtime Governance Enforcement 与 Graph Integration 尚未完成，因此 Dataset V2 仍不能标记为 Candidate 或 Stable。
 
 # 技术栈
 
@@ -946,6 +992,8 @@ Agent Workflow
 
 状态：🟡 进行中
 
+说明：Phase3 原计划时间盒为 Day51-75；由于 Candidate Readiness Closing Gate 尚未完成，当前按 Gate 顺延，Day75 不作为强制阶段结束点。Phase3 正式关闭后，本节将压缩为 Phase3 Milestone Summary。
+
 Phase3 当前进展：
 - Day51 完成 Dependency Lock / Phase3 Environment Stabilization
 - Day52 完成 Retrieval Evaluator / Clarification Candidate Ranking
@@ -971,6 +1019,7 @@ Phase3 当前进展：
 - Day72 完成 21-case Security Evaluation / Audit Event v2 HMAC Hardening / 10、25、50 并发 Minimum Load Test
 - Day73 完成 Metadata V2 / 48-plan Query Plans V2 / Staged & Global History Contracts / Canonical Catalog Regression
 - Day74 完成 Golden Cases V2 / Initial Generalization Baseline / Semantic Signature / Structured Semantic Parser Architecture
+- Day75 完成 Structured Parser Finalization / Candidate Decision / Clarification Narrowing / Semantic Decision Service / Final Acceptance
 
 Day61-Day66 Dataset V2 成果：
 - 完成 V1 Coverage Review 与 V2 P0 / P1 / P2 边界；
@@ -985,7 +1034,7 @@ Day61-Day66 Dataset V2 成果：
 - 完成 P01-P09 observation、口径校准、阈值冻结和 formal acceptance；
 - `manifest_loader.py` Day66 校验通过；
 - `acceptance_observer.py` 正式验收 9/9 PASS，验收过程数据库写入为 0；
-- V2 当前仍为 `draft`；Metadata V2、Query Plans V2 与 Golden Cases V2 已完成；Initial Generalization Evidence、Semantic Retrieval、Metric / Question Semantic Signature 与 Structured Parser Regression 已建立；Candidate Decision、Final Fresh Generalization、Performance Baseline、AI 主链路回归和 Graph 接入尚未完成。
+- V2 当前仍为 `draft`；Metadata V2、Query Plans V2、Golden Cases V2 与 Semantic Decision Layer 已完成候选实现和回归验收；Final Fresh Generalization、Performance Baseline、AI-chain Regression、Runtime Governance Enforcement 和 Graph Integration 尚未完成。
 
 当前稳定依赖基线：
 - Python `3.10.3`
@@ -999,7 +1048,8 @@ Day61-Day66 Dataset V2 成果：
 - 完整锁文件：`requirements-lock.txt`
 
 Phase3 后续重点：
-- Day75：Semantic Decision Final Gate + AI-chain Regression + Performance Baseline + Graph Integration
+- 继续完成 Dataset V2 Candidate Readiness：Final Fresh Generalization → V2 AI-chain Regression → Performance Baseline → Runtime Governance Enforcement → Graph Integration
+- Phase4 Evidence-based Business Insight Engine 仅在 Phase3 Candidate Readiness Gate 关闭后开始
 
 当前原则：
 - 不推翻 Phase2 主链路
@@ -1125,8 +1175,8 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.45
-完成度：Day74 / 100
+Version: v0.46
+完成度：Day75 / 100
 
 当前 Stable Graph：
 
@@ -1258,11 +1308,40 @@ Structured Semantic Parser
 Observed Regression Core Exact 56/60
 ```
 
+Day75 进一步建立：
+
+```text
+Question
+↓
+Structured Semantic Parser
+↓
+Parser Guard
+↓
+Authorization-filtered Structural Compatibility
+↓
+Candidate Decision
+├─ MATCHED
+├─ NEEDS_CLARIFICATION
+└─ UNSUPPORTED
+↓
+Clarification Narrowing
+↓
+Embedding Ranking（仅排序 clarification candidates）
+↓
+Semantic Decision Result
+```
+
+Day75 验证：
+- Structured Parser Static Contract：41/41 PASS
+- Observed 60-case Regression：60/60 Core Exact / 59/60 Full Exact / 60/60 Acceptance
+- Candidate / Semantic Decision Regression：62/62 PASS
+- Final Semantic Decision Acceptance：8/8 PASS
+
 当前边界：
-- Structured Parser 56/60 为已观察 Regression，不是 Fresh Generalization；
-- Full Exact 28/60 主要暴露 Qualifier Contract 冗余与缺失问题，不能简单解释为 Parser 只有 46.67% 准确率；
-- Candidate Decision 尚未实现；
-- Parser / Candidate Decision 冻结后仍需新的 Fresh Holdout；
+- Structured Parser 与 Candidate / Semantic Decision Layer 已冻结，但 60-case 结果仍是已观察 Regression，不是 Final Fresh Generalization；
+- Final Fresh Holdout 尚未运行；
+- Semantic Decision 当前只证明“问题语义是否被正确理解和是否需要澄清”，尚未证明 Scope / Result Grain / Query Plan / SQL / Database Result / Final Answer 的端到端正确性；
+- Performance Baseline、V2 AI-chain Regression 与 Day72 3 条 Runtime Governance Known Gap 尚未关闭；
 - Dataset V2 仍为 `draft`；
 - Stable Graph 仍未接入 Dataset V2。
 
@@ -1302,6 +1381,21 @@ Dataset V2 Day74 Generalization / Semantic Decision Evidence：
 - Candidate Decision：not started
 - Final Fresh Generalization：pending
 - Dataset Status：draft
+- Graph Integration：disabled
+
+Dataset V2 Day75 Semantic Decision Evidence：
+- Question Signature Qualifier Contract：normalized / frozen
+- Structured Parser Static Contract：41/41 PASS
+- Structured Parser Regression Contract：7/7 PASS
+- Observed 60-case Core Exact：60/60
+- Observed 60-case Full Exact：59/60
+- Observed 60-case Acceptance：60/60
+- Candidate / Semantic Decision Regression：62/62 PASS
+- Final Semantic Decision Acceptance：8/8 PASS
+- Candidate Decision：implemented / frozen
+- Final Fresh Generalization：pending
+- Performance Baseline：not started
+- V2 AI-chain Regression：not started
 - Graph Integration：disabled
 
 Dataset V2 Day66 验证：
@@ -1355,6 +1449,7 @@ Day72 当前安全边界：
 - Day72 Security Evaluation、Audit HMAC Hardening 与 Minimum Load Baseline 已完成
 - Day73 Metadata V2 与 48-plan Query Plans V2 Static Catalog 已完成
 - Day74 Golden Cases V2、Initial Generalization Evidence、Semantic Signature 与 Structured Semantic Parser Architecture 已完成
-- Phase3 继续进行
+- Day75 Structured Parser Finalization、Candidate / Semantic Decision Layer 与 Final Acceptance 已完成
+- Phase3 继续进行，Candidate Readiness Closing Gate 尚未关闭
 
-下一步：Day75 Semantic Decision Final Gate + AI-chain Regression + Performance Baseline + Graph Integration
+下一步：Day76 Phase3 Candidate Readiness Continuation — Final Fresh Generalization → V2 AI-chain Regression → Performance Baseline → Runtime Governance Enforcement → Graph Integration

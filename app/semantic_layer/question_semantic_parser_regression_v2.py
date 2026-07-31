@@ -101,14 +101,36 @@ def evaluate_parser_regression_case_v2(
         == expected_multi_intent
     )
 
+    expected_status = (
+        QuestionSemanticParseStatusV2.MULTIPLE_INTENTS
+        if expected_multi_intent
+        else QuestionSemanticParseStatusV2.PARSED
+    )
+
+    if expected_multi_intent:
+        acceptance_pass = (
+            result.status
+            == QuestionSemanticParseStatusV2.MULTIPLE_INTENTS
+            and result.signature is None
+        )
+    else:
+        acceptance_pass = (
+            result.status
+            == QuestionSemanticParseStatusV2.PARSED
+            and result.signature is not None
+            and full_exact
+        )
+
     return {
         "case_id": case.case_id,
         "role": case.role.value,
         "family": case.family,
         "question": case.question,
         "status": result.status.value,
+        "expected_status": expected_status.value,
         "expected_multi_intent": expected_multi_intent,
         "multi_intent_correct": multi_intent_correct,
+        "acceptance_pass": acceptance_pass,
         "core_exact": core_exact,
         "full_exact": full_exact,
         "partition_exact": partition_exact,
@@ -205,6 +227,13 @@ def run_question_semantic_parser_regression_v2(
                     "full_exact"
                 ]
             ),
+            "acceptance_pass": sum(
+                1
+                for row in rows
+                if row[
+                    "acceptance_pass"
+                ]
+            ),
             "failed_case_ids": [
                 row[
                     "case_id"
@@ -212,6 +241,24 @@ def run_question_semantic_parser_regression_v2(
                 for row in rows
                 if not row[
                     "core_exact"
+                ]
+            ],
+            "full_failed_case_ids": [
+                row[
+                    "case_id"
+                ]
+                for row in rows
+                if not row[
+                    "full_exact"
+                ]
+            ],
+            "acceptance_failed_case_ids": [
+                row[
+                    "case_id"
+                ]
+                for row in rows
+                if not row[
+                    "acceptance_pass"
                 ]
             ],
         }
@@ -244,6 +291,16 @@ def run_question_semantic_parser_regression_v2(
                     for row in results
                     if row[
                         "full_exact"
+                    ]
+                ),
+                total,
+            ),
+            "acceptance_pass": _rate(
+                sum(
+                    1
+                    for row in results
+                    if row[
+                        "acceptance_pass"
                     ]
                 ),
                 total,

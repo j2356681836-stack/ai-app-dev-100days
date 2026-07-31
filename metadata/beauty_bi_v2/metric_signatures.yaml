@@ -1,4 +1,4 @@
-signature_version: beauty_bi_v2_metric_signature_1
+signature_version: beauty_bi_v2_metric_signature_2
 dataset_name: beauty_bi_v2
 status: draft
 signatures:
@@ -7,15 +7,13 @@ signatures:
   left_operand: paid_amount
   right_operand: null
   intrinsic_partition: none
-  qualifiers:
-  - paid_only
+  qualifiers: []
 - metric_name: gross_margin
   operator: sum
   left_operand: gross_margin_amount
   right_operand: null
   intrinsic_partition: none
   qualifiers:
-  - paid_only
   - product_cost_basis
 - metric_name: gross_margin_rate
   operator: divide
@@ -23,7 +21,6 @@ signatures:
   right_operand: paid_amount
   intrinsic_partition: none
   qualifiers:
-  - paid_only
   - product_cost_basis
 - metric_name: refund_rate
   operator: divide
@@ -31,8 +28,6 @@ signatures:
   right_operand: paid_amount
   intrinsic_partition: none
   qualifiers:
-  - paid_only
-  - completed_refund_only
   - sales_cohort_attribution
 - metric_name: roi
   operator: divide
@@ -40,7 +35,6 @@ signatures:
   right_operand: marketing_spend
   intrinsic_partition: channel
   qualifiers:
-  - paid_only
   - direct_response_channel
   - same_window_sales_spend
 - metric_name: cac
@@ -49,7 +43,6 @@ signatures:
   right_operand: channel_first_paid_customer
   intrinsic_partition: channel
   qualifiers:
-  - full_history_channel_first_paid
   - direct_response_channel
   - same_window_sales_spend
 - metric_name: brand_paid_new_customer_count
@@ -57,89 +50,76 @@ signatures:
   left_operand: global_first_paid_customer
   right_operand: null
   intrinsic_partition: none
-  qualifiers:
-  - full_history_brand_first_paid
+  qualifiers: []
 - metric_name: channel_paid_new_customer_count
   operator: qualified_count
   left_operand: channel_first_paid_customer
   right_operand: null
   intrinsic_partition: channel
-  qualifiers:
-  - full_history_channel_first_paid
+  qualifiers: []
 - metric_name: repeat_customer_rate
   operator: divide
   left_operand: repeat_distinct_paid_date_customer
   right_operand: paid_buyer
   intrinsic_partition: none
-  qualifiers:
-  - distinct_paid_dates_ge_2
+  qualifiers: []
 - metric_name: member_gmv_share
   operator: divide
   left_operand: payment_time_member_paid_amount
   right_operand: paid_amount
   intrinsic_partition: none
-  qualifiers:
-  - payment_time_membership_snapshot
+  qualifiers: []
 - metric_name: buyer_count
   operator: distinct_count
   left_operand: paid_buyer
   right_operand: null
   intrinsic_partition: none
-  qualifiers:
-  - paid_only
+  qualifiers: []
 - metric_name: order_count
   operator: distinct_count
   left_operand: paid_order
   right_operand: null
   intrinsic_partition: none
-  qualifiers:
-  - paid_only
+  qualifiers: []
 - metric_name: units_sold
   operator: sum
   left_operand: paid_units
   right_operand: null
   intrinsic_partition: none
-  qualifiers:
-  - paid_only
+  qualifiers: []
 - metric_name: spending_per_buyer
   operator: divide
   left_operand: paid_amount
   right_operand: paid_buyer
   intrinsic_partition: none
-  qualifiers:
-  - paid_only
+  qualifiers: []
 - metric_name: ipt
   operator: divide
   left_operand: paid_units
   right_operand: paid_order
   intrinsic_partition: none
-  qualifiers:
-  - paid_only
+  qualifiers: []
 - metric_name: aus
   operator: divide
   left_operand: paid_amount
   right_operand: paid_order
   intrinsic_partition: none
-  qualifiers:
-  - paid_only
+  qualifiers: []
 - metric_name: purchase_frequency
   operator: divide
   left_operand: paid_order
   right_operand: paid_buyer
   intrinsic_partition: none
-  qualifiers:
-  - paid_only
+  qualifiers: []
 - metric_name: repeat_customer_count
   operator: qualified_count
   left_operand: repeat_distinct_paid_date_customer
   right_operand: null
   intrinsic_partition: none
-  qualifiers:
-  - distinct_paid_dates_ge_2
+  qualifiers: []
 - metric_name: multi_order_customer_count
   operator: qualified_count
   left_operand: multi_paid_order_customer
   right_operand: null
   intrinsic_partition: none
-  qualifiers:
-  - paid_orders_ge_2
+  qualifiers: []

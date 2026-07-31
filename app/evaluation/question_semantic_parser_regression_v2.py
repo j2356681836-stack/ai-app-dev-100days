@@ -22,6 +22,14 @@ from app.semantic_layer.question_signature_v2 import (
 
 ParserFn = Callable[[str], QuestionSemanticParseResultV2]
 
+PRE_NORMALIZATION_ADVERSARIAL_FINGERPRINT_V2 = (
+    "eda72cdc4762054ba2bfaa007b56ee422f0c99cdc2145a1eaea54f65e739a929"
+)
+
+NORMALIZED_ADVERSARIAL_FINGERPRINT_V2 = (
+    "9533ecc9c95172cd8565d6f3a8b925422e74048b188291c3c9f2f25745958bec"
+)
+
 
 def _empty_signature() -> QuestionSemanticSignatureV2:
     return QuestionSemanticSignatureV2()
@@ -101,14 +109,36 @@ def evaluate_parser_regression_case_v2(
         == expected_multi_intent
     )
 
+    expected_status = (
+        QuestionSemanticParseStatusV2.MULTIPLE_INTENTS
+        if expected_multi_intent
+        else QuestionSemanticParseStatusV2.PARSED
+    )
+
+    if expected_multi_intent:
+        acceptance_pass = (
+            result.status
+            == QuestionSemanticParseStatusV2.MULTIPLE_INTENTS
+            and result.signature is None
+        )
+    else:
+        acceptance_pass = (
+            result.status
+            == QuestionSemanticParseStatusV2.PARSED
+            and result.signature is not None
+            and full_exact
+        )
+
     return {
         "case_id": case.case_id,
         "role": case.role.value,
         "family": case.family,
         "question": case.question,
         "status": result.status.value,
+        "expected_status": expected_status.value,
         "expected_multi_intent": expected_multi_intent,
         "multi_intent_correct": multi_intent_correct,
+        "acceptance_pass": acceptance_pass,
         "core_exact": core_exact,
         "full_exact": full_exact,
         "partition_exact": partition_exact,
@@ -155,6 +185,20 @@ def run_question_semantic_parser_regression_v2(
     *,
     parser: ParserFn = parse_question_semantics_v2,
 ) -> dict[str, Any]:
+    current_fingerprint = (
+        question_signature_adversarial_fingerprint_v2()
+    )
+
+    if (
+        current_fingerprint
+        != NORMALIZED_ADVERSARIAL_FINGERPRINT_V2
+    ):
+        raise ValueError(
+            "Normalized adversarial regression fingerprint drifted. "
+            f"Expected={NORMALIZED_ADVERSARIAL_FINGERPRINT_V2}; "
+            f"Actual={current_fingerprint}"
+        )
+
     results = [
         evaluate_parser_regression_case_v2(
             case,
@@ -205,6 +249,13 @@ def run_question_semantic_parser_regression_v2(
                     "full_exact"
                 ]
             ),
+            "acceptance_pass": sum(
+                1
+                for row in rows
+                if row[
+                    "acceptance_pass"
+                ]
+            ),
             "failed_case_ids": [
                 row[
                     "case_id"
@@ -214,11 +265,29 @@ def run_question_semantic_parser_regression_v2(
                     "core_exact"
                 ]
             ],
+            "full_failed_case_ids": [
+                row[
+                    "case_id"
+                ]
+                for row in rows
+                if not row[
+                    "full_exact"
+                ]
+            ],
+            "acceptance_failed_case_ids": [
+                row[
+                    "case_id"
+                ]
+                for row in rows
+                if not row[
+                    "acceptance_pass"
+                ]
+            ],
         }
 
     return {
         "evaluation": (
-            "day74_gate5eb3_structured_semantic_parser_regression"
+            "question_semantic_parser_v2_normalized_regression"
         ),
         "dataset_role": (
             "observed_adversarial_regression_not_fresh_generalization"
@@ -226,6 +295,12 @@ def run_question_semantic_parser_regression_v2(
         "case_count": total,
         "source_adversarial_fingerprint": (
             question_signature_adversarial_fingerprint_v2()
+        ),
+        "normalized_adversarial_fingerprint": (
+            NORMALIZED_ADVERSARIAL_FINGERPRINT_V2
+        ),
+        "pre_normalization_adversarial_fingerprint": (
+            PRE_NORMALIZATION_ADVERSARIAL_FINGERPRINT_V2
         ),
         "summary": {
             "core_exact": _rate(
@@ -244,6 +319,16 @@ def run_question_semantic_parser_regression_v2(
                     for row in results
                     if row[
                         "full_exact"
+                    ]
+                ),
+                total,
+            ),
+            "acceptance_pass": _rate(
+                sum(
+                    1
+                    for row in results
+                    if row[
+                        "acceptance_pass"
                     ]
                 ),
                 total,
