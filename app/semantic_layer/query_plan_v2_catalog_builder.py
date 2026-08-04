@@ -12,6 +12,9 @@ from app.semantic_layer.cac_query_plan_v2 import (
 from app.semantic_layer.channel_new_customer_query_plan_v2 import (
     build_channel_paid_new_customer_count_channel_plan,
 )
+from app.semantic_layer.composite_query_plan_v2_builder import (
+    build_gmv_channel_region_plan,
+)
 from app.semantic_layer.member_query_plan_v2 import (
     build_member_gmv_share_overall_plan,
 )
@@ -97,11 +100,12 @@ def build_query_plan_v2_catalog() -> QueryPlanCatalogV2:
     - 1 CAC Query Plan
     - 1 Brand Paid New Customer Query Plan
     - 1 Channel Paid New Customer Query Plan
+    - 1 GMV Channel × Region Composite Query Plan
 
     Total:
-    - 48 plans
+    - 49 plans
     - 19 metrics
-    - 40 QueryLogic
+    - 41 QueryLogic
     - 8 StagedQueryLogic
 
     Important:
@@ -141,6 +145,10 @@ def build_query_plan_v2_catalog() -> QueryPlanCatalogV2:
         build_channel_paid_new_customer_count_channel_plan()
     )
 
+    composite_gmv_plan = (
+        build_gmv_channel_region_plan()
+    )
+
     all_plans = (
         tuple(simple_catalog.query_plans)
         + tuple(repeat_plans)
@@ -151,6 +159,7 @@ def build_query_plan_v2_catalog() -> QueryPlanCatalogV2:
             cac_plan,
             brand_new_plan,
             channel_new_plan,
+            composite_gmv_plan,
         )
     )
 

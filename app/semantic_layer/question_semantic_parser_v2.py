@@ -533,7 +533,11 @@ def extract_deterministic_question_evidence_v2(
         )
 
     elif re.search(
-        r"平均|均值|人均",
+        (
+            r"均摊到|摊到|平均到"
+            r"|按.{0,20}?平均分"
+            r"|平均|均值|人均"
+        ),
         text,
     ):
         operator = (

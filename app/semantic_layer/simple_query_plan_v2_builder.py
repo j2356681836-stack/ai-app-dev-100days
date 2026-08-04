@@ -345,7 +345,13 @@ def _base_query_contract(
         }
 
         required_columns = {
-            "fact_orders.order_id",
+            # customer_id is required by the hidden __group_size
+            # control field for every simple metric plan.
+            #
+            # order_id is intentionally not a universal orders-source
+            # dependency. Metrics that actually use it, such as
+            # order_count and purchase_frequency, add it through
+            # spec.source_columns below.
             "fact_orders.customer_id",
             "fact_orders.channel_id",
             "fact_orders.shipping_region_id",

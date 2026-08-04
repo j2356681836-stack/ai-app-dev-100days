@@ -1155,7 +1155,6 @@ query_plans:
     - dim_region.region_id
     - fact_orders.channel_id
     - fact_orders.customer_id
-    - fact_orders.order_id
     - fact_orders.paid_at
     - fact_orders.shipping_region_id
   scope_contract:
@@ -1234,7 +1233,6 @@ query_plans:
     - dim_region.region_id
     - fact_orders.channel_id
     - fact_orders.customer_id
-    - fact_orders.order_id
     - fact_orders.paid_at
     - fact_orders.shipping_region_id
   scope_contract:
@@ -1318,7 +1316,6 @@ query_plans:
     - dim_region.region_name
     - fact_orders.channel_id
     - fact_orders.customer_id
-    - fact_orders.order_id
     - fact_orders.paid_at
     - fact_orders.shipping_region_id
   scope_contract:
@@ -4649,4 +4646,115 @@ query_plans:
     policy_version: result_protection_v1
   default_sort:
     field: channel_paid_new_customer_count
+    direction: desc
+- name: gmv_channel_region_v2
+  metric: gmv
+  chinese_name: 渠道×地区GMV
+  query_type: aggregate_metric
+  result_grain: channel_region
+  description: 按渠道与地区复合 Grain 计算 GMV。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_channel
+      alias: dc
+      join_type: inner
+      conditions:
+      - left: fo.channel_id
+        right: dc.channel_id
+    - table: dim_region
+      alias: dr
+      join_type: inner
+      conditions:
+      - left: fo.shipping_region_id
+        right: dr.region_id
+    group_by:
+    - dc.channel_id
+    - dc.channel_name
+    - dr.region_id
+    - dr.region_name
+    outputs:
+    - field: channel_name
+      expression: dc.channel_name
+    - field: region_name
+      expression: dr.region_name
+    - field: gmv
+      expression: SUM(foi.item_paid_amount)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_channel.channel_name
+    - dim_region.region_code
+    - dim_region.region_id
+    - dim_region.region_name
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gmv_channel_region_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: channel_name
+      source_columns:
+      - dim_channel.channel_name
+      category: ordinary
+      token_namespace: null
+    - output_field: region_name
+      source_columns:
+      - dim_region.region_name
+      category: ordinary
+      token_namespace: null
+    - output_field: gmv
+      source_columns:
+      - fact_order_items.item_paid_amount
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gmv
     direction: desc
