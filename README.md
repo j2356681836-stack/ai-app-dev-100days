@@ -419,6 +419,32 @@ Structured Audit Event / Hash-chain Audit Sink
 GovernedFinalizationResult（唯一允许跨服务边界的结果）
 ```
 
+Day79 进一步连接 V2 Service-level AI-chain 与 Final Answer：
+
+```text
+Natural Language Question
+↓
+Semantic Decision
+↓
+Analytics Planning
+↓
+Result Grain / Query Plan
+↓
+Time / Scope Binding
+↓
+Governed Planning Envelope
+↓
+Deterministic SQL Compilation
+↓
+PostgreSQL AST Enforcement
+↓
+Governed PostgreSQL Execution
+↓
+Result Protection / Audit Finalization
+↓
+Final Answer V2
+```
+
 当前验证：
 - Governed Planning Envelope：9/9 PASS；
 - Query Plan Compiler V2：8/8 PASS；
@@ -426,7 +452,12 @@ GovernedFinalizationResult（唯一允许跨服务边界的结果）
 - Catalog-wide：49 Plans，其中 45 个 Plan `READY_FOR_COMPILATION → COMPILED → AST ENFORCED`，4 个 Plan按 Scope Contract fail-closed；
 - Governed Query Execution V2 Service Acceptance：6/6 PASS；
 - Governed Query Execution V2 PostgreSQL Integration：4/4 PASS；
-- Day78 Closing Regression：42/42 PASS。
+- Day78 Closing Regression：42/42 PASS；
+- Final Answer V2：5/5 PASS；
+- Question Semantic Parser V2：43/43 PASS；
+- Governed Analytics Service V2：4/4 PASS；
+- Governed Analytics PostgreSQL End-to-End Integration：4/4 PASS；
+- Day79 已观察专项 / 集成测试合计：56/56 PASS。
 
 当前边界：
 - Access Context 尚未接入主 Graph；
@@ -441,7 +472,10 @@ GovernedFinalizationResult（唯一允许跨服务边界的结果）
 - SQL Generation / Repair 尚未登记真实 Token Usage；
 - Query Plans V2 已提供正式 Resource Contract、Scope Target、Result Field Binding 和 Minimum Group Size Control Field，并完成独立 Planning / Compilation / AST Enforcement；当前仍未接入 Stable Graph；
 - Langfuse 尚未接入安全 Audit 摘要；
-- Sensitive Data Protection、Audit Event、Audit Sink 和 Governed Finalization 已接入独立 V2 服务级执行闭环，但尚未接入在线 Graph；
+- Sensitive Data Protection、Audit Event、Audit Sink、Governed Finalization 与 Final Answer V2 已接入独立 V2 服务级 AI-chain，但尚未接入在线 Graph；
+- `PLANNED_MULTIPLE` 已能正确区分于 `MULTIPLE_INTENTS`，但当前服务级 V2 不执行多 Query Plan orchestration；
+- Final Answer Scope Disclosure 来自实际 Bound `ScopedQueryContract`，不从问题文本重新猜测；
+- 用户自然语言 Region / Channel Value Filter 尚未形成正式 Requested Scope Contract（`SCOPE-GAP-001`）；
 - Dataset V2 仍为 `draft`，Graph integration 继续关闭。
 
 ---
@@ -573,7 +607,10 @@ Query Plan V2 当前可显式声明：
 | query_plan_v2_catalog_builder_tests.py | 17/17 PASS |
 | query_plan_v2_tests.py | 22/22 PASS |
 | deepseek_client_tests.py | 3/3 PASS |
-| question_semantic_parser_v2_tests.py | 41/41 PASS |
+| question_semantic_parser_v2_tests.py | 43/43 PASS |
+| final_answer_v2_tests.py | 5/5 PASS |
+| governed_analytics_service_v2_tests.py | 4/4 PASS |
+| governed_analytics_postgresql_integration_v2.py | 4/4 PASS |
 | question_semantic_parser_regression_v2_tests.py | 7/7 PASS |
 | candidate_decision_v2_tests.py | 18/18 PASS |
 | candidate_decision_v2_catalog_tests.py | 7/7 PASS |
@@ -690,7 +727,7 @@ fact_reviews
 
 ## Beauty BI Dataset V2 当前状态
 
-Day61-Day78 已完成 Dataset V2 从设计、Schema、确定性 Seed、P01-P09 正式业务规律验收、Metadata V2 / Query Plans V2 静态语义合同，到 Semantic Decision、Result Grain / Query Plan Planning、执行前治理、确定性 SQL 编译、PostgreSQL AST Enforcement，以及服务级 Governed Execution / Result Protection / Audit Finalization。Dataset 当前仍保持 `draft`，尚未接入主 Graph。
+Day61-Day79 已完成 Dataset V2 从设计、Schema、确定性 Seed、P01-P09 正式业务规律验收、Metadata V2 / Query Plans V2 静态语义合同，到 Semantic Decision、Result Grain / Query Plan Planning、执行前治理、确定性 SQL 编译、PostgreSQL AST Enforcement、服务级 Governed Execution / Result Protection / Audit Finalization，以及 Natural Language → Governed PostgreSQL → Final Answer V2 的服务级 AI-chain。Dataset 当前仍保持 `draft`，尚未接入主 Graph。
 
 当前已完成：
 - 建立独立目录 `app/db/beauty_bi_v2/`；
@@ -718,7 +755,7 @@ Day61-Day78 已完成 Dataset V2 从设计、Schema、确定性 Seed、P01-P09 �
 - Final Fresh 首次运行已完成并暴露 1 条真实 Parser Gap；修复后的 16/16 仅作为 Observed Regression，不重新声明 Fresh PASS；
 - 已建立 Result Grain Resolver、Query Plan Selector、Analytics Planning Service、Time Window Resolution / Binding、Query Plan Scope Binding、Governed Planning Envelope、Deterministic Query Plan Compiler 与 Compiled SQL AST Enforcement；
 - 49 个 Plan 中 45 个达到 `READY_FOR_COMPILATION → COMPILED → AST ENFORCED`，4 个因 Scope Contract 不满足保持 fail-closed；
-- Governed PostgreSQL Execution、Result Protection / Audit Finalization 已完成服务级真实数据库集成；V2 Final Answer Regression、Graph Runtime Governance Integration 与完整 Performance Baseline 仍待完成；
+- Governed PostgreSQL Execution、Result Protection / Audit Finalization 已完成服务级真实数据库集成；Day79 已完成 Final Answer V2 与真实 PostgreSQL AI-chain End-to-End Regression；Graph Runtime Governance Integration 与完整 Performance Baseline 仍待完成；
 - Day78 真实 `gmv_overall_v2`（2025 全年 + 有效 Region / Channel Scope）执行约 18.96 秒，未满足生产默认 5 秒 Execution SLO，登记为 `PERF-GAP-001`；
 - 保持 V1 `public` Schema 不变，Graph integration 继续关闭。
 
@@ -807,7 +844,7 @@ Candidate Readiness Gates：in_progress
 Metadata V2：completed（19 metrics）
 Query Plans V2：completed（49 plans；41 QueryLogic / 8 StagedQueryLogic）
 Golden Cases V2：completed
-Generalization Evaluation：in_progress（Initial Holdout / Adversarial / Parser Regression evidence completed; final fresh holdout pending）
+Generalization Evaluation：first fresh run completed / not clean PASS；修复后的 replay 已被观察，仅作为 Regression Evidence，不声明 Final Fresh PASS
 Semantic Retrieval V2：completed
 Metric Semantic Signature：completed
 Question Semantic Signature：completed
@@ -815,12 +852,14 @@ Structured Semantic Parser：frozen / observed regression validated
 Candidate Decision：implemented / frozen
 Semantic Decision Service：implemented / final acceptance passed
 Governed Planning / SQL Compilation / AST Enforcement：completed（45 enforced / 4 fail-closed）
+Governed Execution / Result Protection / Audit Finalization：completed（Day78 Closing Gate 1/4 PASS）
+V2 AI-chain / Final Answer Regression：completed（Day79 Closing Gate 2/4 PASS）
 Performance Baseline：in_progress（`PERF-GAP-001` 已观察；完整 EXPLAIN ANALYZE / DB Size / End-to-End Baseline 待 Day81）
-AI-chain Regression：in_progress（执行前链路 + Governed PostgreSQL Execution / Finalization 已完成；Final Answer 待 Day79）
+Graph Runtime Governance Integration：pending（Day80）
 Graph integration：disabled
 ```
 
-Beauty BI V1 继续作为 Latest Stable Baseline。Day75 已完成 Structured Parser Finalization 与 Candidate / Semantic Decision Layer 的候选实现和回归验收，但 Final Fresh Generalization、Performance Baseline、Dataset V2 AI-chain Regression、Graph Runtime Governance Enforcement 与 Graph Integration 尚未完成，因此 Dataset V2 仍不能标记为 Candidate 或 Stable。
+Beauty BI V1 继续作为 Latest Stable Baseline。Day79 已完成 V2 Service-level AI-chain 与 Final Answer Regression，但 Performance Baseline、Graph Runtime Governance Enforcement、Full Regression 与 Dataset Candidate / New Stable Baseline Decision 尚未完成，因此 Dataset V2 仍不能标记为 Candidate 或 Stable。
 
 # 技术栈
 
@@ -1081,6 +1120,7 @@ Phase3 当前进展：
 - Day76 完成 Candidate Readiness Architecture Review / Result Grain & Query Plan Planning Boundary
 - Day77 完成 Final Fresh First Run Review / 49-plan Canonical Catalog / Governed Planning Envelope / Deterministic SQL Compiler / PostgreSQL AST Enforcement
 - Day78 完成 AST-Enforced Compiled SQL → Governed Runner → Result Protection / Audit Finalization 服务闭环与真实 PostgreSQL 集成
+- Day79 完成 V2 Service-level AI-chain / Final Answer V2 / Multi-intent vs Multi-grain Boundary Fix / Real PostgreSQL End-to-End Regression，Closing Gate 2/4 PASS
 
 Day61-Day66 Dataset V2 成果：
 - 完成 V1 Coverage Review 与 V2 P0 / P1 / P2 边界；
@@ -1236,8 +1276,8 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.49
-完成度：Day78 / 100
+Version: v0.50
+完成度：Day79 / 100
 
 当前 Stable Graph：
 
@@ -1443,11 +1483,41 @@ Day78 已知边界：
 - 空数据窗口当前通过 `minimum_group_size_violation` fail-closed，Answer Layer 尚未区分“无数据”和“低于最小样本阈值”；
 - Integration Fixture 必须使用 V2 Canonical Scope Codes（如 `JD` / `TMALL` 与城市级 Region Codes），AST 结构夹具中的虚拟 Scope 值不能用于真实数据库验收。
 
+Day79 进一步建立：
+
+```text
+Natural Language Question
+→ Semantic Decision
+→ Analytics Planning
+→ Query Plan
+→ Time / Scope Binding
+→ Governed Planning Envelope
+→ Deterministic SQL Compilation
+→ PostgreSQL AST Enforcement
+→ Governed PostgreSQL Execution
+→ Result Protection / Audit Finalization
+→ Final Answer V2
+```
+
+Day79 验证：
+- Final Answer V2：5/5 PASS；
+- Question Semantic Parser V2：43/43 PASS；
+- Governed Analytics Service V2：4/4 PASS；
+- Governed Analytics PostgreSQL End-to-End Integration：4/4 PASS；
+- Day79 已观察专项 / 集成测试合计：56/56 PASS。
+
+Day79 当前边界：
+- `PLANNED_MULTIPLE` 已可正确区分于 `MULTIPLE_INTENTS`，但服务级 V2 暂不执行多 Query Plan orchestration；
+- Final Answer 的 Scope Disclosure 来自实际 Bound `ScopedQueryContract`；
+- 用户问题中的 Region / Channel Value Filter 尚未形成正式 Requested Scope Contract（`SCOPE-GAP-001`）；
+- Dataset V2 Graph Integration 继续 disabled，Initial / Repaired SQL 的 Graph Runtime Governance 留待 Day80；
+- `PERF-GAP-001` 保持开放，完整 Performance Baseline 留待 Day81。
+
 当前边界：
 - Structured Parser 与 Candidate / Semantic Decision Layer 已冻结，但 60-case 结果仍是已观察 Regression，不是 Final Fresh Generalization；
 - Final Fresh 首次运行已完成，但不是 clean PASS；修复后的 replay 已被观察，只保留为 Regression Evidence；
-- Semantic Decision → Result Grain → Query Plan → Time / Scope → Compiled SQL → AST Enforcement → Governed PostgreSQL Execution → Result Protection / Audit Finalization 已形成独立服务级证据链；Final Answer 与主 Graph 端到端证据仍待完成；
-- `PERF-GAP-001` 已观察，但完整 Performance Baseline、V2 Final Answer Regression、Graph Runtime Enforcement 与 Repair 后治理尚未关闭；
+- Semantic Decision → Result Grain → Query Plan → Time / Scope → Compiled SQL → AST Enforcement → Governed PostgreSQL Execution → Result Protection / Audit Finalization → Final Answer V2 已形成独立服务级证据链；主 Graph 端到端证据仍待完成；
+- `PERF-GAP-001` 已观察，但完整 Performance Baseline、Graph Runtime Enforcement 与 Repair 后治理尚未关闭；
 - Dataset V2 仍为 `draft`；
 - Stable Graph 仍未接入 Dataset V2。
 

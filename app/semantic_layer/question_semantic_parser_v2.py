@@ -441,6 +441,42 @@ def _apply_semantic_specificity_guard_v2(
     )
 
 
+def _is_explicit_separate_result_grain_request_v2(
+    text: str,
+) -> bool:
+    """
+    High-precision exception for one Metric requested as separate
+    result sets across multiple supported dimensions.
+
+    Examples:
+    - 分别按渠道和地区看GMV
+    - 分别按地区、品类统计销售额
+
+    This does not resolve the grain itself. It only prevents the
+    multi-intent discourse guard from consuming a request that belongs
+    to Result Grain Resolver V2.
+    """
+    dimension_token = (
+        r"(?:渠道|平台|地区|区域|品类|类别)"
+    )
+
+    return bool(
+        re.search(
+            (
+                r"分别"
+                r"(?:按|从)?"
+                r".{0,8}"
+                + dimension_token
+                + r".{0,8}"
+                r"(?:和|与|、)"
+                r".{0,8}"
+                + dimension_token
+            ),
+            text,
+        )
+    )
+
+
 def detect_multiple_intents_v2(
     question: str,
 ) -> tuple[bool, str | None]:
@@ -449,10 +485,23 @@ def detect_multiple_intents_v2(
 
     Only strong discourse markers are used here.
     It intentionally does NOT attempt generic semantic decomposition.
+
+    Important boundary:
+    "分别" may describe either multiple business requests or one Metric
+    requested as separate result sets across multiple dimensions.
+    The latter belongs to Result Grain Resolver V2 and must pass through.
     """
     text = str(
         question
     )
+
+    if _is_explicit_separate_result_grain_request_v2(
+        text
+    ):
+        return (
+            False,
+            None,
+        )
 
     patterns = (
         (

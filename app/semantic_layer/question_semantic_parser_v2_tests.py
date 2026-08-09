@@ -330,6 +330,46 @@ def test_parallel_separate_requests_remain_multi_intent() -> None:
     )
 
 
+
+def test_separate_dimensions_pass_through_multi_intent_guard() -> None:
+    is_multi, marker = detect_multiple_intents_v2(
+        "分别按渠道和地区看2025年GMV"
+    )
+
+    assert_equal(
+        is_multi,
+        False,
+        (
+            "一个指标分别按多个结果维度查看时，"
+            "不应被 Parser Guard 误判为多个业务意图。"
+        ),
+    )
+
+    assert_equal(
+        marker,
+        None,
+        "Result Grain request 不应产生 multi-intent marker。",
+    )
+
+
+def test_separate_region_category_pass_through_multi_intent_guard() -> None:
+    is_multi, marker = detect_multiple_intents_v2(
+        "分别按地区、品类统计销售额"
+    )
+
+    assert_equal(
+        is_multi,
+        False,
+        "多个受支持维度的 separate result sets 应交给 Grain Resolver。",
+    )
+
+    assert_equal(
+        marker,
+        None,
+        "Separate result grain request 不应产生 guard marker。",
+    )
+
+
 def test_average_is_deterministic_divide_evidence() -> None:
     evidence = (
         extract_deterministic_question_evidence_v2(
@@ -1123,6 +1163,8 @@ def run_tests() -> None:
 
         test_grouped_separately_is_not_multi_intent,
         test_parallel_separate_requests_remain_multi_intent,
+        test_separate_dimensions_pass_through_multi_intent_guard,
+        test_separate_region_category_pass_through_multi_intent_guard,
         test_average_is_deterministic_divide_evidence,
         
         test_explicit_product_cost_is_deterministic_qualifier_evidence,
