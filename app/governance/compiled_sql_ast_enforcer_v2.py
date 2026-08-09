@@ -18,10 +18,13 @@ from app.governance.governed_planning_envelope_v2 import (
 from app.semantic_layer.query_plan_compiler_v2 import (
     CompiledQueryPlanContractV2,
 )
+from app.governance.repaired_sql_candidate_v2 import (
+    RepairedSqlCandidateV2,
+)
 
 
 AST_ENFORCEMENT_VERSION_V2 = (
-    "compiled_sql_ast_enforcement_v2_0"
+    "compiled_sql_ast_enforcement_v2_1"
 )
 
 _IDENTIFIER_PATTERN = r"^[A-Za-z_][A-Za-z0-9_]*$"
@@ -135,6 +138,9 @@ class CompiledSqlAstStatusV2(str, Enum):
     )
     PARAMETER_CONTRACT_MISMATCH = (
         "parameter_contract_mismatch"
+    )
+    SCOPE_PREDICATE_MISMATCH = (
+        "scope_predicate_mismatch"
     )
     AST_ENFORCEMENT_FAILED = (
         "ast_enforcement_failed"
@@ -336,6 +342,192 @@ class CompiledSqlAstDecisionV2(BaseModel):
         return self
 
 
+class RepairedSqlAstEnforcementContractV2(BaseModel):
+    """
+    AST evidence for an untrusted repaired SQL candidate.
+
+    The source deterministic Compiled Contract remains immutable.
+    This evidence binds a new repaired SQL fingerprint to:
+    - the same Governed Planning Envelope;
+    - the same source Compiled Contract;
+    - the same parameters / outputs / stages / resources;
+    - the same Row Scope predicate semantics.
+    """
+
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+    )
+
+    enforcement_version: str = (
+        AST_ENFORCEMENT_VERSION_V2
+    )
+    sqlglot_version: str
+
+    request_id: str
+    plan_name: str = Field(
+        pattern=_IDENTIFIER_PATTERN
+    )
+    metric_name: str = Field(
+        pattern=_IDENTIFIER_PATTERN
+    )
+    target_schema: str = Field(
+        pattern=_IDENTIFIER_PATTERN
+    )
+
+    envelope_fingerprint: str = Field(
+        pattern=_FINGERPRINT_PATTERN
+    )
+    source_compiled_contract_fingerprint: str = Field(
+        pattern=_FINGERPRINT_PATTERN
+    )
+    candidate_fingerprint: str = Field(
+        pattern=_FINGERPRINT_PATTERN
+    )
+    repaired_sql_fingerprint: str = Field(
+        pattern=_FINGERPRINT_PATTERN
+    )
+    normalized_ast_fingerprint: str = Field(
+        pattern=_FINGERPRINT_PATTERN
+    )
+
+    observed_physical_tables: frozenset[str]
+    observed_physical_columns: frozenset[str]
+    observed_cte_names: tuple[str, ...]
+    observed_output_fields: tuple[str, ...]
+    observed_function_classes: frozenset[str]
+    observed_parameter_names: frozenset[str]
+
+    contract_fingerprint: str = Field(
+        pattern=_FINGERPRINT_PATTERN
+    )
+
+    @model_validator(mode="after")
+    def validate_contract(
+        self,
+    ) -> "RepairedSqlAstEnforcementContractV2":
+        expected = _repaired_enforcement_contract_fingerprint(
+            sqlglot_version=self.sqlglot_version,
+            request_id=self.request_id,
+            plan_name=self.plan_name,
+            metric_name=self.metric_name,
+            target_schema=self.target_schema,
+            envelope_fingerprint=(
+                self.envelope_fingerprint
+            ),
+            source_compiled_contract_fingerprint=(
+                self.source_compiled_contract_fingerprint
+            ),
+            candidate_fingerprint=(
+                self.candidate_fingerprint
+            ),
+            repaired_sql_fingerprint=(
+                self.repaired_sql_fingerprint
+            ),
+            normalized_ast_fingerprint=(
+                self.normalized_ast_fingerprint
+            ),
+            observed_physical_tables=(
+                self.observed_physical_tables
+            ),
+            observed_physical_columns=(
+                self.observed_physical_columns
+            ),
+            observed_cte_names=(
+                self.observed_cte_names
+            ),
+            observed_output_fields=(
+                self.observed_output_fields
+            ),
+            observed_function_classes=(
+                self.observed_function_classes
+            ),
+            observed_parameter_names=(
+                self.observed_parameter_names
+            ),
+        )
+
+        if self.contract_fingerprint != expected:
+            raise ValueError(
+                "Repaired SQL AST enforcement fingerprint mismatch."
+            )
+
+        return self
+
+
+class RepairedSqlAstDecisionV2(BaseModel):
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+    )
+
+    success: bool
+    status: CompiledSqlAstStatusV2
+
+    plan_name: str
+    metric_name: str
+
+    contract: (
+        RepairedSqlAstEnforcementContractV2
+        | None
+    ) = None
+    detail: str | None = None
+    retryable: bool = False
+
+    @model_validator(mode="after")
+    def validate_decision(
+        self,
+    ) -> "RepairedSqlAstDecisionV2":
+        if self.retryable:
+            raise ValueError(
+                "Repaired SQL AST governance failures are "
+                "deterministic and non-retryable."
+            )
+
+        if self.success:
+            if (
+                self.status
+                != CompiledSqlAstStatusV2.ENFORCED
+            ):
+                raise ValueError(
+                    "Successful repaired SQL enforcement must "
+                    "use status=ENFORCED."
+                )
+
+            if self.contract is None:
+                raise ValueError(
+                    "Successful repaired SQL enforcement requires "
+                    "a contract."
+                )
+
+            if self.detail is not None:
+                raise ValueError(
+                    "Successful repaired SQL enforcement must not "
+                    "expose detail."
+                )
+
+            return self
+
+        if self.status == CompiledSqlAstStatusV2.ENFORCED:
+            raise ValueError(
+                "Failed repaired SQL enforcement cannot use "
+                "status=ENFORCED."
+            )
+
+        if self.contract is not None:
+            raise ValueError(
+                "Failed repaired SQL enforcement must not expose "
+                "a contract."
+            )
+
+        if not self.detail:
+            raise ValueError(
+                "Failed repaired SQL enforcement requires detail."
+            )
+
+        return self
+
+
 class _AstPolicyError(ValueError):
     def __init__(
         self,
@@ -492,6 +684,89 @@ def _enforcement_contract_fingerprint(
                 observed_parameter_names
             ),
         }
+    )
+
+
+def _repaired_enforcement_contract_fingerprint(
+    *,
+    sqlglot_version: str,
+    request_id: str,
+    plan_name: str,
+    metric_name: str,
+    target_schema: str,
+    envelope_fingerprint: str,
+    source_compiled_contract_fingerprint: str,
+    candidate_fingerprint: str,
+    repaired_sql_fingerprint: str,
+    normalized_ast_fingerprint: str,
+    observed_physical_tables: frozenset[str],
+    observed_physical_columns: frozenset[str],
+    observed_cte_names: tuple[str, ...],
+    observed_output_fields: tuple[str, ...],
+    observed_function_classes: frozenset[str],
+    observed_parameter_names: frozenset[str],
+) -> str:
+    return _sha256_payload(
+        {
+            "enforcement_version": (
+                AST_ENFORCEMENT_VERSION_V2
+            ),
+            "sqlglot_version": sqlglot_version,
+            "request_id": request_id,
+            "plan_name": plan_name,
+            "metric_name": metric_name,
+            "target_schema": target_schema,
+            "envelope_fingerprint": (
+                envelope_fingerprint
+            ),
+            "source_compiled_contract_fingerprint": (
+                source_compiled_contract_fingerprint
+            ),
+            "candidate_fingerprint": (
+                candidate_fingerprint
+            ),
+            "repaired_sql_fingerprint": (
+                repaired_sql_fingerprint
+            ),
+            "normalized_ast_fingerprint": (
+                normalized_ast_fingerprint
+            ),
+            "observed_physical_tables": (
+                observed_physical_tables
+            ),
+            "observed_physical_columns": (
+                observed_physical_columns
+            ),
+            "observed_cte_names": (
+                observed_cte_names
+            ),
+            "observed_output_fields": (
+                observed_output_fields
+            ),
+            "observed_function_classes": (
+                observed_function_classes
+            ),
+            "observed_parameter_names": (
+                observed_parameter_names
+            ),
+        }
+    )
+
+
+def _failed_repaired(
+    *,
+    candidate: RepairedSqlCandidateV2,
+    status: CompiledSqlAstStatusV2,
+    detail: str,
+) -> RepairedSqlAstDecisionV2:
+    return RepairedSqlAstDecisionV2(
+        success=False,
+        status=status,
+        plan_name=candidate.plan_name,
+        metric_name=candidate.metric_name,
+        contract=None,
+        detail=detail,
+        retryable=False,
     )
 
 
@@ -758,6 +1033,247 @@ def _assert_single_select_statement(
     return root
 
 
+
+
+def _unwrap_parentheses(
+    node: exp.Expr,
+) -> exp.Expr:
+    current = node
+
+    while isinstance(
+        current,
+        exp.Paren,
+    ):
+        current = current.this
+
+    return current
+
+
+def _flatten_top_level_and(
+    node: exp.Expr,
+) -> tuple[exp.Expr, ...]:
+    """
+    Return only top-level AND conjuncts.
+
+    This is intentionally conservative. A governed Scope predicate
+    hidden under OR must not count as preserved, because:
+
+        scope_predicate OR TRUE
+
+    keeps the same tables / columns / parameters while removing the
+    actual authorization restriction.
+    """
+    current = _unwrap_parentheses(
+        node
+    )
+
+    if isinstance(
+        current,
+        exp.And,
+    ):
+        return (
+            *_flatten_top_level_and(
+                current.this
+            ),
+            *_flatten_top_level_and(
+                current.expression
+            ),
+        )
+
+    return (
+        current,
+    )
+
+
+def _normalized_expression_sql(
+    node: exp.Expr,
+) -> str:
+    return _unwrap_parentheses(
+        node
+    ).sql(
+        dialect="postgres",
+        pretty=False,
+    )
+
+
+def _parse_predicate_fragment(
+    fragment: str,
+) -> exp.Expr:
+    try:
+        wrapper = sqlglot.parse_one(
+            f"SELECT 1 WHERE {fragment}",
+            read="postgres",
+        )
+    except ParseError as exc:
+        raise _AstPolicyError(
+            CompiledSqlAstStatusV2
+            .SCOPE_PREDICATE_MISMATCH,
+            (
+                "Governed Scope predicate cannot be parsed as "
+                f"PostgreSQL AST: {exc}"
+            ),
+        ) from exc
+
+    if not isinstance(
+        wrapper,
+        exp.Select,
+    ):
+        raise _AstPolicyError(
+            CompiledSqlAstStatusV2
+            .SCOPE_PREDICATE_MISMATCH,
+            "Governed Scope predicate wrapper is not SELECT.",
+        )
+
+    where = wrapper.args.get(
+        "where"
+    )
+
+    if where is None:
+        raise _AstPolicyError(
+            CompiledSqlAstStatusV2
+            .SCOPE_PREDICATE_MISMATCH,
+            "Governed Scope predicate wrapper has no WHERE.",
+        )
+
+    return _unwrap_parentheses(
+        where.this
+    )
+
+
+def _selects_by_stage_id(
+    tree: exp.Select,
+) -> dict[str | None, exp.Select]:
+    """
+    Map Query Plan stage_id to the SELECT whose WHERE clause owns the
+    governance predicate.
+
+    - None is the root SELECT for simple QueryLogic.
+    - CTE alias is the stage_id for StagedQueryLogic.
+    """
+    result: dict[
+        str | None,
+        exp.Select,
+    ] = {
+        None: tree,
+    }
+
+    for cte in tree.find_all(
+        exp.CTE
+    ):
+        stage_id = cte.alias_or_name
+        body = cte.this
+
+        if isinstance(
+            body,
+            exp.Subquery,
+        ):
+            body = body.this
+
+        if (
+            stage_id
+            and isinstance(
+                body,
+                exp.Select,
+            )
+        ):
+            result[
+                stage_id
+            ] = body
+
+    return result
+
+
+def _assert_scope_predicate_preservation(
+    *,
+    tree: exp.Select,
+    envelope: GovernedPlanningEnvelopeV2,
+) -> None:
+    """
+    Prove that every immutable Row Scope placement is still an actual
+    top-level WHERE conjunct in the final SQL AST.
+
+    Contract identity / fingerprints alone are insufficient: a repaired
+    SQL candidate could retain all governed tables, columns and named
+    parameters but weaken:
+
+        scope_predicate
+
+    into:
+
+        scope_predicate OR TRUE
+
+    This gate rejects that class of semantic authorization bypass.
+    """
+    stage_selects = _selects_by_stage_id(
+        tree
+    )
+
+    for placement in (
+        envelope.scope_binding.placements
+    ):
+        select = stage_selects.get(
+            placement.stage_id
+        )
+
+        if select is None:
+            raise _AstPolicyError(
+                CompiledSqlAstStatusV2
+                .SCOPE_PREDICATE_MISMATCH,
+                (
+                    "Final SQL is missing the SELECT stage required "
+                    "by the governed Scope placement. "
+                    f"stage_id={placement.stage_id}, "
+                    f"target_id={placement.target_id}, "
+                    f"dimension={placement.dimension.value}"
+                ),
+            )
+
+        where = select.args.get(
+            "where"
+        )
+
+        if where is None:
+            raise _AstPolicyError(
+                CompiledSqlAstStatusV2
+                .SCOPE_PREDICATE_MISMATCH,
+                (
+                    "Final SQL is missing a WHERE clause required "
+                    "by the governed Scope placement. "
+                    f"stage_id={placement.stage_id}, "
+                    f"target_id={placement.target_id}, "
+                    f"dimension={placement.dimension.value}"
+                ),
+            )
+
+        observed_conjuncts = frozenset(
+            _normalized_expression_sql(
+                conjunct
+            )
+            for conjunct in (
+                _flatten_top_level_and(
+                    where.this
+                )
+            )
+        )
+
+        expected = _normalized_expression_sql(
+            _parse_predicate_fragment(
+                placement.sql_fragment
+            )
+        )
+
+        if expected not in observed_conjuncts:
+            raise _AstPolicyError(
+                CompiledSqlAstStatusV2
+                .SCOPE_PREDICATE_MISMATCH,
+                (
+                    "Final SQL does not preserve the governed Row "
+                    "Scope predicate as a top-level AND conjunct. "
+                    f"stage_id={placement.stage_id}, "
+                    f"target_id={placement.target_id}, "
+                    f"dimension={placement.dimension.value}"
+                ),
+            )
 
 
 def _callable_function_identity(
@@ -1370,6 +1886,11 @@ def enforce_compiled_sql_ast_v2(
                 ),
             )
 
+        _assert_scope_predicate_preservation(
+            tree=tree,
+            envelope=envelope,
+        )
+
         root_output_fields = _projection_names(
             tree
         )
@@ -1518,6 +2039,367 @@ def enforce_compiled_sql_ast_v2(
         status=CompiledSqlAstStatusV2.ENFORCED,
         plan_name=compiled.plan_name,
         metric_name=compiled.metric_name,
+        contract=contract,
+        detail=None,
+        retryable=False,
+    )
+
+
+def enforce_repaired_sql_candidate_v2(
+    *,
+    envelope: GovernedPlanningEnvelopeV2,
+    source_compiled: CompiledQueryPlanContractV2,
+    candidate: RepairedSqlCandidateV2,
+) -> RepairedSqlAstDecisionV2:
+    """
+    Enforce one untrusted repaired SQL candidate against the original
+    immutable governance chain.
+
+    This function never executes SQL and never mutates the original
+    CompiledQueryPlanContractV2.
+
+    A candidate may pass only when it preserves:
+    - Envelope / source Compiled Contract identity;
+    - exact named parameter contract;
+    - exact CTE / output contract;
+    - exact physical table / column contract;
+    - actual Row Scope predicates as top-level AND conjuncts;
+    - the normal PostgreSQL AST capability allowlist.
+    """
+    if not isinstance(
+        envelope,
+        GovernedPlanningEnvelopeV2,
+    ):
+        raise TypeError(
+            "envelope must be GovernedPlanningEnvelopeV2."
+        )
+
+    if not isinstance(
+        source_compiled,
+        CompiledQueryPlanContractV2,
+    ):
+        raise TypeError(
+            "source_compiled must be CompiledQueryPlanContractV2."
+        )
+
+    if not isinstance(
+        candidate,
+        RepairedSqlCandidateV2,
+    ):
+        raise TypeError(
+            "candidate must be RepairedSqlCandidateV2."
+        )
+
+    try:
+        _assert_contract_linkage(
+            envelope=envelope,
+            compiled=source_compiled,
+        )
+
+        linkage = {
+            "request_id": (
+                source_compiled.request_id,
+                candidate.request_id,
+            ),
+            "plan_name": (
+                source_compiled.plan_name,
+                candidate.plan_name,
+            ),
+            "metric_name": (
+                source_compiled.metric_name,
+                candidate.metric_name,
+            ),
+            "result_grain": (
+                source_compiled.result_grain,
+                candidate.result_grain,
+            ),
+            "target_schema": (
+                source_compiled.target_schema,
+                candidate.target_schema,
+            ),
+            "envelope_fingerprint": (
+                source_compiled.envelope_fingerprint,
+                candidate.envelope_fingerprint,
+            ),
+            "source_compiled_contract_fingerprint": (
+                source_compiled.contract_fingerprint,
+                candidate.source_compiled_contract_fingerprint,
+            ),
+            "source_sql_fingerprint": (
+                source_compiled.sql_fingerprint,
+                candidate.source_sql_fingerprint,
+            ),
+            "parameter_names": (
+                source_compiled.parameter_names,
+                candidate.parameter_names,
+            ),
+            "visible_output_fields": (
+                source_compiled.visible_output_fields,
+                candidate.visible_output_fields,
+            ),
+            "hidden_output_fields": (
+                source_compiled.hidden_output_fields,
+                candidate.hidden_output_fields,
+            ),
+            "compiled_stage_ids": (
+                source_compiled.compiled_stage_ids,
+                candidate.compiled_stage_ids,
+            ),
+        }
+
+        mismatches = {
+            field: {
+                "source": expected,
+                "candidate": actual,
+            }
+            for field, (
+                expected,
+                actual,
+            ) in linkage.items()
+            if expected != actual
+        }
+
+        if mismatches:
+            raise _AstPolicyError(
+                CompiledSqlAstStatusV2
+                .INVALID_CONTRACT_LINKAGE,
+                (
+                    "Repaired SQL candidate is not linked to the "
+                    "original governed compiled contract. "
+                    f"mismatches={mismatches}"
+                ),
+            )
+
+        actual_sql_fingerprint = _sha256_text(
+            candidate.repaired_sql
+        )
+
+        if (
+            actual_sql_fingerprint
+            != candidate.repaired_sql_fingerprint
+        ):
+            raise _AstPolicyError(
+                CompiledSqlAstStatusV2
+                .SQL_FINGERPRINT_MISMATCH,
+                (
+                    "Repaired SQL no longer matches its frozen "
+                    "repaired_sql_fingerprint."
+                ),
+            )
+
+        parameter_names = frozenset(
+            _PARAMETER_FINDER.findall(
+                candidate.repaired_sql
+            )
+        )
+        declared_parameter_names = frozenset(
+            candidate.parameter_names
+        )
+
+        if parameter_names != declared_parameter_names:
+            raise _AstPolicyError(
+                CompiledSqlAstStatusV2
+                .PARAMETER_CONTRACT_MISMATCH,
+                (
+                    "Repaired SQL placeholders must exactly match "
+                    "the original compiled parameter contract. "
+                    f"missing={sorted(parameter_names - declared_parameter_names)}, "
+                    f"unused={sorted(declared_parameter_names - parameter_names)}"
+                ),
+            )
+
+        tree = _assert_single_select_statement(
+            candidate.repaired_sql
+        )
+
+        function_classes = (
+            _assert_ast_capabilities(
+                tree
+            )
+        )
+
+        (
+            cte_names,
+            cte_outputs,
+        ) = _cte_contract(
+            tree
+        )
+
+        if cte_names != candidate.compiled_stage_ids:
+            raise _AstPolicyError(
+                CompiledSqlAstStatusV2
+                .CTE_CONTRACT_MISMATCH,
+                (
+                    "Repaired SQL CTE sequence must exactly match "
+                    "the original compiled stage contract. "
+                    f"observed={cte_names}, "
+                    f"declared={candidate.compiled_stage_ids}"
+                ),
+            )
+
+        _assert_scope_predicate_preservation(
+            tree=tree,
+            envelope=envelope,
+        )
+
+        root_output_fields = _projection_names(
+            tree
+        )
+        expected_output_fields = (
+            *candidate.visible_output_fields,
+            *candidate.hidden_output_fields,
+        )
+
+        if root_output_fields != expected_output_fields:
+            raise _AstPolicyError(
+                CompiledSqlAstStatusV2
+                .OUTPUT_CONTRACT_MISMATCH,
+                (
+                    "Repaired SQL outputs must exactly match the "
+                    "original compiled output contract. "
+                    f"observed={root_output_fields}, "
+                    f"expected={expected_output_fields}"
+                ),
+            )
+
+        (
+            physical_tables,
+            physical_columns,
+        ) = _inspect_resources(
+            tree=tree,
+            envelope=envelope,
+            cte_outputs=cte_outputs,
+        )
+
+        normalized_sql = tree.sql(
+            dialect="postgres",
+            pretty=False,
+        )
+        normalized_ast_fingerprint = (
+            _sha256_text(
+                normalized_sql
+            )
+        )
+
+    except _AstPolicyError as exc:
+        return _failed_repaired(
+            candidate=candidate,
+            status=exc.status,
+            detail=exc.detail,
+        )
+    except (
+        AttributeError,
+        KeyError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        return _failed_repaired(
+            candidate=candidate,
+            status=(
+                CompiledSqlAstStatusV2
+                .AST_ENFORCEMENT_FAILED
+            ),
+            detail=(
+                f"{type(exc).__name__}: {exc}"
+            ),
+        )
+
+    sqlglot_version = sqlglot.__version__
+
+    contract_fingerprint = (
+        _repaired_enforcement_contract_fingerprint(
+            sqlglot_version=sqlglot_version,
+            request_id=candidate.request_id,
+            plan_name=candidate.plan_name,
+            metric_name=candidate.metric_name,
+            target_schema=candidate.target_schema,
+            envelope_fingerprint=(
+                candidate.envelope_fingerprint
+            ),
+            source_compiled_contract_fingerprint=(
+                candidate.source_compiled_contract_fingerprint
+            ),
+            candidate_fingerprint=(
+                candidate.candidate_fingerprint
+            ),
+            repaired_sql_fingerprint=(
+                candidate.repaired_sql_fingerprint
+            ),
+            normalized_ast_fingerprint=(
+                normalized_ast_fingerprint
+            ),
+            observed_physical_tables=(
+                physical_tables
+            ),
+            observed_physical_columns=(
+                physical_columns
+            ),
+            observed_cte_names=(
+                cte_names
+            ),
+            observed_output_fields=(
+                root_output_fields
+            ),
+            observed_function_classes=(
+                function_classes
+            ),
+            observed_parameter_names=(
+                parameter_names
+            ),
+        )
+    )
+
+    contract = (
+        RepairedSqlAstEnforcementContractV2(
+            sqlglot_version=sqlglot_version,
+            request_id=candidate.request_id,
+            plan_name=candidate.plan_name,
+            metric_name=candidate.metric_name,
+            target_schema=candidate.target_schema,
+            envelope_fingerprint=(
+                candidate.envelope_fingerprint
+            ),
+            source_compiled_contract_fingerprint=(
+                candidate.source_compiled_contract_fingerprint
+            ),
+            candidate_fingerprint=(
+                candidate.candidate_fingerprint
+            ),
+            repaired_sql_fingerprint=(
+                candidate.repaired_sql_fingerprint
+            ),
+            normalized_ast_fingerprint=(
+                normalized_ast_fingerprint
+            ),
+            observed_physical_tables=(
+                physical_tables
+            ),
+            observed_physical_columns=(
+                physical_columns
+            ),
+            observed_cte_names=(
+                cte_names
+            ),
+            observed_output_fields=(
+                root_output_fields
+            ),
+            observed_function_classes=(
+                function_classes
+            ),
+            observed_parameter_names=(
+                parameter_names
+            ),
+            contract_fingerprint=(
+                contract_fingerprint
+            ),
+        )
+    )
+
+    return RepairedSqlAstDecisionV2(
+        success=True,
+        status=CompiledSqlAstStatusV2.ENFORCED,
+        plan_name=candidate.plan_name,
+        metric_name=candidate.metric_name,
         contract=contract,
         detail=None,
         retryable=False,

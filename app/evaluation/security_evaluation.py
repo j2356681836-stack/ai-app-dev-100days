@@ -58,6 +58,15 @@ from app.governance.sensitive_data import (
     build_raw_field_binding,
     protect_result_rows,
 )
+from app.evaluation.governed_analyst_graph_budget_security_v2_tests import (
+    test_prompt_injection_cannot_mutate_server_access_context,
+)
+from app.evaluation.compiled_sql_scope_predicate_runtime_v2_tests import (
+    test_region_scope_or_true_is_denied,
+)
+from app.evaluation.repaired_sql_candidate_governance_v2_tests import (
+    test_region_scope_weakening_is_denied,
+)
 
 
 class ObservedStatus(str, Enum):
@@ -129,6 +138,18 @@ def _case_sec_001() -> str:
     return "Frozen AccessContext remained unchanged."
 
 
+def _case_sec_002() -> str:
+    """
+    Aggregate the Day80 Graph-level Prompt Injection control evidence.
+
+    The specialized test proves that prompt text cannot mutate the
+    server-trusted AccessContext, expand Region / Channel scope, or
+    inject raw SQL directly into the governed executor.
+    """
+    test_prompt_injection_cannot_mutate_server_access_context()
+    return "graph_access_context_and_compiled_execution_boundary_enforced"
+
+
 def _case_sec_003() -> str:
     decision = authorize_metric(_build_context(), "customer_lifetime_value")
     _assert(not decision.allowed, "Unauthorized metric was allowed.")
@@ -184,6 +205,17 @@ def _case_sec_007() -> str:
     _assert(not decision.allowed, "Empty Region scope was treated as global.")
     _assert(decision.reason_code == RowScopeReason.EMPTY_SCOPE, "Wrong empty-scope reason.")
     return decision.reason_code.value
+
+
+def _case_sec_008() -> str:
+    """
+    Aggregate the Day80 final-SQL Scope Predicate AST evidence.
+
+    A candidate that keeps the same tables, columns and parameters but
+    weakens the Region predicate with `OR TRUE` must fail closed.
+    """
+    test_region_scope_or_true_is_denied()
+    return "final_sql_region_scope_predicate_ast_enforced"
 
 
 def _case_sec_009() -> str:
@@ -249,6 +281,18 @@ def _case_sec_010() -> str:
         "Wrong contract mismatch reason.",
     )
     return decision.reason_code.value
+
+
+def _case_sec_011() -> str:
+    """
+    Aggregate the Day80 Repaired SQL Candidate governance evidence.
+
+    Automatic V2 Repair Runtime remains disabled, but any future repair
+    output must preserve the original governed Scope semantics and
+    re-pass AST enforcement before it can become executable evidence.
+    """
+    test_region_scope_weakening_is_denied()
+    return "repaired_sql_candidate_scope_and_ast_contract_enforced"
 
 
 def _case_sec_012() -> str:
@@ -606,13 +650,16 @@ def _case_sec_021() -> str:
 
 CASE_FUNCTIONS: dict[str, Callable[[], str]] = {
     "SEC-001": _case_sec_001,
+    "SEC-002": _case_sec_002,
     "SEC-003": _case_sec_003,
     "SEC-004": _case_sec_004,
     "SEC-005": _case_sec_005,
     "SEC-006": _case_sec_006,
     "SEC-007": _case_sec_007,
+    "SEC-008": _case_sec_008,
     "SEC-009": _case_sec_009,
     "SEC-010": _case_sec_010,
+    "SEC-011": _case_sec_011,
     "SEC-012": _case_sec_012,
     "SEC-013": _case_sec_013,
     "SEC-014": _case_sec_014,
@@ -725,7 +772,7 @@ def run_security_evaluation(
     skipped = sum(item["observed_status"] == "skipped" for item in results)
 
     print("=" * 80)
-    print("Day72 Security Evaluation Summary")
+    print("Day80 Security Evaluation Summary")
     print(f"Total: {len(results)}")
     print(f"Controlled PASS: {passed}")
     print(f"Unexpected FAIL: {failed}")
