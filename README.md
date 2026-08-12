@@ -103,6 +103,27 @@ V2 Candidate Graph 进一步将 Planning、Compilation、AST Gate、Execution Bu
 - Day81 将 `beauty_bi_v2` 提升为 Candidate，而不是 New Stable；
 - Phase4 在 Candidate 基线上继续建设 Evidence-based Business Insight Engine。
 
+### Day82 Phase4 Contract Foundation
+
+Day82 在 Dataset V2 Candidate 之上完成 Phase4 第一层合同基础：
+
+```text
+Time Comparison Contract
++
+Insight Contract
++
+Tool Contract
++
+Business Decision Evaluation Contract
+```
+
+关键边界：
+- Phase3 `FinalAnswerV2` 保持 deterministic factual answer，不被经营诊断逻辑改写；
+- `TimeWindowResolverV2` 保持单时间窗口职责，Comparison 作为独立 Contract；
+- Model 未来可以选择受控 Tool，但不能传 raw SQL 或重新定义 `metric_formula`；
+- Fact / Anomaly / Contribution / Candidate Explanation / Unknown / Recommended Check 被结构化分离；
+- Business Decision Evaluation 不使用简单平均掩盖事实错误或 epistemic 越界。
+
 # Demo
 
 用户输入：哪个品类退款率最高？
@@ -568,6 +589,17 @@ Day81 完成 Closing Gate 4/4：
 - Phase3：CLOSED，Phase4 最早 Day82 开始。
 
 性能修复不是通过新增索引或放宽 timeout 完成，而是通过补齐 PostgreSQL Planner Statistics，使 Planner 能基于真实数据规模重新选择执行计划。Dataset V2 后续 rebuild / bulk seed 必须把 `ANALYZE` 作为 Query Readiness 生命周期步骤。
+
+### Day82 Phase4 Contract Acceptance
+
+```text
+Time Comparison Contract V2 Acceptance：6/6 PASS
+Insight + Tool Contract V2 Acceptance：12/12 PASS
+Business Decision Evaluation Contract V2 Acceptance：7/7 PASS
+```
+
+Day82 只建立 Contract Foundation；尚未实现 Anomaly Detection、Contribution Analysis、Agentic Planner / Loop 或 Automated Judge。
+
 ---
 
 ## Dataset V2 Semantic Contract
@@ -712,6 +744,9 @@ Query Plan V2 当前可显式声明：
 | semantic_decision_service_v2_tests.py | 6/6 PASS |
 | semantic_decision_acceptance_v2.py | 8/8 PASS |
 | llm_transport_migration_tests.py | 2/2 PASS |
+| time_comparison_contract_acceptance_v2.py | 6/6 PASS |
+| investigation_contracts_acceptance_v2.py | 12/12 PASS |
+| business_decision_evaluation_contract_acceptance_v2.py | 7/7 PASS |
 
 ### Day74 Dataset V2 Generalization Evidence
 
@@ -1168,11 +1203,11 @@ Phase3 最终定位：一个运行在 Beauty BI Dataset V2 上、具备可解释
 
 Evidence-based Business Insight Engine + Public Delivery
 
-状态：⬜ 未开始（计划 Day82 启动）
+状态：🚧 进行中（Day82 Contract Foundation 已完成）
 
-当前 Day82-Day92 目标：
-- Insight Contract / Tool Contract / Time Comparison；
-- Anomaly Detection 与 Comparison Evaluation；
+当前 Day82-Day94 目标：
+- ✅ Day82：Insight Contract / Tool Contract / Time Comparison / Business Decision Evaluation Contract；
+- Day83：Anomaly Detection 与 Comparison Evaluation；
 - Contribution Analysis；
 - Controlled Drill-down Workflow；
 - Evidence Pack；
@@ -1288,10 +1323,10 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.52
-完成度：Day81 / 100
+Version: v0.53
+完成度：Day82 / 100
 Phase3：CLOSED
-Phase4：计划 Day82 启动
+Phase4：IN_PROGRESS（Day82 completed）
 
 Latest Stable Baseline：
 
@@ -1350,6 +1385,14 @@ Observed Semantic Parser：
 - Multi-intent 60/60
 ```
 
+Day82 Phase4 Contract Foundation：
+
+```text
+Time Comparison：6/6 PASS
+Insight + Tool：12/12 PASS
+Business Decision Evaluation：7/7 PASS
+```
+
 当前已知限制：
 - `SEM-REL-GAP-001`：live Structured Semantic Parser repeatability；
 - `SCOPE-GAP-001`：Requested Region / Channel Value Filter 尚未正式结构化；
@@ -1360,4 +1403,4 @@ Observed Semantic Parser：
 - V2 automatic SQL Repair Runtime disabled；
 - real LLM token usage capture / Langfuse safe audit mapping pending。
 
-下一步：Day82 进入 Phase4 Evidence-based Business Insight Engine。
+下一步：Day83 进入 Anomaly Detection，建立 deterministic anomaly threshold 与 evidence contract。
