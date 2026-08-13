@@ -124,6 +124,53 @@ Business Decision Evaluation Contract
 - Fact / Anomaly / Contribution / Candidate Explanation / Unknown / Recommended Check 被结构化分离；
 - Business Decision Evaluation 不使用简单平均掩盖事实错误或 epistemic 越界。
 
+
+### Day83 Deterministic Anomaly Detection
+
+Day83 在 Day82 Contract Foundation 之上完成确定性异常判断与 Insight 证据集成：
+
+```text
+TimeComparisonContractV2
+↓
+Active AnomalyPolicyV2
+↓
+Minimum Sample / Exposure Gate
+↓
+Deterministic Anomaly Detector
+↓
+AnomalyDecisionV2
+↓
+Anomaly Insight Adapter
+↓
+InsightContractV2.detected_anomalies
+```
+
+当前已实现：
+- 同时保留 absolute change 与 relative change；
+- sample gate 使用 `sample_metric_name + current/reference_sample_value`，不把样本语义写死为订单数；
+- 明确区分 `ANOMALY / NORMAL / INSUFFICIENT_SAMPLE / NOT_COMPARABLE / POLICY_NOT_FOUND`；
+- Policy 必须绑定 Metric、Comparison Type、Direction、Threshold、Sample Basis 与 Policy Version；
+- 建立 `AnomalyPolicyCandidateV2 → ACTIVE → AnomalyPolicyV2` 生命周期；
+- `TBD_CALIBRATION` Candidate 不能进入 Detector；
+- 只有完整 ACTIVE Policy 才能确定性执行；
+- `AnomalyDecisionV2` 通过 Adapter 转换为 evidence-backed anomaly statement，不直接改写 Day82 `InsightContractV2`。
+
+Day83 Acceptance：
+
+```text
+Anomaly Detection V2：11/11 PASS
+Anomaly Policy Candidate V2：8/8 PASS
+Anomaly Insight Adapter V2：8/8 PASS
+```
+
+当前业务边界：
+- 首批 8 个 Tier A Policy Candidate 覆盖 GMV、Gross Margin Rate、Refund Rate、Order Count 的 YoY / Campaign YoY / Baseline Deviation 候选组合；
+- 8 个 Candidate 当前全部为 `TBD_CALIBRATION`；
+- 当前没有把 Dataset Acceptance 区间、测试 fixture 或 LLM 判断冒充生产 anomaly threshold；
+- Statistical threshold 用于产生 calibration candidate，正式阈值仍需 Business / Human Calibration 后才能升级为 ACTIVE；
+- LLM 可以在后续 Investigation 中解释异常和选择调查方向，但不作为核心 anomaly truth source；
+- Day83 不做 Contribution Analysis，也不声称 anomaly 原因或因果关系。
+
 # Demo
 
 用户输入：哪个品类退款率最高？
@@ -747,6 +794,9 @@ Query Plan V2 当前可显式声明：
 | time_comparison_contract_acceptance_v2.py | 6/6 PASS |
 | investigation_contracts_acceptance_v2.py | 12/12 PASS |
 | business_decision_evaluation_contract_acceptance_v2.py | 7/7 PASS |
+| anomaly_detection_acceptance_v2.py | 11/11 PASS |
+| anomaly_policy_candidates_acceptance_v2.py | 8/8 PASS |
+| anomaly_insight_adapter_acceptance_v2.py | 8/8 PASS |
 
 ### Day74 Dataset V2 Generalization Evidence
 
@@ -1203,11 +1253,11 @@ Phase3 最终定位：一个运行在 Beauty BI Dataset V2 上、具备可解释
 
 Evidence-based Business Insight Engine + Public Delivery
 
-状态：🚧 进行中（Day82 Contract Foundation 已完成）
+状态：🚧 进行中（Day83 Deterministic Anomaly Detection 已完成）
 
 当前 Day82-Day94 目标：
 - ✅ Day82：Insight Contract / Tool Contract / Time Comparison / Business Decision Evaluation Contract；
-- Day83：Anomaly Detection 与 Comparison Evaluation；
+- ✅ Day83：Deterministic Anomaly Detection / Policy Candidate / Insight Evidence Integration；
 - Contribution Analysis；
 - Controlled Drill-down Workflow；
 - Evidence Pack；
@@ -1323,10 +1373,10 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.53
-完成度：Day82 / 100
+Version: v0.54
+完成度：Day83 / 100
 Phase3：CLOSED
-Phase4：IN_PROGRESS（Day82 completed）
+Phase4：IN_PROGRESS（Day83 completed）
 
 Latest Stable Baseline：
 
@@ -1393,6 +1443,15 @@ Insight + Tool：12/12 PASS
 Business Decision Evaluation：7/7 PASS
 ```
 
+Day83 Deterministic Anomaly Detection：
+
+```text
+Anomaly Detection：11/11 PASS
+Policy Candidate：8/8 PASS
+Insight Adapter：8/8 PASS
+Production Active Policy：0（8 个 Tier A Candidate 均为 TBD_CALIBRATION）
+```
+
 当前已知限制：
 - `SEM-REL-GAP-001`：live Structured Semantic Parser repeatability；
 - `SCOPE-GAP-001`：Requested Region / Channel Value Filter 尚未正式结构化；
@@ -1403,4 +1462,4 @@ Business Decision Evaluation：7/7 PASS
 - V2 automatic SQL Repair Runtime disabled；
 - real LLM token usage capture / Langfuse safe audit mapping pending。
 
-下一步：Day83 进入 Anomaly Detection，建立 deterministic anomaly threshold 与 evidence contract。
+下一步：Day84 进入 Contribution Analysis，定位异常主要来自哪些维度，并保持 contribution ≠ causality。
