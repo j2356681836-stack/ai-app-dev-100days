@@ -171,6 +171,58 @@ Anomaly Insight Adapter V2：8/8 PASS
 - LLM 可以在后续 Investigation 中解释异常和选择调查方向，但不作为核心 anomaly truth source；
 - Day83 不做 Contribution Analysis，也不声称 anomaly 原因或因果关系。
 
+### Day84 Deterministic Contribution Analysis
+
+Day84 在 Day83 anomaly evidence 之后完成第一版确定性 Contribution Analysis，并接入 `InsightContractV2.dimension_contributions`：
+
+```text
+Governed Current / Reference Evidence
+↓
+ContributionAnalysisV2
+↓
+member alignment
+↓
+member delta / contribution rate
+↓
+positive / negative contribution ranking
+↓
+reconciliation / unexplained remainder
+↓
+Contribution Insight Adapter
+↓
+InsightContractV2.dimension_contributions
+```
+
+当前第一版正式支持范围：
+
+```text
+Metric：GMV
+Dimension：Channel
+Comparison：绑定 TimeComparisonContractV2
+Decomposition：ADDITIVE
+```
+
+关键边界：
+- `contribution ≠ causality`，Contribution 只描述“变化由哪些维度成员贡献”，不自动升级为原因判断；
+- `contribution_rate = member_delta / overall_delta`，允许大于 100% 或小于 0%，因为正负成员可能互相抵消；
+- current / reference channel member 显式对齐，确认 ABSENT 才可按 0 处理；
+- overall 与 dimension decomposition 必须共享同一 Effective Scope；
+- `minimum_group_size` 属于 Result Protection，不等于 anomaly minimum sample；受保护结果不可被 Contribution 绕过；
+- `GMV × channel` 使用与 `gmv_overall_v2` 一致的 GMV 计算语义，仅改变 result grain，适合作为首个 additive decomposition；
+- ratio / derived metric、non-additive metric × dimension、cross-fact metric 不套用通用 additive contribution 公式，当前保持 fail-closed / unsupported；
+- reconciliation 不闭合时，unexplained remainder 进入 `unknowns`，不由 LLM 补造原因；
+- Contribution Result 绑定 `TimeComparisonContractV2` provenance，Adapter 会阻止 comparison mismatch；
+- Day84 不接入 Agentic Planner / Investigation Loop，不提前进入 Day85 / Day86。
+
+Day84 Acceptance：
+
+```text
+Contribution Analysis V2：16/16 PASS
+Contribution Insight Adapter V2：11/11 PASS
+```
+
+Day84 的计划范围原本包含更多维度；实际 Closing 冻结为“先完成可证明安全的 `GMV × channel` 首版闭环”。其他维度 / Ratio / Cross-fact / First-event 的 Contribution Generalization 保持显式能力边界，不冒充已完成支持。
+
 # Demo
 
 用户输入：哪个品类退款率最高？
@@ -645,7 +697,7 @@ Insight + Tool Contract V2 Acceptance：12/12 PASS
 Business Decision Evaluation Contract V2 Acceptance：7/7 PASS
 ```
 
-Day82 只建立 Contract Foundation；尚未实现 Anomaly Detection、Contribution Analysis、Agentic Planner / Loop 或 Automated Judge。
+Day82 只建立 Contract Foundation；Day83 已完成 Anomaly Detection，Day84 已完成第一版 Contribution Analysis；Agentic Planner / Loop 与 Automated Judge 仍待后续。
 
 ---
 
@@ -797,6 +849,8 @@ Query Plan V2 当前可显式声明：
 | anomaly_detection_acceptance_v2.py | 11/11 PASS |
 | anomaly_policy_candidates_acceptance_v2.py | 8/8 PASS |
 | anomaly_insight_adapter_acceptance_v2.py | 8/8 PASS |
+| contribution_analysis_acceptance_v2.py | 16/16 PASS |
+| contribution_insight_adapter_acceptance_v2.py | 11/11 PASS |
 
 ### Day74 Dataset V2 Generalization Evidence
 
@@ -1253,14 +1307,15 @@ Phase3 最终定位：一个运行在 Beauty BI Dataset V2 上、具备可解释
 
 Evidence-based Business Insight Engine + Public Delivery
 
-状态：🚧 进行中（Day83 Deterministic Anomaly Detection 已完成）
+状态：🚧 进行中（Day84 Deterministic Contribution Analysis 已完成）
 
 当前 Day82-Day94 目标：
 - ✅ Day82：Insight Contract / Tool Contract / Time Comparison / Business Decision Evaluation Contract；
 - ✅ Day83：Deterministic Anomaly Detection / Policy Candidate / Insight Evidence Integration；
-- Contribution Analysis；
-- Controlled Drill-down Workflow；
-- Evidence Pack；
+- ✅ Day84：Deterministic Contribution Analysis / GMV × Channel / Insight Evidence Integration；
+- Day85：Agentic Investigation Planner；
+- Day86：Agentic Investigation Loop；
+- Day87：Evidence Pack；
 - Insight Golden Cases / Evaluation；
 - Streamlit Decision Console MVP；
 - Docker Compose / One-command Startup；
@@ -1373,10 +1428,10 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.54
-完成度：Day83 / 100
+Version: v0.55
+完成度：Day84 / 100
 Phase3：CLOSED
-Phase4：IN_PROGRESS（Day83 completed）
+Phase4：IN_PROGRESS（Day84 completed）
 
 Latest Stable Baseline：
 
@@ -1452,6 +1507,16 @@ Insight Adapter：8/8 PASS
 Production Active Policy：0（8 个 Tier A Candidate 均为 TBD_CALIBRATION）
 ```
 
+Day84 Deterministic Contribution Analysis：
+
+```text
+Contribution Analysis：16/16 PASS
+Contribution Insight Adapter：11/11 PASS
+Initial Supported Pair：GMV × Channel
+Contribution Result：TimeComparisonContractV2-bound
+Contribution ≠ Causality
+```
+
 当前已知限制：
 - `SEM-REL-GAP-001`：live Structured Semantic Parser repeatability；
 - `SCOPE-GAP-001`：Requested Region / Channel Value Filter 尚未正式结构化；
@@ -1462,4 +1527,4 @@ Production Active Policy：0（8 个 Tier A Candidate 均为 TBD_CALIBRATION）
 - V2 automatic SQL Repair Runtime disabled；
 - real LLM token usage capture / Langfuse safe audit mapping pending。
 
-下一步：Day84 进入 Contribution Analysis，定位异常主要来自哪些维度，并保持 contribution ≠ causality。
+下一步：Day85 进入 Agentic Investigation Planner，在既有 Tool / Semantic / Governance Boundary 内建立 bounded tool selection 与 next-step decision。
