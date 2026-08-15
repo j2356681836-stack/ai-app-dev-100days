@@ -223,6 +223,62 @@ Contribution Insight Adapter V2：11/11 PASS
 
 Day84 的计划范围原本包含更多维度；实际 Closing 冻结为“先完成可证明安全的 `GMV × channel` 首版闭环”。其他维度 / Ratio / Cross-fact / First-event 的 Contribution Generalization 保持显式能力边界，不冒充已完成支持。
 
+
+### Day85 Bounded Agentic Investigation Planner
+
+Day85 在 Day82 Tool Contract、Day83 Anomaly Evidence 与 Day84 Contribution Evidence 之上完成第一版受控调查 Planner：
+
+```text
+Protected Insight / Evidence
++
+Investigation State
++
+Authorization-filtered Available Actions
+↓
+LLM Planner Proposal
+↓
+Deterministic Planner Validation
+↓
+PlannerDecisionV2
+```
+
+当前能力：
+- `InvestigationStateV2` 结构化保存当前 Evidence、已完成动作、可选动作与上游 clarification requirement；
+- Model 只允许提出 `SELECT_TOOL(action_id)` 或 `CLARIFY`，不能提交 raw SQL、metric formula、permission 或自行改写 Tool 参数；
+- `available_actions` 必须先由系统在既有 Tool / Authorization / Scope Boundary 内形成，Planner 只在合法候选中选择；
+- 已完成动作不能再次进入当前可选动作，避免 Planner 无意义重复调查；
+- `SELECT_TOOL` 必须引用当前 Insight 中真实存在的 supporting evidence；
+- 上游存在未解决语义前提时必须进入 clarification；没有未解决前提时，Model 不能凭空制造 clarification；
+- Planner Proposal 即使结构合法，也必须经过 deterministic validator；模型拥有建议权，不拥有最终执行权；
+- Executor 的真实执行权限 / Scope Enforcement 仍不能省略：Planner 校验“这个动作能不能选”，Executor 校验“这次实际请求能不能执行”；
+- LLM Adapter 使用最小 Planner Context + 严格 Pydantic JSON parsing；非法 action、非法 evidence、额外字段、非 JSON / Markdown fenced JSON 均 fail-closed；
+- Day85 不实现自动 retry / recovery / re-plan / stop loop，这些属于 Day86；
+- 机器合同字段与 action / evidence ID 保持英文稳定标识符；面向人的 `rationale / clarification_prompt` 强制简体中文，避免中文 BI 项目在解释层退化成英文体验。
+
+Day85 Acceptance：
+
+```text
+Investigation Planner V2：15/15 PASS
+Investigation Planner LLM V2：16/16 PASS
+```
+
+Day85 Live DeepSeek Observed Probe：
+
+```text
+Model：deepseek-v4-pro
+Observed Contract：PASS
+Selected Action：drill_product_within_skincare
+Observed Decision Quality：PASS
+```
+
+该 Live Probe 只记录真实模型 observed evidence，不等同 deterministic regression，也不声称模型长期稳定 100% 做出同样选择。
+
+当前边界：
+- Day85 只完成“基于 Evidence / State 在合法 Action Set 中选择下一步”的 Bounded Planner；
+- 尚未把 Planner 接成完整 `Plan → Execute → Observe → Re-plan → Stop` 循环；
+- tool failure recovery、alternative path、max depth、investigation budget、stopping condition 与 insufficient-evidence stop 留到 Day86；
+- Planner 不重新定义 Metric、Query Plan、SQL、Authorization 或可信业务事实。
+
 # Demo
 
 用户输入：哪个品类退款率最高？
@@ -851,6 +907,8 @@ Query Plan V2 当前可显式声明：
 | anomaly_insight_adapter_acceptance_v2.py | 8/8 PASS |
 | contribution_analysis_acceptance_v2.py | 16/16 PASS |
 | contribution_insight_adapter_acceptance_v2.py | 11/11 PASS |
+| investigation_planner_acceptance_v2.py | 15/15 PASS |
+| investigation_planner_llm_acceptance_v2.py | 16/16 PASS |
 
 ### Day74 Dataset V2 Generalization Evidence
 
@@ -1307,13 +1365,13 @@ Phase3 最终定位：一个运行在 Beauty BI Dataset V2 上、具备可解释
 
 Evidence-based Business Insight Engine + Public Delivery
 
-状态：🚧 进行中（Day84 Deterministic Contribution Analysis 已完成）
+状态：🚧 进行中（Day85 Bounded Agentic Investigation Planner 已完成）
 
 当前 Day82-Day94 目标：
 - ✅ Day82：Insight Contract / Tool Contract / Time Comparison / Business Decision Evaluation Contract；
 - ✅ Day83：Deterministic Anomaly Detection / Policy Candidate / Insight Evidence Integration；
 - ✅ Day84：Deterministic Contribution Analysis / GMV × Channel / Insight Evidence Integration；
-- Day85：Agentic Investigation Planner；
+- ✅ Day85：Bounded Agentic Investigation Planner / Structured LLM Proposal / Deterministic Validation；
 - Day86：Agentic Investigation Loop；
 - Day87：Evidence Pack；
 - Insight Golden Cases / Evaluation；
@@ -1428,10 +1486,10 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.55
-完成度：Day84 / 100
+Version: v0.56
+完成度：Day85 / 100
 Phase3：CLOSED
-Phase4：IN_PROGRESS（Day84 completed）
+Phase4：IN_PROGRESS（Day85 completed）
 
 Latest Stable Baseline：
 
@@ -1517,6 +1575,17 @@ Contribution Result：TimeComparisonContractV2-bound
 Contribution ≠ Causality
 ```
 
+Day85 Bounded Agentic Investigation Planner：
+
+```text
+Deterministic Planner Acceptance：15/15 PASS
+LLM Planner Acceptance：16/16 PASS
+Live DeepSeek Observed Contract：PASS
+Live Observed Decision Quality：PASS
+User-facing Planner Rationale：简体中文
+Day86 Loop / Recovery / Stop：尚未实现
+```
+
 当前已知限制：
 - `SEM-REL-GAP-001`：live Structured Semantic Parser repeatability；
 - `SCOPE-GAP-001`：Requested Region / Channel Value Filter 尚未正式结构化；
@@ -1527,4 +1596,4 @@ Contribution ≠ Causality
 - V2 automatic SQL Repair Runtime disabled；
 - real LLM token usage capture / Langfuse safe audit mapping pending。
 
-下一步：Day85 进入 Agentic Investigation Planner，在既有 Tool / Semantic / Governance Boundary 内建立 bounded tool selection 与 next-step decision。
+下一步：Day86 进入 Agentic Investigation Loop，把 Day85 的 next-step decision 接入受控 Execute / Observe / Re-plan / Recovery / Stop，并继续受既有 Tool / Semantic / Governance Boundary 约束。
