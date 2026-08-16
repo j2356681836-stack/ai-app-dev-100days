@@ -279,6 +279,92 @@ Observed Decision Quality：PASS
 - tool failure recovery、alternative path、max depth、investigation budget、stopping condition 与 insufficient-evidence stop 留到 Day86；
 - Planner 不重新定义 Metric、Query Plan、SQL、Authorization 或可信业务事实。
 
+
+### Day86 Bounded Agentic Investigation Loop
+
+Day86 将 Day85 的“下一步选择”接成第一版完整受控调查循环：
+
+```text
+Planner Decision
+↓
+Trusted Tool Binding
+↓
+Governed Executor
+↓
+Protected Observation / Evidence
+↓
+State Update
+↓
+RETRY / REPLAN / RECOVER / STOP
+↓
+Next Planner Decision
+```
+
+当前能力：
+- 建立 `InvestigationLoopStateV2`，保存 Planner State、Observation History、当前轮调查步数与 Budget Policy；
+- Tool 执行结果结构化为 `EVIDENCE / NO_DATA / FAILURE`；
+- `NO_DATA` 表示当前 Scope / Time Window 下执行成功但没有数据，不等于 0，也不等于执行失败；
+- `RETRY` 仅在真实 Executor 明确返回 `retryable=True` 且 Retry Budget 仍有额度时允许；
+- `REPLAN` 在成功 Observation / 新 Evidence 改变 State 后重新选择调查方向；
+- `RECOVER` 在当前路径 non-retryable failure 结束但仍有合法替代路径时进入；
+- `STOP` 显式区分 evidence sufficient、investigation budget exhausted、no legal action、retry budget exhausted、non-retryable failure；
+- Observation / Evidence 必须先写回 State，再允许 Planner 进行下一次决策；
+- 已结束动作进入 `completed_action_ids`，不继续出现在当前 `available_actions`；Retry 中的动作保持未完成；
+- Planner 再规划仍只能从刷新后的 `available_actions` 中选择，不能修改系统预绑定 Tool Contract / 参数；
+- 新增系统侧 `TrustedToolExecutionBindingV2`，Planner 不接触 raw SQL、Envelope、Compiled Contract 或权限对象；
+- Investigation Tool 真实复用 Phase3 `execute_governed_query_v2()`，经过 AST Enforcement、read-only PostgreSQL、Result Protection、Audit 与 Governed Finalization；
+- 只有 Finalization 已允许释放的 protected rows 才能进入 Investigation Evidence；
+- 建立 Round Budget + Session Budget：本轮 Budget 用完不等于调查完成；只有用户明确要求继续且 Session 总预算仍有额度时才能开启下一 Round；
+- continuation 保留 Evidence、Observation History、completed actions 与剩余合法动作，只重置新一轮 step count；
+- 系统不能在没有用户明确 continuation 请求时自动续轮。
+
+Day86 Acceptance：
+
+```text
+Investigation Loop Core：39/39 PASS
+Investigation Tool Executor Adapter：9/9 PASS
+Real PostgreSQL Tool Integration：1/1 PASS
+Real PostgreSQL Two-step End-to-End Loop：1/1 PASS
+Real PostgreSQL Failure → Recovery → Alternative Path：1/1 PASS
+```
+
+真实 End-to-End 已验证：
+
+```text
+异常 Evidence
+→ Planner 选择渠道
+→ Governed PostgreSQL
+→ 渠道 Evidence
+→ State Update
+→ Re-plan 选择区域
+→ Governed PostgreSQL
+→ 区域 Evidence
+→ Evidence Sufficient
+→ STOP
+```
+
+真实 Recovery 已验证：
+
+```text
+Planner 选择渠道
+→ Governed PostgreSQL 被执行治理边界阻断
+→ FAILURE / retryable=False
+→ State Update
+→ RECOVER
+→ Planner 改选仍合法的区域路径
+→ Governed PostgreSQL 成功
+→ Evidence
+→ STOP
+```
+
+当前边界：
+- Day86 已完成单个 Investigation Session 内的 bounded loop，不代表已经实现跨请求持久化；
+- `InvestigationSessionStateV2` 当前是结构化状态合同，不自动提供数据库 State Store / TTL / Checkpoint；
+- 一个 Conversation 内多 Investigation 的 Registry、暂停 / 恢复与 Follow-up Routing 尚未实现；
+- 用户自然语言“继续”到 continuation intent 的完整交互层尚未实现；后续 Decision Console 可利用 `can_continue / uninvestigated_action_ids / stop_reason`；
+- Day86 不实现 Day87 Evidence Pack，也不把 Agent 输出升级为因果结论；
+- Latest Stable 仍保持 Day60 / `beauty_bi_v1` / `6701323`，Day86 不触发 Stable Promotion。
+
 # Demo
 
 用户输入：哪个品类退款率最高？
@@ -1365,14 +1451,14 @@ Phase3 最终定位：一个运行在 Beauty BI Dataset V2 上、具备可解释
 
 Evidence-based Business Insight Engine + Public Delivery
 
-状态：🚧 进行中（Day85 Bounded Agentic Investigation Planner 已完成）
+状态：🚧 进行中（Day86 Agentic Investigation Loop 已完成）
 
 当前 Day82-Day94 目标：
 - ✅ Day82：Insight Contract / Tool Contract / Time Comparison / Business Decision Evaluation Contract；
 - ✅ Day83：Deterministic Anomaly Detection / Policy Candidate / Insight Evidence Integration；
 - ✅ Day84：Deterministic Contribution Analysis / GMV × Channel / Insight Evidence Integration；
 - ✅ Day85：Bounded Agentic Investigation Planner / Structured LLM Proposal / Deterministic Validation；
-- Day86：Agentic Investigation Loop；
+- ✅ Day86：Agentic Investigation Loop / Governed Tool Execution / Re-plan / Recovery / Stop / Budget；
 - Day87：Evidence Pack；
 - Insight Golden Cases / Evaluation；
 - Streamlit Decision Console MVP；
@@ -1437,19 +1523,19 @@ Phase3 最终产出不是替换 Day60 Stable，而是形成独立 `beauty_bi_v2`
 ## 最终目标
 
 ```text
-Question
-↓
-Multi-Agent Workflow
+Question / Business Anomaly
 ↓
 Business Semantic Layer
 ↓
-SQL / Tool Calling
+Deterministic Trust Plane
 ↓
-Execution
+Bounded Agentic Investigation
 ↓
-Business Analysis
+Controlled Tool / SQL Execution
 ↓
-Dashboard / Answer
+Evidence-based Business Analysis
+↓
+Decision Console / Answer / Audit Trace
 ```
 
 ---
@@ -1486,10 +1572,10 @@ Dashboard / Answer
 
 # 当前版本
 
-Version: v0.56
-完成度：Day85 / 100
+Version: v0.57
+完成度：Day86 / 100
 Phase3：CLOSED
-Phase4：IN_PROGRESS（Day85 completed）
+Phase4：IN_PROGRESS（Day86 completed）
 
 Latest Stable Baseline：
 
@@ -1583,7 +1669,18 @@ LLM Planner Acceptance：16/16 PASS
 Live DeepSeek Observed Contract：PASS
 Live Observed Decision Quality：PASS
 User-facing Planner Rationale：简体中文
-Day86 Loop / Recovery / Stop：尚未实现
+```
+
+Day86 Bounded Agentic Investigation Loop：
+
+```text
+Loop Core：39/39 PASS
+Tool Executor Adapter：9/9 PASS
+Real PostgreSQL Tool Integration：1/1 PASS
+Real PostgreSQL Two-step E2E Loop：1/1 PASS
+Real PostgreSQL Failure → Recovery：1/1 PASS
+Round / Session Budget：implemented
+Cross-request State Persistence / Multi-Investigation Registry：not implemented
 ```
 
 当前已知限制：
@@ -1596,4 +1693,4 @@ Day86 Loop / Recovery / Stop：尚未实现
 - V2 automatic SQL Repair Runtime disabled；
 - real LLM token usage capture / Langfuse safe audit mapping pending。
 
-下一步：Day86 进入 Agentic Investigation Loop，把 Day85 的 next-step decision 接入受控 Execute / Observe / Re-plan / Recovery / Stop，并继续受既有 Tool / Semantic / Governance Boundary 约束。
+下一步：Day87 进入 Evidence Pack，把 Day83-Day86 产生的 Fact / Anomaly / Contribution / Investigation Observation / Scope / Tool / Audit Evidence 组织成可追溯、可披露边界明确的证据包。
