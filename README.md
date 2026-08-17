@@ -362,8 +362,64 @@ Planner 选择渠道
 - `InvestigationSessionStateV2` 当前是结构化状态合同，不自动提供数据库 State Store / TTL / Checkpoint；
 - 一个 Conversation 内多 Investigation 的 Registry、暂停 / 恢复与 Follow-up Routing 尚未实现；
 - 用户自然语言“继续”到 continuation intent 的完整交互层尚未实现；后续 Decision Console 可利用 `can_continue / uninvestigated_action_ids / stop_reason`；
-- Day86 不实现 Day87 Evidence Pack，也不把 Agent 输出升级为因果结论；
+- Day86 Loop 本身不承担 Evidence Pack；Day87 已在其上增加独立 Evidence Delivery 层，仍不把 Agent 输出升级为因果结论；
 - Latest Stable 仍保持 Day60 / `beauty_bi_v1` / `6701323`，Day86 不触发 Stable Promotion。
+
+
+### Day87 Evidence Pack & Evidence Delivery
+
+Day87 将 Phase4 的分析结论升级为可追溯的 Evidence Delivery：
+
+```text
+Business Semantic Metric Definition
++
+Governed PostgreSQL / Protected Result / Audit
+→ Direct Evidence
+
+Direct Evidence
+→ Anomaly / Contribution
+→ Derived Evidence + Parent Lineage
+
+Investigation Observation
+→ EVIDENCE / NO_DATA / FAILURE Evidence
+
+以上 Evidence
+→ EvidencePackV2
+→ Claim-type / Epistemic Gate
+→ Evidence Sufficiency
+→ EvidencePackDeliveryV2
+```
+
+当前能力：
+- `EvidenceRecordV2` 统一表达直接证据、派生证据与调查 Observation；
+- Governed Query Evidence 只接受成功、已 Audit Persistence、已通过 Result Protection 的释放结果；
+- Evidence provenance 绑定 Query Plan / Envelope / Compiler / SQL / Time / Scope / Audit fingerprints，而不是复制 raw SQL / raw parameters；
+- 真实 PostgreSQL 已验证 protected channel GMV result 可以形成 Confirmed Fact 与 Evidence Pack；
+- Anomaly / Contribution 保留 parent evidence lineage，不伪装成直接 SQL 事实；
+- `NO_DATA` / `FAILURE` 可以记录调查边界，但不能冒充业务 Confirmed Fact；
+- Confirmed Fact / Detected Anomaly / Dimension Contribution 分别受 Evidence Type Gate 约束；
+- Candidate Hypothesis 进入 Evidence Pack 时必须有 supporting evidence；完全无证据的方向保持 Unknown + Recommended Check；
+- Metric Definition Snapshot 从 Dataset V2 Business Metrics Catalog 构建，LLM 不能自行定义指标公式；
+- Evidence Sufficiency 使用 `SUFFICIENT_FOR_CURRENT_SCOPE / PARTIAL / INSUFFICIENT`，不输出没有统计依据的伪精确 numeric confidence；
+- Contribution / correlation 继续不能自动升级为 causal attribution。
+
+Day87 Acceptance：
+
+```text
+Evidence Pack Contract：14/14 PASS
+Governed Evidence Builder：10/10 PASS
+Real PostgreSQL Evidence Pack：1/1 PASS
+Derived Evidence Lineage：10/10 PASS
+Investigation Observation Evidence：10/10 PASS
+Evidence Delivery / Sufficiency：10/10 PASS
+```
+
+当前边界：
+- Evidence Delivery 尚未成为完整生产 Agent / LangGraph 的自动 final output；
+- Day88 才建立 Insight Golden / Automated / Business Decision Evaluation；
+- Day89 才接入 Decision Console；
+- Latest Stable 仍保持 Day60 / `beauty_bi_v1` / `6701323`，Day87 不触发 Stable Promotion。
+
 
 # Demo
 
@@ -839,7 +895,7 @@ Insight + Tool Contract V2 Acceptance：12/12 PASS
 Business Decision Evaluation Contract V2 Acceptance：7/7 PASS
 ```
 
-Day82 只建立 Contract Foundation；Day83 已完成 Anomaly Detection，Day84 已完成第一版 Contribution Analysis；Agentic Planner / Loop 与 Automated Judge 仍待后续。
+Day82 只建立 Contract Foundation；Day83-Day87 已继续完成 Anomaly、Contribution、Planner、Investigation Loop 与 Evidence Pack；Automated / Business Decision Evaluation 留到 Day88。
 
 ---
 
@@ -995,6 +1051,17 @@ Query Plan V2 当前可显式声明：
 | contribution_insight_adapter_acceptance_v2.py | 11/11 PASS |
 | investigation_planner_acceptance_v2.py | 15/15 PASS |
 | investigation_planner_llm_acceptance_v2.py | 16/16 PASS |
+| investigation_loop_acceptance_v2.py | 39/39 PASS |
+| investigation_tool_executor_acceptance_v2.py | 9/9 PASS |
+| investigation_tool_executor_postgresql_integration_v2.py | 1/1 PASS |
+| investigation_loop_postgresql_end_to_end_v2.py | 1/1 PASS |
+| investigation_loop_failure_recovery_postgresql_v2.py | 1/1 PASS |
+| evidence_pack_acceptance_v2.py | 14/14 PASS |
+| evidence_pack_builder_acceptance_v2.py | 10/10 PASS |
+| evidence_pack_postgresql_integration_v2.py | 1/1 PASS |
+| derived_evidence_builder_acceptance_v2.py | 10/10 PASS |
+| evidence_pack_observation_acceptance_v2.py | 10/10 PASS |
+| evidence_pack_delivery_acceptance_v2.py | 10/10 PASS |
 
 ### Day74 Dataset V2 Generalization Evidence
 
@@ -1451,7 +1518,7 @@ Phase3 最终定位：一个运行在 Beauty BI Dataset V2 上、具备可解释
 
 Evidence-based Business Insight Engine + Public Delivery
 
-状态：🚧 进行中（Day86 Agentic Investigation Loop 已完成）
+状态：🚧 进行中（Day87 Evidence Pack & Delivery 已完成）
 
 当前 Day82-Day94 目标：
 - ✅ Day82：Insight Contract / Tool Contract / Time Comparison / Business Decision Evaluation Contract；
@@ -1459,7 +1526,7 @@ Evidence-based Business Insight Engine + Public Delivery
 - ✅ Day84：Deterministic Contribution Analysis / GMV × Channel / Insight Evidence Integration；
 - ✅ Day85：Bounded Agentic Investigation Planner / Structured LLM Proposal / Deterministic Validation；
 - ✅ Day86：Agentic Investigation Loop / Governed Tool Execution / Re-plan / Recovery / Stop / Budget；
-- Day87：Evidence Pack；
+- ✅ Day87：Evidence Pack / Provenance / Derived Lineage / Observation Evidence / Sufficiency / Delivery；
 - Insight Golden Cases / Evaluation；
 - Streamlit Decision Console MVP；
 - Docker Compose / One-command Startup；
@@ -1572,10 +1639,10 @@ Decision Console / Answer / Audit Trace
 
 # 当前版本
 
-Version: v0.57
-完成度：Day86 / 100
+Version: v0.58
+完成度：Day87 / 100
 Phase3：CLOSED
-Phase4：IN_PROGRESS（Day86 completed）
+Phase4：IN_PROGRESS（Day87 completed）
 
 Latest Stable Baseline：
 
@@ -1683,6 +1750,19 @@ Round / Session Budget：implemented
 Cross-request State Persistence / Multi-Investigation Registry：not implemented
 ```
 
+Day87 Evidence Pack & Delivery：
+
+```text
+Evidence Pack Contract：14/14 PASS
+Governed Evidence Builder：10/10 PASS
+Real PostgreSQL Evidence Pack：1/1 PASS
+Derived Evidence Lineage：10/10 PASS
+Investigation Observation Evidence：10/10 PASS
+Evidence Delivery / Sufficiency：10/10 PASS
+Metric Definition Snapshot：Dataset V2 metadata-bound
+Numeric LLM Confidence：not used
+```
+
 当前已知限制：
 - `SEM-REL-GAP-001`：live Structured Semantic Parser repeatability；
 - `SCOPE-GAP-001`：Requested Region / Channel Value Filter 尚未正式结构化；
@@ -1693,4 +1773,4 @@ Cross-request State Persistence / Multi-Investigation Registry：not implemented
 - V2 automatic SQL Repair Runtime disabled；
 - real LLM token usage capture / Langfuse safe audit mapping pending。
 
-下一步：Day87 进入 Evidence Pack，把 Day83-Day86 产生的 Fact / Anomaly / Contribution / Investigation Observation / Scope / Tool / Audit Evidence 组织成可追溯、可披露边界明确的证据包。
+下一步：Day88 进入 Insight Golden Cases / Automated Insight Evaluation / Business Decision Evaluation，并建立 Judge ↔ Human Calibration Design。
