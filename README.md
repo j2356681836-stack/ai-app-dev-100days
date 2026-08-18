@@ -421,6 +421,90 @@ Evidence Delivery / Sufficiency：10/10 PASS
 - Latest Stable 仍保持 Day60 / `beauty_bi_v1` / `6701323`，Day87 不触发 Stable Promotion。
 
 
+
+### Day88 Insight Evaluation / Human Calibration
+
+Day88 在 Day87 `EvidencePackDeliveryV2` 之上建立多层 Business Insight Evaluation：
+
+```text
+Insight Golden Case
++
+EvidencePackDeliveryV2
+↓
+Deterministic Automated Evaluation
+↓
+Business Decision Judge
+↓
+Human Expert Proxy Review
+↓
+Judge ↔ Human Calibration
+↓
+Versioned Business Decision Rubric
+```
+
+当前能力：
+- Golden Case 显式区分 `REGRESSION / HOLDOUT / FRESH_GENERALIZATION`，已观察 / 用于开发的 Case 不继续冒充 Fresh；
+- 建立 8 个 Visible Regression Cases，覆盖 activity review / ROI / margin / refund / CAC / region / membership / promotion；
+- Automated Evaluation 确定性检查 Metric、Analysis Mode、Evidence Sufficiency、required / forbidden sections；
+- `READY_FOR_BUSINESS_REVIEW` 只代表结构与证据 Gate 通过，不等于最终 Business Decision PASS；
+- Business Decision Judge 评估 factual correctness / diagnostic relevance / prioritization / actionability / epistemic discipline / evidence sufficiency；
+- Judge 不能自行填写 `overall_status`，不能引用 Evidence Pack 中不存在的 evidence ID；
+- deterministic gate 失败时不会调用 LLM Judge；
+- Human Expert Proxy 与 Judge 独立评分，逐维保存 agreement / disagreement；
+- Rubric 版本化，历史 Evaluation 保留原 `rubric_version`，新标准不覆盖旧结果。
+
+Day88 Acceptance：
+
+```text
+Insight Golden Case Contract：12/12 PASS
+Visible Regression Golden Cases：12/12 PASS
+Automated Insight Evaluator：6/6 PASS
+Business Decision Judge + Human Calibration：10/10 PASS
+Rubric Versioning + Observed Calibration Evidence：7/7 PASS
+
+Deterministic / Contract Acceptance：
+47/47 PASS
+```
+
+真实 PostgreSQL + DeepSeek observed evaluation：
+
+```text
+Case：INS-OBS-001
+Evidence Class：REGRESSION
+
+Fact：
+2025年当前授权范围内
+GMV 最高渠道 = 天猫旗舰店
+GMV = 2,586,549.37
+
+Deterministic Precheck：
+READY_FOR_BUSINESS_REVIEW
+
+Live Judge：
+6 dimensions PASS
+overall = PASS
+
+Human Expert Proxy：
+prioritization = PARTIAL
+overall = PARTIAL
+
+Calibration：
+5 agreement / 1 disagreement
+critical disagreement = 0
+review required = true
+```
+
+该 disagreement 促成 `business_decision_rubric_v2_0`：
+“业务规模最大”不能自动等价于“最值得优先调查”；`prioritization = PASS` 需要与用户 business objective 直接相关，并有比较性 Evidence 支撑。
+
+当前边界：
+- Day88 公开 Case 均为 Regression，不声称 Fresh Generalization；
+- 一次 Live Judge PASS 不证明模型长期 repeatability；
+- Human Expert Proxy 不被当作绝对 Ground Truth；
+- Day89 才将 Evidence / Evaluation 接入 Streamlit Decision Console；
+- Dataset V2 仍保持 Candidate，Latest Stable 仍是 Day60 V1。
+
+
 # Demo
 
 用户输入：哪个品类退款率最高？
@@ -1062,6 +1146,11 @@ Query Plan V2 当前可显式声明：
 | derived_evidence_builder_acceptance_v2.py | 10/10 PASS |
 | evidence_pack_observation_acceptance_v2.py | 10/10 PASS |
 | evidence_pack_delivery_acceptance_v2.py | 10/10 PASS |
+| insight_golden_case_contract_acceptance_v2.py | 12/12 PASS |
+| insight_golden_cases_acceptance_v2.py | 12/12 PASS |
+| automated_insight_evaluator_acceptance_v2.py | 6/6 PASS |
+| business_decision_judge_calibration_acceptance_v2.py | 10/10 PASS |
+| business_decision_rubric_calibration_acceptance_v2.py | 7/7 PASS |
 
 ### Day74 Dataset V2 Generalization Evidence
 
@@ -1518,7 +1607,7 @@ Phase3 最终定位：一个运行在 Beauty BI Dataset V2 上、具备可解释
 
 Evidence-based Business Insight Engine + Public Delivery
 
-状态：🚧 进行中（Day87 Evidence Pack & Delivery 已完成）
+状态：🚧 进行中（Day88 Insight Evaluation & Human Calibration 已完成）
 
 当前 Day82-Day94 目标：
 - ✅ Day82：Insight Contract / Tool Contract / Time Comparison / Business Decision Evaluation Contract；
@@ -1527,8 +1616,8 @@ Evidence-based Business Insight Engine + Public Delivery
 - ✅ Day85：Bounded Agentic Investigation Planner / Structured LLM Proposal / Deterministic Validation；
 - ✅ Day86：Agentic Investigation Loop / Governed Tool Execution / Re-plan / Recovery / Stop / Budget；
 - ✅ Day87：Evidence Pack / Provenance / Derived Lineage / Observation Evidence / Sufficiency / Delivery；
-- Insight Golden Cases / Evaluation；
-- Streamlit Decision Console MVP；
+- ✅ Day88：Insight Golden Cases / Automated Evaluation / Business Decision Judge / Human Calibration / Rubric Versioning；
+- Day89：Streamlit Decision Console MVP；
 - Docker Compose / One-command Startup；
 - Observability / Unified Regression / CI / Delivery Performance；
 - Cloud Deployment、Blind Test 与 Public Delivery。
@@ -1639,10 +1728,10 @@ Decision Console / Answer / Audit Trace
 
 # 当前版本
 
-Version: v0.58
-完成度：Day87 / 100
+Version: v0.59
+完成度：Day88 / 100
 Phase3：CLOSED
-Phase4：IN_PROGRESS（Day87 completed）
+Phase4：IN_PROGRESS（Day88 completed）
 
 Latest Stable Baseline：
 
@@ -1763,8 +1852,27 @@ Metric Definition Snapshot：Dataset V2 metadata-bound
 Numeric LLM Confidence：not used
 ```
 
+Day88 Insight Evaluation & Human Calibration：
+
+```text
+Insight Golden Case Contract：12/12 PASS
+Visible Regression Golden Cases：12/12 PASS
+Automated Insight Evaluator：6/6 PASS
+Business Decision Judge + Human Calibration：10/10 PASS
+Rubric Versioning + Observed Calibration Evidence：7/7 PASS
+Deterministic / Contract Acceptance：47/47 PASS
+
+Real PostgreSQL + Live DeepSeek Observed Probe：PASS
+Judge overall：PASS
+Human Expert Proxy overall：PARTIAL
+Disagreement：prioritization
+Rubric：v1_0 → v2_0
+Fresh Generalization：not claimed
+```
+
 当前已知限制：
 - `SEM-REL-GAP-001`：live Structured Semantic Parser repeatability；
+- `TIME-REL-GAP-001`：显式年份表达存在 whitespace / silent fallback 风险；Day88 只修 observed probe fixture，生产 Time Resolver 尚待 Public Delivery 前关闭；
 - `SCOPE-GAP-001`：Requested Region / Channel Value Filter 尚未正式结构化；
 - Scope Canonical Value Validation；
 - 4 个 Query Plan 继续按 Scope Contract fail-closed；
@@ -1773,4 +1881,4 @@ Numeric LLM Confidence：not used
 - V2 automatic SQL Repair Runtime disabled；
 - real LLM token usage capture / Langfuse safe audit mapping pending。
 
-下一步：Day88 进入 Insight Golden Cases / Automated Insight Evaluation / Business Decision Evaluation，并建立 Judge ↔ Human Calibration Design。
+下一步：Day89 进入 Streamlit Decision Console MVP，消费 Evidence Delivery / Evaluation / Calibration，建立 decision-oriented、authorization-aware 的交付界面。
