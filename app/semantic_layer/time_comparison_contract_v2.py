@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, model_validator
 
 
 class ComparisonTypeV2(str, Enum):
+    DOD = "dod"
     WOW = "wow"
     MOM = "mom"
     YOY = "yoy"

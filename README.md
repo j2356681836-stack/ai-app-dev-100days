@@ -505,6 +505,103 @@ review required = true
 - Dataset V2 仍保持 Candidate，Latest Stable 仍是 Day60 V1。
 
 
+
+### Day89 Decision Console / Runtime HITL / Periodic Business Delivery
+
+Day89 将 Day87 Evidence Delivery、Day84 Contribution、Day86 Investigation Loop 与 Day88 Evaluation Boundary 接入统一 Streamlit Decision Console，形成第一版面向业务交付的产品界面：
+
+```text
+Business Question / Report Definition
+↓
+Governed Evidence / Investigation
+↓
+Decision Console Delivery Layer
+├─ Business Decision View
+├─ Analyst Investigation View
+└─ Engineering / Audit View
+```
+
+当前正式接通两个入口：
+
+```text
+Ad-hoc Investigation
+→ 自然语言问题
+→ Governed Seed Evidence
+→ Bounded Agentic Investigation
+→ Evidence / Trace / HITL
+
+Periodic Business Report
+→ Daily / Weekly / Monthly
+→ Deterministic Time Comparison
+→ Governed PostgreSQL
+→ Evidence / Contribution / Reconciliation
+```
+
+当前能力：
+- KPI Cards：current / reference / delta / delta%；
+- Protected Breakdown：只展示 Result Protection 允许释放的聚合结果；
+- Data Verification：Metric Definition / Time Window / Effective Scope / Evidence / Audit reference；
+- `GMV × channel` Contribution Ranking 与 Reconciliation；
+- Production Active Anomaly Policy 仍为 0，页面明确展示“未评估 / 未激活”，不因数值变化伪造 anomaly；
+- Evidence Drawer、Investigation Trace、Evidence Sufficiency 与 Executive Decision Brief Preview；
+- 三层 Progressive Disclosure：Business / Analyst / Engineering；
+- Runtime HITL Explicit Continue：Round Budget 用完后，只有用户明确继续且 Session Budget 允许，才开启下一轮；
+- Runtime HITL Clarification：用户只能从 server-owned Resolution Contract 的合法选项中选择，不能用自由文本绕过 prerequisite；
+- UI / Session State 不保存 raw SQL、compiled context、Governed Envelope 或 blocked raw rows。
+
+Periodic Report 当前时间语义：
+
+```text
+Daily
+→ 当前完整自然日 vs 前一日
+→ DOD
+
+Weekly
+→ 当前自然周（Monday-Sunday）vs 前一完整自然周
+→ WOW
+
+Monthly
+→ 当前完整自然月 vs 前一完整自然月
+→ MOM
+```
+
+Daily 首次真实验证还形成了 `PARTIAL_READY` 交付语义：
+
+```text
+Overall Comparison 可安全释放
++
+Channel Breakdown 触发 Result Protection
+↓
+保留可信 KPI / Overall Evidence
+不释放被保护 Channel rows
+不计算 Contribution
+```
+
+Weekly / Monthly 在当前代表性窗口可形成完整 `READY`，包含 Overall Comparison、Channel Breakdown、Contribution 与 Reconciliation。
+
+Day89 Final Delivery Gate：
+
+```text
+Final Delivery Gate：95/95 PASS
+Real PostgreSQL Final Gate：5/5 PASS
+```
+
+真实 PostgreSQL Final Gate 覆盖：
+- Explicit Continue；
+- Clarification Resume；
+- Daily Privacy-aware `PARTIAL_READY`；
+- Weekly Full Periodic Delivery；
+- Monthly Unified Periodic Delivery。
+
+Day89 继续保持：
+- Dataset V2 = Candidate；
+- Latest Stable = Day60 / `beauty_bi_v1` / `6701323`；
+- Contribution 不升级为因果解释；
+- Scheduler / Email Subscription / Report History / Multi-tenant Reporting 不进入当前主线；
+- Docker / One-command Startup 留到 Day90；
+- Observability / Unified Regression / CI 留到 Day91；
+- Cloud Deployment 留到 Day92。
+
 # Demo
 
 用户输入：哪个品类退款率最高？
@@ -1607,7 +1704,7 @@ Phase3 最终定位：一个运行在 Beauty BI Dataset V2 上、具备可解释
 
 Evidence-based Business Insight Engine + Public Delivery
 
-状态：🚧 进行中（Day88 Insight Evaluation & Human Calibration 已完成）
+状态：🚧 进行中（Day89 Decision Console / Runtime HITL / Periodic Delivery 已完成）
 
 当前 Day82-Day94 目标：
 - ✅ Day82：Insight Contract / Tool Contract / Time Comparison / Business Decision Evaluation Contract；
@@ -1617,7 +1714,7 @@ Evidence-based Business Insight Engine + Public Delivery
 - ✅ Day86：Agentic Investigation Loop / Governed Tool Execution / Re-plan / Recovery / Stop / Budget；
 - ✅ Day87：Evidence Pack / Provenance / Derived Lineage / Observation Evidence / Sufficiency / Delivery；
 - ✅ Day88：Insight Golden Cases / Automated Evaluation / Business Decision Judge / Human Calibration / Rubric Versioning；
-- Day89：Streamlit Decision Console MVP；
+- ✅ Day89：Streamlit Decision Console / Runtime HITL / Daily-Weekly-Monthly Periodic Delivery / Final Delivery Gate；
 - Docker Compose / One-command Startup；
 - Observability / Unified Regression / CI / Delivery Performance；
 - Cloud Deployment、Blind Test 与 Public Delivery。
@@ -1728,10 +1825,10 @@ Decision Console / Answer / Audit Trace
 
 # 当前版本
 
-Version: v0.59
-完成度：Day88 / 100
+Version: v0.60
+完成度：Day89 / 100
 Phase3：CLOSED
-Phase4：IN_PROGRESS（Day88 completed）
+Phase4：IN_PROGRESS（Day89 completed）
 
 Latest Stable Baseline：
 
@@ -1870,6 +1967,24 @@ Rubric：v1_0 → v2_0
 Fresh Generalization：not claimed
 ```
 
+
+Day89 Decision Console / Runtime HITL / Periodic Delivery：
+
+```text
+Decision Console：Business / Analyst / Engineering 三视图
+Ad-hoc Investigation：Governed Seed → Bounded Investigation → Evidence / Trace
+Runtime HITL Explicit Continue：implemented
+Runtime HITL Clarification Response：implemented
+Periodic：
+- Daily / DOD：implemented；支持 privacy-aware PARTIAL_READY
+- Weekly / WOW：implemented
+- Monthly / MOM：implemented
+Contribution：GMV × Channel + Reconciliation
+Anomaly UI：Active Policy = 0 时保持“未评估 / 未激活”
+Final Delivery Gate：95/95 PASS
+Real PostgreSQL Final Gate：5/5 PASS
+```
+
 当前已知限制：
 - `SEM-REL-GAP-001`：live Structured Semantic Parser repeatability；
 - `TIME-REL-GAP-001`：显式年份表达存在 whitespace / silent fallback 风险；Day88 只修 observed probe fixture，生产 Time Resolver 尚待 Public Delivery 前关闭；
@@ -1881,4 +1996,4 @@ Fresh Generalization：not claimed
 - V2 automatic SQL Repair Runtime disabled；
 - real LLM token usage capture / Langfuse safe audit mapping pending。
 
-下一步：Day89 进入 Streamlit Decision Console MVP，消费 Evidence Delivery / Evaluation / Calibration，建立 decision-oriented、authorization-aware 的交付界面。
+下一步：Day90 进入 Docker Compose / One-command Startup / Reproducibility，冻结 Seed → ANALYZE → Query Readiness 的可复现启动链。
