@@ -1,0 +1,43 @@
+﻿# Git / editor
+.git
+.gitignore
+.vscode
+.idea
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python local environments
+venv
+venv_*
+.venv
+env
+__pycache__
+**/__pycache__
+*.py[cod]
+*.pyo
+
+# Test / tooling caches
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# Private project documents
+_private
+
+# Runtime output
+runtime
+*.log
+
+# Generated / temporary output
+docs/evaluation
+tmp
+temp
+
+# OS noise
+.DS_Store
+Thumbs.db

@@ -1,26 +1,81 @@
 services:
   beauty_db:
     image: pgvector/pgvector:0.8.2-pg17-trixie
-    container_name: beauty_agent_pg
-
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-
     ports:
-      - "${POSTGRES_PORT}:5432"
-
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
-
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
+        ]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
 
+  bootstrap:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: beauty_db
+      POSTGRES_PORT: "5432"
+      AI_AUDIT_LOG_PATH: /app/runtime/audit/audit_events.jsonl
+    depends_on:
+      beauty_db:
+        condition: service_healthy
+    volumes:
+      - audit_data:/app/runtime/audit
+    command:
+      [
+        "python",
+        "-m",
+        "app.db.beauty_bi_v2.bootstrap_v2"
+      ]
+    restart: "no"
+
+  decision_console:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: beauty_db
+      POSTGRES_PORT: "5432"
+      AI_AUDIT_LOG_PATH: /app/runtime/audit/audit_events.jsonl
+      PYTHONPATH: /app
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - "${STREAMLIT_PORT:-8501}:8501"
+    volumes:
+      - audit_data:/app/runtime/audit
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8501/_stcore/health', timeout=2)"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
     restart: unless-stopped
 
 volumes:
   pg_data:
+  audit_data:

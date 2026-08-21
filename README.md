@@ -602,6 +602,74 @@ Day89 继续保持：
 - Observability / Unified Regression / CI 留到 Day91；
 - Cloud Deployment 留到 Day92。
 
+### Day90 Reproducible Docker Runtime / One-command Startup
+
+Day90 将 Day89 Decision Console 与 Governed Runtime 放入可重复启动的 Docker Compose 交付链：
+
+```text
+beauty_db
+PostgreSQL / pgvector / persistent volume
+↓ healthcheck
+bootstrap
+Probe → state → allowed action → re-Probe → READY
+↓ service_completed_successfully
+decision_console
+Streamlit / Investigation / Periodic Report
+```
+
+Startup lifecycle：
+
+```text
+Database Start
+→ Schema Init
+→ deterministic Seed
+→ Formal Data Acceptance
+→ ANALYZE
+→ Governed Query Role Readiness
+→ Application Readiness
+→ Decision Console Ready
+```
+
+当前实现：
+- Docker Compose 管理 PostgreSQL、one-shot Bootstrap 与 Streamlit Decision Console；
+- `.env.example` 提供 owner / query role / governance secret / DeepSeek / Streamlit 配置模板；
+- Bootstrap 根据结构化 readiness state 只执行当前唯一允许的恢复动作，异常 / 漂移状态 fail-closed；
+- Dataset rebuild / bulk seed 后自动要求 `ANALYZE`，避免 Planner Statistics 缺失造成 Query Readiness 假阳性；
+- PostgreSQL 查询 Runtime 继续使用独立只读 Query Role，不因容器化绕过 Scope / AST / Result Protection / Audit；
+- `.dockerignore` 排除真实 `.env`、本地 venv、私有文档与 runtime artifacts；
+- Decision Console 容器通过真实页面 / 业务查询验证 application readiness，不只依赖 Web server health endpoint。
+
+Day90 Fresh-volume Reproducibility Gate：
+
+```text
+empty isolated volume
+→ initialize_schema
+→ seed_dataset
+→ formal acceptance
+→ analyze_dataset
+→ provision_query_runtime
+→ Bootstrap READY
+→ Decision Console healthy
+→ real GMV query PASS
+```
+
+Day90 Acceptance：
+
+```text
+Startup Readiness Contract：11/11 PASS
+Startup Readiness Probe：11/11 PASS
+Bootstrap Contract：8/8 PASS
+Fresh-volume Bootstrap：PASS
+Fresh Decision Console：PASS
+Fresh Real Business Query：PASS
+```
+
+当前部署边界：
+- 当前 Docker image 仍使用完整 development dependency snapshot，尚未拆分最小 Production Runtime dependencies；
+- Cloud Deployment、Observability / Unified CI、Blind Test 分别留到 Day91-Day93；
+- Fresh Gate 证明 infrastructure / data semantics / business result 可复现，不声称 byte-for-byte reproducibility；
+- Latest Stable 仍保持 Day60，Dataset V2 继续保持 Candidate。
+
 # Demo
 
 用户输入：哪个品类退款率最高？
@@ -1431,10 +1499,11 @@ Deterministic E2E = PASS
 
 # 技术栈
 
-## Backend
+## Application / Runtime
 
-- Python 3.10.3
-- FastAPI（规划中）
+- Python 3.10.x（Latest Stable host baseline：3.10.3；Day90 Docker：Python 3.10 compatibility line）
+- Streamlit 1.61.1（Decision Console）
+- FastAPI（Phase1 API Foundation；当前 Decision Console 主交付路径不依赖 FastAPI）
 
 ## Database
 
@@ -1452,7 +1521,7 @@ Deterministic E2E = PASS
 
 ## Engineering
 
-- Docker
+- Docker / Docker Compose
 - AsyncIO
 - Tenacity
 - Structured Outputs
@@ -1488,6 +1557,10 @@ app/
 │       ├── schema.sql
 │       ├── init_schema.py
 │       ├── db_check.py
+│       ├── analyze_dataset.py
+│       ├── startup_readiness_v2.py
+│       ├── startup_readiness_probe_v2.py
+│       ├── bootstrap_v2.py
 │       ├── manifest_loader.py
 │       ├── seed_dimensions.py
 │       ├── seed_transactions.py
@@ -1496,6 +1569,8 @@ app/
 │   └── deepseek_client.py
 ├── semantic_layer/
 ├── text_to_sql/
+├── ui/
+│   └── decision_console_app.py
 └── evaluation/
 metadata/
 ├── business_metrics.yaml
@@ -1503,6 +1578,10 @@ metadata/
 ├── table_dictionary.yaml
 └── table_relationships.yaml
 docs/
+Dockerfile
+docker-compose.yml
+.env.example
+.dockerignore
 ```
 ---
 
@@ -1704,7 +1783,7 @@ Phase3 最终定位：一个运行在 Beauty BI Dataset V2 上、具备可解释
 
 Evidence-based Business Insight Engine + Public Delivery
 
-状态：🚧 进行中（Day89 Decision Console / Runtime HITL / Periodic Delivery 已完成）
+状态：🚧 进行中（Day90 Docker / One-command Startup / Reproducibility 已完成）
 
 当前 Day82-Day94 目标：
 - ✅ Day82：Insight Contract / Tool Contract / Time Comparison / Business Decision Evaluation Contract；
@@ -1715,9 +1794,11 @@ Evidence-based Business Insight Engine + Public Delivery
 - ✅ Day87：Evidence Pack / Provenance / Derived Lineage / Observation Evidence / Sufficiency / Delivery；
 - ✅ Day88：Insight Golden Cases / Automated Evaluation / Business Decision Judge / Human Calibration / Rubric Versioning；
 - ✅ Day89：Streamlit Decision Console / Runtime HITL / Daily-Weekly-Monthly Periodic Delivery / Final Delivery Gate；
-- Docker Compose / One-command Startup；
-- Observability / Unified Regression / CI / Delivery Performance；
-- Cloud Deployment、Blind Test 与 Public Delivery。
+- ✅ Day90：Docker Compose / One-command Startup / Fresh-volume Reproducibility；
+- Day91：Observability / Unified Regression / CI / Delivery Performance；
+- Day92：Cloud Deployment / Public Demo；
+- Day93：Blind Test / Human Expert Proxy Review；
+- Day94：Phase4 Full Regression / Public Delivery Hard Gate。
 
 Phase4 不以继续扩建 Text-to-SQL 为主，而是把已受治理的数据查询能力升级为“证据化经营异动诊断”。
 
@@ -1826,9 +1907,9 @@ Decision Console / Answer / Audit Trace
 # 当前版本
 
 Version: v0.60
-完成度：Day89 / 100
+完成度：Day90 / 100
 Phase3：CLOSED
-Phase4：IN_PROGRESS（Day89 completed）
+Phase4：IN_PROGRESS（Day90 completed）
 
 Latest Stable Baseline：
 
@@ -1985,6 +2066,21 @@ Final Delivery Gate：95/95 PASS
 Real PostgreSQL Final Gate：5/5 PASS
 ```
 
+Day90 Docker / Reproducible Startup：
+
+```text
+Startup Readiness Contract：11/11 PASS
+Startup Readiness Probe：11/11 PASS
+Bootstrap Contract：8/8 PASS
+Docker Linux Image Build：PASS
+Existing-environment Investigation E2E：PASS
+Existing-environment Monthly Report E2E：PASS
+Fresh Bootstrap：initialize → seed → ANALYZE → query role → READY
+Fresh Decision Console：healthy
+Fresh Real GMV Query：PASS
+Fresh Test Volume Cleanup：PASS
+```
+
 当前已知限制：
 - `SEM-REL-GAP-001`：live Structured Semantic Parser repeatability；
 - `TIME-REL-GAP-001`：显式年份表达存在 whitespace / silent fallback 风险；Day88 只修 observed probe fixture，生产 Time Resolver 尚待 Public Delivery 前关闭；
@@ -1996,4 +2092,4 @@ Real PostgreSQL Final Gate：5/5 PASS
 - V2 automatic SQL Repair Runtime disabled；
 - real LLM token usage capture / Langfuse safe audit mapping pending。
 
-下一步：Day90 进入 Docker Compose / One-command Startup / Reproducibility，冻结 Seed → ANALYZE → Query Readiness 的可复现启动链。
+下一步：Day91 进入 Observability / Unified Regression / CI / Delivery Performance，建立 Console → Investigation → Tool → SQL → Evidence 的可追踪工程链。

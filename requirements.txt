@@ -30,5 +30,11 @@ langchain-core>=0.3.85,<1.0.0
 # Agent Workflow / LangGraph
 langgraph>=0.6,<0.7
 
+# UI / Delivery
+streamlit==1.61.1
+
 # Local Proxy Support
-socksio==1.0.0sqlglot==30.13.0
+socksio==1.0.0
+
+# SQL Parsing / Validation
+sqlglot==30.13.0

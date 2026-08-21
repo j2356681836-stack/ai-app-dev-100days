@@ -1,0 +1,16 @@
+services:
+  beauty_db:
+    ports: !override []
+
+  bootstrap:
+    image: ai-app-dev-100days-bootstrap:latest
+
+  decision_console:
+    image: ai-app-dev-100days-decision_console:latest
+    environment:
+      POSTGRES_HOST: beauty_db
+      POSTGRES_PORT: "5432"
+      AI_AUDIT_LOG_PATH: /app/runtime/audit/audit_events.jsonl
+      PYTHONPATH: /app
+    ports: !override
+      - "18501:8501"
