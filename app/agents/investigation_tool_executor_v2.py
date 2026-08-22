@@ -24,6 +24,10 @@ from app.governance.governed_finalization import (
     FinalizationReason,
     GovernedFinalizationResult,
 )
+from app.observability.langfuse_observability_v2 import (
+    start_safe_span_v2,
+    update_safe_observation_v2,
+)
 
 
 GovernedToolExecutorV2 = Callable[[], GovernedFinalizationResult]
@@ -138,7 +142,7 @@ def _map_failure_code(
     return ToolFailureCodeV2.EXECUTION_FAILURE
 
 
-def execute_investigation_tool_v2(
+def _execute_investigation_tool_impl_v2(
     *,
     decision: PlannerDecisionV2,
     attempt_number: int,
@@ -297,3 +301,61 @@ def execute_investigation_tool_v2(
             result.audit_event_fingerprint
         ),
     )
+
+def execute_investigation_tool_v2(
+    *,
+    decision: PlannerDecisionV2,
+    attempt_number: int,
+    bindings: Mapping[str, TrustedToolExecutionBindingV2],
+) -> InvestigationToolExecutionResultV2:
+    """
+    Observed wrapper for one bounded Investigation Tool execution.
+
+    Observability contract:
+    - does not capture PlannerDecisionV2 / bindings as input;
+    - does not upload protected rows or evidence payloads;
+    - records only allowlisted action / attempt / status metadata;
+    - preserves the original business return contract unchanged.
+    """
+    selected_action = getattr(
+        decision,
+        "selected_action",
+        None,
+    )
+    action_id = getattr(
+        selected_action,
+        "action_id",
+        None,
+    )
+
+    with start_safe_span_v2(
+        name="tool_execution",
+        stage="tool_execution",
+        action_id=action_id,
+        attempt_number=attempt_number,
+    ) as tool_span:
+        try:
+            result = _execute_investigation_tool_impl_v2(
+                decision=decision,
+                attempt_number=attempt_number,
+                bindings=bindings,
+            )
+        except Exception as exc:
+            update_safe_observation_v2(
+                tool_span,
+                status="exception",
+                reason_code=type(exc).__name__,
+            )
+            raise
+
+        update_safe_observation_v2(
+            tool_span,
+            status=result.observation.status,
+            action_id=result.observation.action_id,
+            attempt_number=result.observation.attempt_number,
+            retryable=result.observation.retryable,
+            reason_code=result.finalization_reason,
+            released_row_count=len(result.released_rows),
+        )
+
+        return result

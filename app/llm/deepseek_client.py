@@ -7,6 +7,12 @@ from typing import Any
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from app.observability.langfuse_observability_v2 import (
+    start_safe_generation_v2,
+    update_safe_generation_usage_v2,
+    update_safe_observation_v2,
+)
+
 
 load_dotenv()
 
@@ -83,18 +89,53 @@ def chat_completion(
         else get_deepseek_client()
     )
 
-    response = (
-        actual_client
-        .chat
-        .completions
-        .create(
-            model=actual_model,
-            messages=messages,
-            temperature=temperature,
+    with start_safe_generation_v2(
+        name="deepseek_chat_completion",
+        model=actual_model,
+        stage="llm_transport",
+    ) as generation:
+        response = (
+            actual_client
+            .chat
+            .completions
+            .create(
+                model=actual_model,
+                messages=messages,
+                temperature=temperature,
+            )
         )
-    )
 
-    return (
-        response.choices[0].message.content
-        or ""
-    )
+        usage = getattr(
+            response,
+            "usage",
+            None,
+        )
+
+        update_safe_generation_usage_v2(
+            generation,
+            prompt_tokens=(
+                getattr(usage, "prompt_tokens", None)
+                if usage is not None
+                else None
+            ),
+            completion_tokens=(
+                getattr(usage, "completion_tokens", None)
+                if usage is not None
+                else None
+            ),
+            total_tokens=(
+                getattr(usage, "total_tokens", None)
+                if usage is not None
+                else None
+            ),
+        )
+
+        update_safe_observation_v2(
+            generation,
+            status="success",
+        )
+
+        return (
+            response.choices[0].message.content
+            or ""
+        )

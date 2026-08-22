@@ -81,6 +81,10 @@ from app.governance.governed_finalization import (
 from app.governance.governed_query_execution_v2 import (
     execute_governed_query_v2,
 )
+from app.observability.langfuse_observability_v2 import (
+    build_safe_metadata_v2,
+    start_safe_span_v2,
+)
 from app.semantic_layer.query_plan_compiler_v2 import (
     CompiledQueryPlanContractV2,
     QueryPlanCompileStatusV2,
@@ -740,10 +744,38 @@ def run_one_investigation_step_v2(
         bindings=bindings,
     )
 
-    refreshed_insight = _append_execution_evidence_v2(
-        insight=planner_state.insight,
-        execution_result=execution_result,
+    evidence_before = len(
+        planner_state.insight.evidence
     )
+
+    with start_safe_span_v2(
+        name="evidence_update",
+        stage="evidence_update",
+        action_id=execution_result.observation.action_id,
+    ) as evidence_span:
+        refreshed_insight = _append_execution_evidence_v2(
+            insight=planner_state.insight,
+            execution_result=execution_result,
+        )
+
+        evidence_after = len(
+            refreshed_insight.evidence
+        )
+
+        if evidence_span is not None:
+            evidence_span.update(
+                metadata=build_safe_metadata_v2(
+                    status=(
+                        "evidence_added"
+                        if evidence_after > evidence_before
+                        else "no_new_evidence"
+                    ),
+                    action_id=(
+                        execution_result.observation.action_id
+                    ),
+                    evidence_count=evidence_after,
+                )
+            )
 
     selected_action = first_decision.selected_action
     assert selected_action is not None
@@ -754,13 +786,34 @@ def run_one_investigation_step_v2(
         if action.action_id != selected_action.action_id
     )
 
-    transition = advance_investigation_loop_v2(
-        state=session.loop_state,
-        observation=execution_result.observation,
-        refreshed_insight=refreshed_insight,
-        refreshed_available_actions=remaining_actions,
-        evidence_sufficient=evidence_sufficient_after_step,
-    )
+    with start_safe_span_v2(
+        name="loop_control",
+        stage="loop_control",
+        action_id=execution_result.observation.action_id,
+    ) as loop_span:
+        transition = advance_investigation_loop_v2(
+            state=session.loop_state,
+            observation=execution_result.observation,
+            refreshed_insight=refreshed_insight,
+            refreshed_available_actions=remaining_actions,
+            evidence_sufficient=evidence_sufficient_after_step,
+        )
+
+        if loop_span is not None:
+            loop_span.update(
+                metadata=build_safe_metadata_v2(
+                    status=execution_result.observation.status,
+                    action_id=(
+                        execution_result.observation.action_id
+                    ),
+                    directive=(
+                        transition.control_decision.directive
+                    ),
+                    stop_reason=(
+                        transition.control_decision.stop_reason
+                    ),
+                )
+            )
 
     session_after = _session_after_transition_v2(
         session=session,
@@ -1236,85 +1289,138 @@ def run_day89_agentic_investigation_step_v2(
         session_policy=active_session_policy,
     )
 
-    prepared_bindings = (
-        _prepare_day89_gmv_investigation_bindings_v2(
-            actions=actions,
-            context=context,
-            analysis_window=(
-                seed_result.delivery.evidence_pack
-                .analysis_scope.analysis_window
-            ),
-            runtime_config=active_config,
-            execution_policy=execution_policy,
-            request_id=request_id,
-        )
-    )
-
-    bindings = {
-        action_id: prepared.binding
-        for action_id, prepared in prepared_bindings.items()
-    }
-
-    if planner is None:
-        def active_planner(
-            state: InvestigationStateV2,
-        ) -> PlannerDecisionV2:
-            return plan_next_investigation_step_v2(
-                state=state,
-                model=planner_model,
-                client=planner_client,
+    with start_safe_span_v2(
+        name="investigation_round",
+        stage="investigation_round",
+        request_id=request_id,
+        round_number=session.round_number,
+    ) as round_span:
+        prepared_bindings = (
+            _prepare_day89_gmv_investigation_bindings_v2(
+                actions=actions,
+                context=context,
+                analysis_window=(
+                    seed_result.delivery.evidence_pack
+                    .analysis_scope.analysis_window
+                ),
+                runtime_config=active_config,
+                execution_policy=execution_policy,
+                request_id=request_id,
             )
-    else:
-        active_planner = planner
-
-    step = run_one_investigation_step_v2(
-        session=session,
-        bindings=bindings,
-        planner=active_planner,
-        evidence_sufficient_after_step=False,
-    )
-
-    if (
-        step.status
-        == Day89InvestigationRuntimeStatusV2
-        .CLARIFICATION_REQUIRED
-    ):
-        return step
-
-    selected_action = step.planner_decision.selected_action
-    if selected_action is None:
-        raise ValueError(
-            "执行型 Investigation Step 缺少 selected_action。"
         )
 
-    prepared = prepared_bindings.get(
-        selected_action.action_id
-    )
-    if prepared is None:
-        raise ValueError(
-            "执行型 Investigation Step 缺少 server-trusted binding context。"
-        )
-
-    finalization = prepared.capture.finalization
-    if finalization is None:
-        raise ValueError(
-            "Tool 已执行但未捕获 GovernedFinalizationResult；"
-            "不能进入 Evidence Delivery。"
-        )
-
-    governed_context = Day89GovernedQueryEvidenceContextV2(
-        action_id=selected_action.action_id,
-        tool_contract=prepared.tool_contract,
-        envelope=prepared.envelope,
-        compiled=prepared.compiled,
-        finalization=finalization,
-    )
-
-    return step.model_copy(
-        update={
-            "governed_query_context": governed_context,
+        bindings = {
+            action_id: prepared.binding
+            for action_id, prepared in prepared_bindings.items()
         }
-    )
+
+        if planner is None:
+            def active_planner(
+                state: InvestigationStateV2,
+            ) -> PlannerDecisionV2:
+                return plan_next_investigation_step_v2(
+                    state=state,
+                    model=planner_model,
+                    client=planner_client,
+                )
+        else:
+            active_planner = planner
+
+        with start_safe_span_v2(
+            name="investigation_step",
+            stage="investigation_step",
+            request_id=request_id,
+            round_number=session.round_number,
+        ) as step_span:
+            step = run_one_investigation_step_v2(
+                session=session,
+                bindings=bindings,
+                planner=active_planner,
+                evidence_sufficient_after_step=False,
+            )
+
+            selected_action = (
+                step.planner_decision.selected_action
+            )
+            directive = (
+                step.transition.control_decision.directive
+                if step.transition is not None
+                else None
+            )
+            stop_reason = (
+                step.stop_status.stop_reason
+                if step.stop_status is not None
+                else None
+            )
+
+            if step_span is not None:
+                step_span.update(
+                    metadata=build_safe_metadata_v2(
+                        status=step.status,
+                        action_id=(
+                            selected_action.action_id
+                            if selected_action is not None
+                            else None
+                        ),
+                        directive=directive,
+                        stop_reason=stop_reason,
+                    )
+                )
+
+        if round_span is not None:
+            round_span.update(
+                metadata=build_safe_metadata_v2(
+                    status=step.status,
+                    action_id=(
+                        selected_action.action_id
+                        if selected_action is not None
+                        else None
+                    ),
+                    directive=directive,
+                    stop_reason=stop_reason,
+                )
+            )
+
+        if (
+            step.status
+            == Day89InvestigationRuntimeStatusV2
+            .CLARIFICATION_REQUIRED
+        ):
+            return step
+
+        if selected_action is None:
+            raise ValueError(
+                "执行型 Investigation Step 缺少 selected_action。"
+            )
+
+        prepared = prepared_bindings.get(
+            selected_action.action_id
+        )
+        if prepared is None:
+            raise ValueError(
+                "执行型 Investigation Step 缺少 server-trusted binding context。"
+            )
+
+        finalization = prepared.capture.finalization
+        if finalization is None:
+            raise ValueError(
+                "Tool 已执行但未捕获 GovernedFinalizationResult；"
+                "不能进入 Evidence Delivery。"
+            )
+
+        governed_context = Day89GovernedQueryEvidenceContextV2(
+            action_id=selected_action.action_id,
+            tool_contract=prepared.tool_contract,
+            envelope=prepared.envelope,
+            compiled=prepared.compiled,
+            finalization=finalization,
+        )
+
+        return step.model_copy(
+            update={
+                "governed_query_context": governed_context,
+            }
+        )
 
 def continue_day89_agentic_investigation_step_v2(
     *,

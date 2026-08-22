@@ -30,6 +30,10 @@ from app.governance.governed_planning_envelope_v2 import (
 from app.semantic_layer.query_plan_compiler_v2 import (
     CompiledQueryPlanContractV2,
 )
+from app.observability.langfuse_observability_v2 import (
+    start_safe_span_v2,
+    update_safe_observation_v2,
+)
 
 
 def _fail_before_execution(
@@ -134,7 +138,7 @@ def _validate_context_envelope_linkage(
     return None
 
 
-def execute_governed_query_v2(
+def _execute_governed_query_impl_v2(
     *,
     context: AccessContext,
     question: str,
@@ -256,12 +260,30 @@ def execute_governed_query_v2(
             "governed envelope and compiled SQL contract."
         )
 
-    execution = run_governed_sql(
-        sql=compiled.sql,
-        parameters=compiled.parameter_mapping(),
-        policy=active_policy,
-        engine_override=engine_override,
-    )
+    with start_safe_span_v2(
+        name="sql_execution",
+        stage="sql_execution",
+        metric_name=envelope.metric_name,
+    ) as sql_span:
+        try:
+            execution = run_governed_sql(
+                sql=compiled.sql,
+                parameters=compiled.parameter_mapping(),
+                policy=active_policy,
+                engine_override=engine_override,
+            )
+        except Exception as exc:
+            update_safe_observation_v2(
+                sql_span,
+                status="exception",
+                reason_code=type(exc).__name__,
+            )
+            raise
+
+        update_safe_observation_v2(
+            sql_span,
+            status="completed",
+        )
 
     # The raw execution rows remain inside this function. Only the
     # finalization result may cross the governance boundary.
@@ -295,3 +317,73 @@ def execute_governed_query_v2(
         occurred_at_utc=occurred_at_utc,
         written_at_utc=written_at_utc,
     )
+
+def execute_governed_query_v2(
+    *,
+    context: AccessContext,
+    question: str,
+    envelope: GovernedPlanningEnvelopeV2,
+    compiled: CompiledQueryPlanContractV2,
+    runtime_config: GovernanceRuntimeConfig,
+    execution_policy: GovernedExecutionPolicy | None = None,
+    engine_override: Engine | None = None,
+    budget: ExecutionBudgetState | None = None,
+    event_id: str | None = None,
+    occurred_at_utc: datetime | None = None,
+    written_at_utc: datetime | None = None,
+) -> GovernedFinalizationResult:
+    """
+    Observed wrapper around the existing Governed Query security boundary.
+
+    The business/security contract remains unchanged. Observability receives
+    only allowlisted metadata and never receives:
+    - question text;
+    - SQL or SQL parameters;
+    - raw/protected rows;
+    - AccessContext;
+    - envelope / compiled contract payloads.
+    """
+    metric_name = (
+        envelope.metric_name
+        if isinstance(
+            envelope,
+            GovernedPlanningEnvelopeV2,
+        )
+        else None
+    )
+
+    with start_safe_span_v2(
+        name="governed_query_execution",
+        stage="governed_query_execution",
+        metric_name=metric_name,
+    ) as governed_query_span:
+        try:
+            result = _execute_governed_query_impl_v2(
+                context=context,
+                question=question,
+                envelope=envelope,
+                compiled=compiled,
+                runtime_config=runtime_config,
+                execution_policy=execution_policy,
+                engine_override=engine_override,
+                budget=budget,
+                event_id=event_id,
+                occurred_at_utc=occurred_at_utc,
+                written_at_utc=written_at_utc,
+            )
+        except Exception as exc:
+            update_safe_observation_v2(
+                governed_query_span,
+                status="exception",
+                reason_code=type(exc).__name__,
+            )
+            raise
+
+        update_safe_observation_v2(
+            governed_query_span,
+            status=result.outcome,
+            reason_code=result.reason_code,
+            row_count=result.row_count,
+        )
+
+        return result

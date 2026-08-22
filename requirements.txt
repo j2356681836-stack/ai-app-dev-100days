@@ -30,6 +30,9 @@ langchain-core>=0.3.85,<1.0.0
 # Agent Workflow / LangGraph
 langgraph>=0.6,<0.7
 
+# Observability
+langfuse==4.14.3
+
 # UI / Delivery
 streamlit==1.61.1
 

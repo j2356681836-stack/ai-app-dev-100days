@@ -12,6 +12,10 @@ from app.agents.investigation_planner_v2 import (
     validate_planner_proposal_v2,
 )
 from app.llm.deepseek_client import chat_completion
+from app.observability.langfuse_observability_v2 import (
+    start_safe_span_v2,
+    update_safe_observation_v2,
+)
 
 
 _SYSTEM_PROMPT = """You are a bounded business-investigation planner.
@@ -234,16 +238,35 @@ def plan_next_investigation_step_v2(
             "belongs to Day86."
         )
 
-    raw_text = chat_completion(
-        messages=build_planner_messages_v2(state),
-        temperature=0,
-        model=model,
-        client=client,
-    )
+    with start_safe_span_v2(
+        name="planner",
+        stage="planner",
+    ) as planner_span:
+        raw_text = chat_completion(
+            messages=build_planner_messages_v2(state),
+            temperature=0,
+            model=model,
+            client=client,
+        )
 
-    proposal = parse_planner_proposal_v2(raw_text)
+        proposal = parse_planner_proposal_v2(raw_text)
 
-    return validate_planner_proposal_v2(
-        state=state,
-        proposal=proposal,
-    )
+        decision = validate_planner_proposal_v2(
+            state=state,
+            proposal=proposal,
+        )
+
+        selected_action = decision.selected_action
+
+        update_safe_observation_v2(
+            planner_span,
+            status="success",
+            decision_type=decision.decision_type,
+            action_id=(
+                selected_action.action_id
+                if selected_action is not None
+                else None
+            ),
+        )
+
+        return decision
