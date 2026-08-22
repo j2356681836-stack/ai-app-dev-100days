@@ -1,6 +1,6 @@
 # Day91 Delivery Performance Evidence
 
-> 状态：Observed Evidence（单次实测证据），不是 Benchmark / SLA / Capacity Claim。
+> 状态：Observed Evidence（单次 / 少量实测证据），不是 Benchmark / SLA / Capacity Claim。
 
 ## 1. 证据目的
 
@@ -10,6 +10,7 @@ Day91 需要证明一次真实 Investigation 的主要执行阶段可以被观�
 - Planner / LLM / Tool / SQL 分别耗时多少；
 - LLM Token Usage 是否可见；
 - Agent 最终为什么停止；
+- failure / recovery path 是否可观察；
 - Observability 是否避免自动上传业务 Input / Output。
 
 ## 2. Live DeepSeek + PostgreSQL Investigation
@@ -70,19 +71,59 @@ Integration result：
 - Passed: 1
 - Failed: 0
 
-## 4. 当前性能解释
+## 4. Failure / Recovery Investigation
 
-这两条证据支持以下结论：
+来源：Day91 failure / recovery observability probe，复用 Day86 真实 PostgreSQL failure-recovery integration。
+
+```text
+investigation_failure_recovery      1.36s
+├─ tool_execution                   0.34s
+│  └─ governed_query_execution      0.34s
+│     └─ sql_execution              0.32s
+├─ loop_control
+├─ tool_execution                   0.07s
+│  └─ governed_query_execution      0.07s
+│     └─ sql_execution              0.05s
+└─ loop_control
+```
+
+Failure Loop Control：
+
+```text
+action_id = drill_channel
+status = failure
+retryable = false
+attempt_number = 1
+directive = recover
+```
+
+Recovery Loop Control：
+
+```text
+action_id = drill_region
+status = evidence
+retryable = false
+attempt_number = 1
+directive = stop
+stop_reason = evidence_sufficient
+```
+
+该证据证明 Day91 Observability 不只覆盖 happy path，也能看见治理阻断后的 non-retryable recovery、替代查询路径与最终停止原因。
+
+## 5. 当前性能解释
+
+这些证据支持以下 observed 结论：
 
 1. 在 live Investigation 中，主要延迟来自 LLM Generation，而不是 PostgreSQL SQL Execution。
-2. `planner` 与 `deepseek_chat_completion` 的耗时非常接近，说明 Planner 的 JSON parse / Pydantic validation / deterministic validation 本身不是主要耗时来源。
-3. PostgreSQL 路径在当前单次样本中处于几十毫秒量级；当前证据不足以推导一般化数据库性能 SLA。
+2. `planner` 与 `deepseek_chat_completion` 的耗时非常接近，说明该样本中 Planner 的 JSON parse / Pydantic validation / deterministic validation 不是主要耗时来源。
+3. 成功路径 PostgreSQL SQL execution 在当前样本中处于几十毫秒量级；failure 路径首次 SQL 约 0.32s。当前证据不足以推导一般化数据库性能 SLA。
 4. `evidence_update` 与 `loop_control` 在当前样本中耗时极低，但它们仍有独立观测价值，因为需要记录 Evidence 数量、REPLAN / RECOVER / STOP 与 stop reason。
 5. `investigation_round` 比 `investigation_step` 更长，说明外围 runtime setup / binding preparation / planning-envelope compilation / delivery assembly 仍存在可观测但尚未进一步拆分的耗时。
+6. Live LLM token usage 已可捕获；DeepSeek cost 尚未建立经验证的 pricing mapping，因此不将空 / 0 cost 显示冒充可信成本证据。
 
-## 5. 证据边界
+## 6. 证据边界
 
-本文件记录的是 Day91 单次/少量运行的 observed evidence，不等同于：
+本文件记录的是 Day91 单次 / 少量运行的 observed evidence，不等同于：
 
 - 性能 Benchmark；
 - P95 / P99 latency；
@@ -94,7 +135,14 @@ Integration result：
 
 这些需要在后续专门的 performance / load / production validation 中建立。
 
-## 6. Day91 Delivery Performance Gate
+另外：
+
+```text
+Token Usage = captured
+Trusted Cost Evidence = not claimed
+```
+
+## 7. Day91 Delivery Performance Gate
 
 - Real Investigation total latency captured: PASS
 - Planner latency captured: PASS
@@ -102,5 +150,8 @@ Integration result：
 - Tool / Governed Query / SQL latency captured: PASS
 - LLM token usage captured: PASS
 - Loop stop reason captured: PASS
+- Failure / RECOVER / alternative path captured: PASS
+- Final STOP / EVIDENCE_SUFFICIENT captured: PASS
 - Safe metadata / no automatic business payload upload: PASS
+- Cost mapping gap explicitly disclosed: PASS
 - Performance evidence documented with non-SLA boundary: PASS

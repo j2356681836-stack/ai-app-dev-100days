@@ -670,6 +670,141 @@ Fresh Real Business Query：PASS
 - Fresh Gate 证明 infrastructure / data semantics / business result 可复现，不声称 byte-for-byte reproducibility；
 - Latest Stable 仍保持 Day60，Dataset V2 继续保持 Candidate。
 
+
+### Day91 Observability / Unified Regression / Minimal CI / Delivery Performance
+
+Day91 将 Day89-Day90 已能运行的 Decision Console / Investigation Runtime 从“能运行”升级为“可追踪、可统一回归、可在提交时自动守门”的工程链：
+
+```text
+Investigation Round
+└─ Investigation Step
+   ├─ Planner
+   │  └─ DeepSeek Generation
+   ├─ Tool Execution
+   │  └─ Governed Query Execution
+   │     └─ SQL Execution
+   ├─ Evidence Update
+   └─ Loop Control
+```
+
+Observability 采用 Safe Allowlist Boundary：
+- Langfuse 只接收显式允许的结构化 metadata；
+- 默认不上传 raw question / prompt / completion text；
+- 不上传 raw SQL / SQL parameters / raw rows / blocked rows；
+- 不上传 `AccessContext`、Governed Envelope、Compiled Contract 或 secret；
+- Trace Input 保持 `null`，Output 保持 `undefined`；
+- `LANGFUSE_OBSERVABILITY_ENABLED=false` 时退化为 no-op，不让 Observability 成为核心 Runtime 的硬依赖行为。
+
+真实 DeepSeek + PostgreSQL Investigation Trace：
+
+```text
+investigation_round                 7.44s
+└─ investigation_step               6.93s
+   ├─ planner                       6.83s
+   │  └─ deepseek_chat_completion   6.81s
+   ├─ tool_execution                0.09s
+   │  └─ governed_query_execution   0.09s
+   │     └─ sql_execution            0.06s
+   ├─ evidence_update
+   └─ loop_control
+```
+
+LLM Usage：
+
+```text
+Prompt Tokens：1,079
+Completion Tokens：286
+Total Tokens：1,365
+```
+
+该样本显示主要 latency 来自 LLM Generation，而不是 PostgreSQL SQL Execution。当前只将其作为 observed evidence，不外推为 P95 / P99 / SLA。
+
+Failure / Recovery Observability 进一步验证：
+
+```text
+drill_channel
+→ Governed PostgreSQL / Governance Boundary
+→ FAILURE
+→ retryable = false
+→ RECOVER
+→ drill_region
+→ Governed PostgreSQL
+→ EVIDENCE
+→ STOP
+→ evidence_sufficient
+```
+
+Loop Control 的真实 metadata：
+
+```text
+Step 1：
+status = failure
+retryable = false
+directive = recover
+
+Step 2：
+status = evidence
+directive = stop
+stop_reason = evidence_sufficient
+```
+
+统一回归入口：
+
+```text
+python -m app.evaluation.unified_regression_v2
+```
+
+当前 deterministic Unified Regression：
+
+```text
+Semantic                               7/7 PASS
+Governed Query Execution               6/6 PASS
+Governed Finalization                 14/14 PASS
+Audit Sink                            16/16 PASS
+Investigation Runtime                  5/5 PASS
+Investigation Tool Executor            9/9 PASS
+Decision Console Runtime               7/7 PASS
+
+Total：
+7 modules
+64 cases
+PASS
+```
+
+Minimal CI：
+- GitHub Actions；
+- Ubuntu runner；
+- Python 3.10.20；
+- 从 `requirements-lock.txt` 安装；
+- `pip check`；
+- deterministic Unified Regression；
+- live DeepSeek / Langfuse Cloud / PostgreSQL / Docker 不作为基础 CI hard gate；
+- `.env` 不存在的 CI-like preflight 本地 PASS；
+- GitHub Actions 真实运行 PASS；
+- workflow 使用 `actions/checkout@v7` / `actions/setup-python@v7`。
+
+Day91 依赖合同：
+- `langfuse==4.14.3` 进入 direct dependency；
+- 当前真实 `venv_day51_a` 重新生成 UTF-8 `requirements-lock.txt`；
+- `pip check` PASS；
+- `.env.example` 增加 Observability / Langfuse 配置占位符；
+- Observability 默认关闭。
+
+Day91 Delivery Performance Evidence：
+
+```text
+docs/evaluation/day91_delivery_performance_evidence.md
+```
+
+当前明确边界：
+- Token Usage 已完成真实 capture；
+- DeepSeek cost 尚未建立已验证的价格映射，因此不声称已获得可信 cost evidence；
+- Token Usage 尚未接入在线 `ExecutionBudgetState`；
+- Day90 已构建的 Docker image 早于 Day91 Langfuse dependency 变更，Day92 Cloud Deployment 必须从当前 lock 重新 build / validate；
+- 当前性能证据是 observed evidence，不是容量测试或 SLA；
+- Latest Stable 仍保持 Day60 / `beauty_bi_v1` / `6701323`；
+- Dataset V2 继续保持 Candidate。
+
 # Demo
 
 用户输入：哪个品类退款率最高？
@@ -1316,6 +1451,7 @@ Query Plan V2 当前可显式声明：
 | automated_insight_evaluator_acceptance_v2.py | 6/6 PASS |
 | business_decision_judge_calibration_acceptance_v2.py | 10/10 PASS |
 | business_decision_rubric_calibration_acceptance_v2.py | 7/7 PASS |
+| unified_regression_v2.py | 7 modules / 64 cases PASS |
 
 ### Day74 Dataset V2 Generalization Evidence
 
@@ -1567,6 +1703,8 @@ app/
 │       └── acceptance_observer.py
 ├── llm/
 │   └── deepseek_client.py
+├── observability/
+│   └── langfuse_observability_v2.py
 ├── semantic_layer/
 ├── text_to_sql/
 ├── ui/
@@ -1578,6 +1716,11 @@ metadata/
 ├── table_dictionary.yaml
 └── table_relationships.yaml
 docs/
+├── evaluation/
+│   └── day91_delivery_performance_evidence.md
+.github/
+└── workflows/
+    └── ci.yml
 Dockerfile
 docker-compose.yml
 .env.example
@@ -1783,7 +1926,7 @@ Phase3 最终定位：一个运行在 Beauty BI Dataset V2 上、具备可解释
 
 Evidence-based Business Insight Engine + Public Delivery
 
-状态：🚧 进行中（Day90 Docker / One-command Startup / Reproducibility 已完成）
+状态：🚧 进行中（Day91 Observability / Unified Regression / CI / Delivery Performance 已完成）
 
 当前 Day82-Day94 目标：
 - ✅ Day82：Insight Contract / Tool Contract / Time Comparison / Business Decision Evaluation Contract；
@@ -1795,7 +1938,7 @@ Evidence-based Business Insight Engine + Public Delivery
 - ✅ Day88：Insight Golden Cases / Automated Evaluation / Business Decision Judge / Human Calibration / Rubric Versioning；
 - ✅ Day89：Streamlit Decision Console / Runtime HITL / Daily-Weekly-Monthly Periodic Delivery / Final Delivery Gate；
 - ✅ Day90：Docker Compose / One-command Startup / Fresh-volume Reproducibility；
-- Day91：Observability / Unified Regression / CI / Delivery Performance；
+- ✅ Day91：Observability / Unified Regression / CI / Delivery Performance；
 - Day92：Cloud Deployment / Public Demo；
 - Day93：Blind Test / Human Expert Proxy Review；
 - Day94：Phase4 Full Regression / Public Delivery Hard Gate。
@@ -1907,9 +2050,9 @@ Decision Console / Answer / Audit Trace
 # 当前版本
 
 Version: v0.60
-完成度：Day90 / 100
+完成度：Day91 / 100
 Phase3：CLOSED
-Phase4：IN_PROGRESS（Day90 completed）
+Phase4：IN_PROGRESS（Day91 completed）
 
 Latest Stable Baseline：
 
@@ -2081,6 +2224,18 @@ Fresh Real GMV Query：PASS
 Fresh Test Volume Cleanup：PASS
 ```
 
+Day91 Observability / Unified Regression / CI：
+
+```text
+Safe Langfuse Observability：PASS
+Real Investigation End-to-End Trace：PASS
+DeepSeek Generation Usage：1,079 prompt + 286 completion = 1,365 tokens
+Failure → RECOVER → Alternative PostgreSQL → STOP：PASS
+Unified Regression：7 modules / 64 cases PASS
+GitHub Actions Deterministic CI：PASS
+Delivery Performance Evidence：documented
+```
+
 当前已知限制：
 - `SEM-REL-GAP-001`：live Structured Semantic Parser repeatability；
 - `TIME-REL-GAP-001`：显式年份表达存在 whitespace / silent fallback 风险；Day88 只修 observed probe fixture，生产 Time Resolver 尚待 Public Delivery 前关闭；
@@ -2090,6 +2245,6 @@ Fresh Test Volume Cleanup：PASS
 - Post-sequence Scope Runtime；
 - Multi-plan Execution Orchestration；
 - V2 automatic SQL Repair Runtime disabled；
-- real LLM token usage capture / Langfuse safe audit mapping pending。
+- real LLM token usage 已由 Day91 Langfuse Generation Capture 完成；可信 cost mapping 尚未验证，Token Usage 尚未接入在线 Execution Budget；Observability ↔ Audit 的进一步 correlation 仍可增强。
 
-下一步：Day91 进入 Observability / Unified Regression / CI / Delivery Performance，建立 Console → Investigation → Tool → SQL → Evidence 的可追踪工程链。
+下一步：Day92 进入 Cloud Deployment / Public Demo，基于 Day91 已通过的 Observability / Unified Regression / CI Gate 部署 Decision Console，并验证 secret / network / rate-limit / deployment smoke boundary。
