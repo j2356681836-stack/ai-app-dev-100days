@@ -12,13 +12,15 @@
 # - 本地 Docker 默认仍使用 8501。
 # - 云端 Web Service 可以通过 PORT 覆盖运行端口。
 # - 应用继续绑定 0.0.0.0，允许容器外部访问。
+# - PYTHONPATH=/app 固化进镜像，避免依赖 Docker Compose 才能导入顶层 app 包。
 
 FROM python:3.10.20-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_NO_CACHE_DIR=1
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/app
 
 WORKDIR /app
 
