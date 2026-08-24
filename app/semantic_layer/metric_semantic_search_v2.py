@@ -1,14 +1,92 @@
 from __future__ import annotations
 
-from typing import AbstractSet, Any
-
-from sentence_transformers import util
+import math
+from types import SimpleNamespace
+from typing import AbstractSet, Any, Sequence
 
 from app.semantic_layer.embedding_service import (
     embed_text,
 )
 from app.semantic_layer.vector_store_v2 import (
     load_metric_vectors_v2,
+)
+
+
+def _cosine_similarity_v2(
+    left: Sequence[float],
+    right: Sequence[float],
+) -> float:
+    """
+    轻量 Cosine Similarity。
+
+    不再为了一个 cosine 函数 import sentence-transformers / torch。
+    """
+
+    try:
+        left_values = tuple(
+            float(value)
+            for value in left
+        )
+        right_values = tuple(
+            float(value)
+            for value in right
+        )
+    except Exception as error:
+        raise ValueError(
+            "Cosine vectors must contain numeric values."
+        ) from error
+
+    if (
+        not left_values
+        or len(left_values)
+        != len(right_values)
+    ):
+        raise ValueError(
+            "Cosine vectors must have the same non-zero dimension."
+        )
+
+    dot_product = sum(
+        left_value * right_value
+        for left_value, right_value in zip(
+            left_values,
+            right_values,
+            strict=True,
+        )
+    )
+    left_norm = math.sqrt(
+        sum(
+            value * value
+            for value in left_values
+        )
+    )
+    right_norm = math.sqrt(
+        sum(
+            value * value
+            for value in right_values
+        )
+    )
+
+    if (
+        left_norm == 0
+        or right_norm == 0
+    ):
+        raise ValueError(
+            "Cosine vectors must have non-zero norm."
+        )
+
+    return (
+        dot_product
+        / (
+            left_norm
+            * right_norm
+        )
+    )
+
+
+# 兼容现有 Retrieval Tests 的 monkeypatch surface。
+# 这里的 util 已经是项目自己的轻量对象，不再来自 sentence-transformers。
+util = SimpleNamespace(
+    cos_sim=_cosine_similarity_v2
 )
 
 
@@ -25,7 +103,11 @@ def rank_metric_candidates_by_embedding_v2(
 
     只输出 raw semantic ranking，不决定：
     matched / clarification / unsupported / confidence。
+
+    Metric vectors 与 query vector 都通过同一个
+    embedding_service runtime profile 生成。
     """
+
     if top_k < 1:
         raise ValueError(
             "top_k must be >= 1."

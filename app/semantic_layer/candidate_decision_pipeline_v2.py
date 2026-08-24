@@ -13,9 +13,6 @@ from app.semantic_layer.candidate_decision_ranking_v2 import (
 from app.semantic_layer.candidate_decision_v2 import (
     decide_metric_candidate_v2,
 )
-from app.semantic_layer.metric_semantic_search_v2 import (
-    rank_metric_candidates_by_embedding_v2,
-)
 from app.semantic_layer.question_signature_v2 import (
     QuestionSemanticSignatureV2,
 )
@@ -26,9 +23,7 @@ def resolve_candidate_decision_v2(
     question: str,
     question_signature: QuestionSemanticSignatureV2,
     allowed_metric_names: AbstractSet[str] | None = None,
-    ranker: EmbeddingRankerV2 = (
-        rank_metric_candidates_by_embedding_v2
-    ),
+    ranker: EmbeddingRankerV2 | None = None,
 ) -> RankedCandidateDecisionV2:
     """
     Gate 3H unified Candidate Decision entry point.

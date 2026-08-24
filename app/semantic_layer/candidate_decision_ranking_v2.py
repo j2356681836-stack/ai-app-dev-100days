@@ -8,12 +8,24 @@ from app.semantic_layer.candidate_decision_v2 import (
     CandidateDecisionStatusV2,
     CandidateDecisionV2,
 )
-from app.semantic_layer.metric_semantic_search_v2 import (
-    rank_metric_candidates_by_embedding_v2,
-)
 
 
 EmbeddingRankerV2 = Callable[..., dict[str, Any]]
+
+
+def _resolve_default_embedding_ranker_v2() -> EmbeddingRankerV2:
+    """
+    仅在确实需要 Embedding Ranking 时加载本地实现。
+
+    普通 MATCHED / UNSUPPORTED / 页面启动路径不会因为模块导入
+    提前加载 sentence-transformers / torch。
+    """
+
+    from app.semantic_layer.metric_semantic_search_v2 import (
+        rank_metric_candidates_by_embedding_v2,
+    )
+
+    return rank_metric_candidates_by_embedding_v2
 
 
 class RankedCandidateDecisionV2(BaseModel):
@@ -40,9 +52,7 @@ def apply_embedding_ranking_v2(
     *,
     question: str,
     decision: CandidateDecisionV2,
-    ranker: EmbeddingRankerV2 = (
-        rank_metric_candidates_by_embedding_v2
-    ),
+    ranker: EmbeddingRankerV2 | None = None,
 ) -> RankedCandidateDecisionV2:
     """
     Use embedding as ranking evidence only.
@@ -78,6 +88,9 @@ def apply_embedding_ranking_v2(
             ranking_applied=False,
             ranking_method=None,
         )
+
+    if ranker is None:
+        ranker = _resolve_default_embedding_ranker_v2()
 
     result = ranker(
         question,

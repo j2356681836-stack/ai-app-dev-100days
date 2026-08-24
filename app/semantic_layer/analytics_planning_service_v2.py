@@ -7,7 +7,6 @@ from pydantic import BaseModel, ConfigDict, model_validator
 
 from app.semantic_layer.candidate_decision_ranking_v2 import (
     EmbeddingRankerV2,
-    rank_metric_candidates_by_embedding_v2,
 )
 from app.semantic_layer.query_plan_selector_v2 import (
     QueryPlanSelectionResultV2,
@@ -203,9 +202,7 @@ def resolve_analytics_planning_v2(
     question: str,
     allowed_metric_names: AbstractSet[str] | None = None,
     llm_call: LLMCall | None = None,
-    ranker: EmbeddingRankerV2 = (
-        rank_metric_candidates_by_embedding_v2
-    ),
+    ranker: EmbeddingRankerV2 | None = None,
     semantic_resolver: SemanticResolverV2 = (
         resolve_semantic_decision_v2
     ),

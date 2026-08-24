@@ -10,7 +10,6 @@ from app.semantic_layer.candidate_decision_pipeline_v2 import (
 )
 from app.semantic_layer.candidate_decision_ranking_v2 import (
     EmbeddingRankerV2,
-    rank_metric_candidates_by_embedding_v2,
 )
 from app.semantic_layer.candidate_decision_v2 import (
     CandidateDecisionStatusV2,
@@ -72,9 +71,7 @@ def resolve_semantic_decision_v2(
     question: str,
     allowed_metric_names: AbstractSet[str] | None = None,
     llm_call: LLMCall | None = None,
-    ranker: EmbeddingRankerV2 = (
-        rank_metric_candidates_by_embedding_v2
-    ),
+    ranker: EmbeddingRankerV2 | None = None,
 ) -> SemanticDecisionResultV2:
     """
     Gate 3J unified Semantic Decision entry point.
