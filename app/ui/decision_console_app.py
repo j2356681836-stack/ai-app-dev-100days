@@ -475,20 +475,47 @@ def _render_fact_delivery_business(
         st.error("READY Runtime 缺少 Console View / Executive Brief。")
         return
 
+    if view.fact_metric is not None:
+        st.markdown("### 核心 KPI")
+        st.metric(
+            format_metric_name_v2(
+                view.fact_metric.metric_name
+            ),
+            format_number_v2(
+                view.fact_metric.value
+            ),
+        )
+        st.caption(
+            "分析窗口："
+            f"{view.fact_metric.analysis_window.start_date} → "
+            f"{view.fact_metric.analysis_window.end_date} ｜ "
+            "该数值直接来自已释放的 Governed Evidence，"
+            "页面不重新计算。"
+        )
+
     c1, c2, c3 = st.columns(3)
     with c1:
         st.metric("指标", format_metric_name_v2(view.metric_name))
     with c2:
-        st.metric("证据充分性", format_evidence_sufficiency_v2(view.evidence_sufficiency))
+        st.metric(
+            "证据充分性",
+            format_evidence_sufficiency_v2(
+                view.evidence_sufficiency
+            ),
+        )
     with c3:
         st.metric("交付类型", "事实型")
 
     _render_scope_summary(view.scope_summary)
     _render_key_findings(result)
 
-    if view.comparison is None:
+    if (
+        view.comparison is None
+        and view.fact_metric is None
+    ):
         st.caption(
-            "当前为事实型交付，暂无可信的对比合同，因此不展示 current/reference/delta KPI 卡片。"
+            "当前为事实型交付，但没有满足安全单值投影合同的 KPI；"
+            "页面仅展示 evidence-backed 文字结论。"
         )
 
     _render_breakdown(result)

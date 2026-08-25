@@ -697,6 +697,57 @@ def invoke_governed_plan_delivery_v2(
         approved_tool_binding=approved_tool_binding,
     )
 
+def _select_approved_tool_binding_for_plan_v2(
+    *,
+    actual_plan_name: str | None,
+    primary_binding: ApprovedGovernedQueryToolBindingV2,
+    approved_tool_binding_registry: tuple[
+        ApprovedGovernedQueryToolBindingV2,
+        ...,
+    ] = (),
+) -> ApprovedGovernedQueryToolBindingV2 | None:
+    """
+    从 server-owned 静态 Approved Tool Binding Registry 中，
+    为 Graph 已经真实产生的 Query Plan 选择唯一匹配 binding。
+
+    安全边界：
+    - 不根据 question 猜 Query Plan；
+    - 不创建新的 Tool identity；
+    - 不修改 Graph 的规划结果；
+    - 不允许同一 plan_name 重复注册；
+    - 没有批准项时返回 None，由原 mismatch gate fail closed。
+    """
+    if actual_plan_name is None:
+        return None
+
+    bindings = (
+        primary_binding,
+        *approved_tool_binding_registry,
+    )
+
+    plan_names = [
+        binding.plan_name
+        for binding in bindings
+    ]
+
+    if len(plan_names) != len(set(plan_names)):
+        raise ValueError(
+            "Approved Tool Binding Registry contains duplicate "
+            f"plan_name values: {plan_names}"
+        )
+
+    matches = tuple(
+        binding
+        for binding in bindings
+        if binding.plan_name == actual_plan_name
+    )
+
+    if len(matches) == 1:
+        return matches[0]
+
+    return None
+
+
 def invoke_governed_graph_delivery_v2(
     *,
     context: AccessContext,
@@ -704,6 +755,10 @@ def invoke_governed_graph_delivery_v2(
     reference_date: date,
     runtime_config: GovernanceRuntimeConfig,
     approved_tool_binding: ApprovedGovernedQueryToolBindingV2,
+    approved_tool_binding_registry: tuple[
+        ApprovedGovernedQueryToolBindingV2,
+        ...,
+    ] = (),
     llm_call: LLMCall | None = None,
     execution_policy: GovernedExecutionPolicy | None = None,
     engine_override: Engine | None = None,
@@ -718,6 +773,14 @@ def invoke_governed_graph_delivery_v2(
 
     这里直接调用 Graph internal state，是为了在 Governance Boundary
     内完成 Evidence Builder；完整 state 永远不会返回给 Streamlit。
+
+    approved_tool_binding 是向后兼容的 primary binding。
+    approved_tool_binding_registry 是 server-owned 静态批准表：
+    - UI 不能指定或创建 Tool identity；
+    - Graph 先独立产生真实 Query Plan；
+    - Bridge 只允许从预先批准的 bindings 中选择与实际 plan_name
+      完全一致的 binding；
+    - 没有匹配项时继续保持 fail closed。
     """
 
     active_budget_policy = (
@@ -751,7 +814,23 @@ def invoke_governed_graph_delivery_v2(
         }
     )
 
+    selected_binding = _select_approved_tool_binding_for_plan_v2(
+        actual_plan_name=(
+            state["envelope"].plan_name
+            if state.get("envelope") is not None
+            else None
+        ),
+        primary_binding=approved_tool_binding,
+        approved_tool_binding_registry=(
+            approved_tool_binding_registry
+        ),
+    )
+
     return build_runtime_delivery_from_governed_state_v2(
         state=state,
-        approved_tool_binding=approved_tool_binding,
+        approved_tool_binding=(
+            selected_binding
+            if selected_binding is not None
+            else approved_tool_binding
+        ),
     )

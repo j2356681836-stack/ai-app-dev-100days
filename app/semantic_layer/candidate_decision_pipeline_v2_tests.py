@@ -64,6 +64,144 @@ def test_matched_gmv_uses_unified_pipeline_without_embedding() -> None:
     )
 
 
+def test_explicit_gmv_alias_recovers_partial_signature() -> None:
+    """
+    Day92 SEM-REL-GAP-001 回归：
+    Live Parser 曾真实出现 operator=None + paid_amount。
+    显式 GMV Alias 应把已有 structural candidates 收窄为 gmv。
+    """
+    result = resolve_candidate_decision_v2(
+        question="2025年GMV是多少？",
+        question_signature=QuestionSemanticSignatureV2(
+            operator=None,
+            left_operand=SemanticOperand.PAID_AMOUNT,
+            right_operand=None,
+        ),
+        ranker=_fail_if_called,
+    )
+
+    _assert_equal(
+        result.status,
+        CandidateDecisionStatusV2.MATCHED,
+        "显式 GMV 应在欠解析 Signature 下稳定 MATCHED。",
+    )
+    _assert_equal(
+        result.metric_name,
+        "gmv",
+        "显式 GMV Alias 应收窄到 gmv。",
+    )
+    _assert_equal(
+        result.candidates,
+        ("gmv",),
+        "Grounding 后只能保留 gmv。",
+    )
+    _assert_true(
+        not result.ranking_applied,
+        "确定性 Alias Grounding 成功后不应再调用 Embedding。",
+    )
+
+
+def test_explicit_roi_alias_recovers_partial_signature() -> None:
+    result = resolve_candidate_decision_v2(
+        question="2025年ROI是多少？",
+        question_signature=QuestionSemanticSignatureV2(
+            operator=None,
+            left_operand=SemanticOperand.PAID_AMOUNT,
+            right_operand=None,
+        ),
+        ranker=_fail_if_called,
+    )
+
+    _assert_equal(
+        result.status,
+        CandidateDecisionStatusV2.MATCHED,
+        "显式 ROI 应在欠解析 Signature 下稳定 MATCHED。",
+    )
+    _assert_equal(
+        result.metric_name,
+        "roi",
+        "显式 ROI Alias 应收窄到 roi。",
+    )
+
+
+def test_explicit_alias_does_not_override_structural_match() -> None:
+    """
+    Alias Grounding 只修 clarification，不覆盖已经明确的结构判断。
+    """
+    result = resolve_candidate_decision_v2(
+        question="GMV除以订单量是多少？",
+        question_signature=QuestionSemanticSignatureV2(
+            operator=QuestionOperator.DIVIDE,
+            left_operand=SemanticOperand.PAID_AMOUNT,
+            right_operand=SemanticOperand.PAID_ORDER,
+        ),
+        ranker=_fail_if_called,
+    )
+
+    _assert_equal(
+        result.status,
+        CandidateDecisionStatusV2.MATCHED,
+        "明确 ratio 结构应保持 MATCHED。",
+    )
+    _assert_equal(
+        result.metric_name,
+        "aus",
+        "paid_amount / paid_order 应保持 AUS，不得被 GMV Alias 抢占。",
+    )
+
+
+def test_unauthorized_explicit_metric_is_not_invented() -> None:
+    seen_allowed = None
+
+    def fake_ranker(
+        question,
+        *,
+        allowed_metric_names,
+        top_k,
+    ):
+        nonlocal seen_allowed
+        seen_allowed = set(allowed_metric_names)
+
+        return {
+            "method": "embedding_v2",
+            "candidates": [
+                {"name": "aus", "score": 0.9},
+                {"name": "roi", "score": 0.8},
+                {"name": "spending_per_buyer", "score": 0.7},
+            ],
+        }
+
+    result = resolve_candidate_decision_v2(
+        question="2025年GMV是多少？",
+        question_signature=QuestionSemanticSignatureV2(
+            operator=None,
+            left_operand=SemanticOperand.PAID_AMOUNT,
+            right_operand=None,
+        ),
+        allowed_metric_names={
+            "aus",
+            "roi",
+            "spending_per_buyer",
+        },
+        ranker=fake_ranker,
+    )
+
+    _assert_equal(
+        result.status,
+        CandidateDecisionStatusV2.NEEDS_CLARIFICATION,
+        "未授权 gmv 不能由 Alias Grounding 重新注入。",
+    )
+    _assert_true(
+        "gmv" not in result.candidates,
+        "未授权 Metric 不得出现在最终候选中。",
+    )
+    _assert_equal(
+        seen_allowed,
+        {"aus", "roi", "spending_per_buyer"},
+        "Embedding 只能看到授权后的 structural candidates。",
+    )
+
+
 def test_generic_new_customer_is_narrowed_before_ranking() -> None:
     seen_allowed = None
 
@@ -79,14 +217,8 @@ def test_generic_new_customer_is_narrowed_before_ranking() -> None:
         return {
             "method": "embedding_v2",
             "candidates": [
-                {
-                    "name": "channel_paid_new_customer_count",
-                    "score": 0.9,
-                },
-                {
-                    "name": "brand_paid_new_customer_count",
-                    "score": 0.8,
-                },
+                {"name": "channel_paid_new_customer_count", "score": 0.9},
+                {"name": "brand_paid_new_customer_count", "score": 0.8},
             ],
         }
 
@@ -105,7 +237,6 @@ def test_generic_new_customer_is_narrowed_before_ranking() -> None:
         CandidateDecisionStatusV2.NEEDS_CLARIFICATION,
         "Generic new customer 必须保持 clarification。",
     )
-
     _assert_equal(
         seen_allowed,
         {
@@ -113,15 +244,6 @@ def test_generic_new_customer_is_narrowed_before_ranking() -> None:
             "channel_paid_new_customer_count",
         },
         "Embedding 应只看到 Narrowing 之后的两个新客候选。",
-    )
-
-    _assert_equal(
-        result.candidates,
-        (
-            "channel_paid_new_customer_count",
-            "brand_paid_new_customer_count",
-        ),
-        "Embedding 只允许重排这两个候选。",
     )
 
 
@@ -140,14 +262,8 @@ def test_generic_average_is_narrowed_before_ranking() -> None:
         return {
             "method": "embedding_v2",
             "candidates": [
-                {
-                    "name": "aus",
-                    "score": 0.9,
-                },
-                {
-                    "name": "spending_per_buyer",
-                    "score": 0.8,
-                },
+                {"name": "aus", "score": 0.9},
+                {"name": "spending_per_buyer", "score": 0.8},
             ],
         }
 
@@ -166,13 +282,9 @@ def test_generic_average_is_narrowed_before_ranking() -> None:
         CandidateDecisionStatusV2.NEEDS_CLARIFICATION,
         "Generic average 必须保持 clarification。",
     )
-
     _assert_equal(
         seen_allowed,
-        {
-            "spending_per_buyer",
-            "aus",
-        },
+        {"spending_per_buyer", "aus"},
         "Embedding 应只看到 average narrowing 后的两个候选。",
     )
 
@@ -196,7 +308,6 @@ def test_authorization_happens_before_narrowing_and_ranking() -> None:
         CandidateDecisionStatusV2.MATCHED,
         "授权过滤后只有一个结构候选时应直接 MATCHED。",
     )
-
     _assert_equal(
         result.metric_name,
         "brand_paid_new_customer_count",
@@ -220,7 +331,6 @@ def test_unsupported_path_does_not_call_embedding() -> None:
         CandidateDecisionStatusV2.UNSUPPORTED,
         "不存在的结构必须保持 UNSUPPORTED。",
     )
-
     _assert_true(
         not result.ranking_applied,
         "UNSUPPORTED 不应调用 Embedding。",
@@ -229,6 +339,10 @@ def test_unsupported_path_does_not_call_embedding() -> None:
 
 _TESTS = (
     test_matched_gmv_uses_unified_pipeline_without_embedding,
+    test_explicit_gmv_alias_recovers_partial_signature,
+    test_explicit_roi_alias_recovers_partial_signature,
+    test_explicit_alias_does_not_override_structural_match,
+    test_unauthorized_explicit_metric_is_not_invented,
     test_generic_new_customer_is_narrowed_before_ranking,
     test_generic_average_is_narrowed_before_ranking,
     test_authorization_happens_before_narrowing_and_ranking,

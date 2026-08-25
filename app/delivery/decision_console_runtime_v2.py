@@ -224,13 +224,17 @@ def run_day89_local_investigation_v2(
         request_id=request_id,
     )
 
+    channel_binding = build_day89_channel_tool_binding_v2()
+    overall_binding = build_day89_overall_gmv_tool_binding_v2()
+
     return invoke_governed_graph_delivery_v2(
         context=context,
         question=question,
         reference_date=reference_date,
         runtime_config=active_config,
-        approved_tool_binding=(
-            build_day89_channel_tool_binding_v2()
+        approved_tool_binding=channel_binding,
+        approved_tool_binding_registry=(
+            overall_binding,
         ),
         execution_policy=execution_policy,
         event_id=request_id,

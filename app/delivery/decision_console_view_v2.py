@@ -104,6 +104,26 @@ class MetricComparisonViewV2(BaseModel):
     reference_evidence_id: str
 
 
+class FactMetricValueViewV2(BaseModel):
+    """
+    FACT / overall 单值 KPI 的安全只读投影。
+
+    只允许来自已经进入 Evidence Pack 的 GOVERNED_QUERY_RESULT
+    ProtectedResultV2。这里不解析自然语言答案、不重新执行 SQL、
+    不重新聚合，也不读取未释放字段。
+    """
+
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+    )
+
+    metric_name: str
+    value: Decimal
+    analysis_window: TimeWindowReferenceV2
+    evidence_id: str
+
+
 class DataVerificationViewV2(BaseModel):
     """
     Day89 Data Verification 的第一版。
@@ -442,6 +462,7 @@ class DecisionConsoleViewV2(BaseModel):
     unknowns: tuple[str, ...]
     recommended_checks: tuple[str, ...]
 
+    fact_metric: FactMetricValueViewV2 | None = None
     comparison: MetricComparisonViewV2 | None = None
     verification: DataVerificationViewV2 | None = None
     breakdown: ProtectedBreakdownViewV2 | None = None
@@ -462,6 +483,88 @@ def _evidence_record_by_id(
         for record in delivery.evidence_pack.evidence_records
     }
     return records.get(evidence_id)
+
+
+def _build_fact_metric_value_v2(
+    *,
+    delivery: EvidencePackDeliveryV2,
+) -> FactMetricValueViewV2 | None:
+    """
+    从单次 FACT Delivery 的受保护 Evidence 中投影 overall scalar。
+
+    只接受非常窄的可信形状：
+    - analysis_scope 没有 comparison；
+    - result_grain == "overall"；
+    - 当前 scope 恰好对应一条 GOVERNED_QUERY_RESULT；
+    - ProtectedResult 恰好 1 行；
+    - visible field 恰好只有 metric_name；
+    - value 可以安全转换成 Decimal。
+
+    任一条件不满足都返回 None，由 UI 保持原有文字交付，
+    不猜值、不解析 FinalAnswer 文本、不聚合明细。
+    """
+    scope = delivery.evidence_pack.analysis_scope
+
+    if scope.comparison is not None:
+        return None
+
+    if scope.result_grain != "overall":
+        return None
+
+    records = tuple(
+        record
+        for record in delivery.evidence_pack.evidence_records
+        if (
+            record.evidence_type
+            == EvidenceTypeV2.GOVERNED_QUERY_RESULT
+            and record.provenance is not None
+            and record.protected_result is not None
+            and record.provenance.metric_name == scope.metric_name
+            and record.provenance.result_grain == "overall"
+            and (
+                record.provenance.analysis_window
+                == scope.analysis_window
+            )
+        )
+    )
+
+    if len(records) != 1:
+        return None
+
+    record = records[0]
+    protected = record.protected_result
+    assert protected is not None
+
+    if protected.row_count != 1:
+        return None
+
+    if protected.field_names != (scope.metric_name,):
+        return None
+
+    if len(protected.rows) != 1:
+        return None
+
+    row = protected.rows[0]
+
+    if set(row) != {scope.metric_name}:
+        return None
+
+    raw_value = row.get(scope.metric_name)
+
+    if raw_value is None or isinstance(raw_value, bool):
+        return None
+
+    try:
+        value = Decimal(str(raw_value))
+    except Exception:
+        return None
+
+    return FactMetricValueViewV2(
+        metric_name=scope.metric_name,
+        value=value,
+        analysis_window=scope.analysis_window,
+        evidence_id=record.reference.evidence_id,
+    )
 
 
 def _build_verification_evidence_view_v2(
@@ -1376,6 +1479,10 @@ def build_decision_console_view_v2(
         delivery=delivery,
     )
 
+    fact_metric_view = _build_fact_metric_value_v2(
+        delivery=delivery,
+    )
+
     comparison_view = None
     verification_view = None
 
@@ -1514,6 +1621,7 @@ def build_decision_console_view_v2(
             item.check
             for item in insight.recommended_checks
         ),
+        fact_metric=fact_metric_view,
         comparison=comparison_view,
         verification=verification_view,
         breakdown=breakdown_view,

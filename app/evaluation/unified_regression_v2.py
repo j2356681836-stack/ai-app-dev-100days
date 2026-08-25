@@ -24,6 +24,38 @@ REGRESSION_CASES_V2: tuple[RegressionCaseV2, ...] = (
             "question_semantic_parser_regression_v2_tests"
         ),
     ),
+    RegressionCaseV2(
+        category="semantic",
+        name="Candidate Decision Pipeline Regression",
+        module=(
+            "app.semantic_layer."
+            "candidate_decision_pipeline_v2_tests"
+        ),
+    ),
+    RegressionCaseV2(
+        category="semantic",
+        name="Embedding Shared Client Regression",
+        module=(
+            "app.llm."
+            "embedding_client_tests"
+        ),
+    ),
+    RegressionCaseV2(
+        category="semantic",
+        name="Embedding Service Regression",
+        module=(
+            "app.semantic_layer."
+            "embedding_service_tests"
+        ),
+    ),
+    RegressionCaseV2(
+        category="semantic",
+        name="Metric Semantic Cloud Runtime Regression",
+        module=(
+            "app.semantic_layer."
+            "metric_semantic_cloud_runtime_v2_tests"
+        ),
+    ),
 
     # Governance / Security
     RegressionCaseV2(
@@ -78,13 +110,29 @@ REGRESSION_CASES_V2: tuple[RegressionCaseV2, ...] = (
             "decision_console_runtime_acceptance_v2"
         ),
     ),
+    RegressionCaseV2(
+        category="delivery",
+        name="Runtime Delivery Binding Registry Regression",
+        module=(
+            "app.delivery."
+            "runtime_delivery_binding_registry_v2_tests"
+        ),
+    ),
+    RegressionCaseV2(
+        category="delivery",
+        name="Decision Console FACT KPI Projection Regression",
+        module=(
+            "app.evaluation."
+            "decision_console_fact_kpi_projection_v2_tests"
+        ),
+    ),
 )
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Run the deterministic Day91 Unified Regression V2 gate."
+            "Run the deterministic Unified Regression V2 gate."
         )
     )
 
@@ -191,7 +239,7 @@ def main() -> None:
     cases = _selected_cases(args.category)
 
     if args.list:
-        print("Day91 Unified Regression V2 Cases")
+        print("Unified Regression V2 Cases")
         for case in cases:
             print(
                 f"- [{case.category}] "
@@ -220,7 +268,7 @@ def main() -> None:
 
     print()
     print("=" * 80)
-    print("Day91 Unified Regression V2 Summary")
+    print("Unified Regression V2 Summary")
     print(f"Total modules: {total}")
     print(f"Passed modules: {passed}")
     print(f"Failed modules: {failed}")

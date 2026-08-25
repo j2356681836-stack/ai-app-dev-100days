@@ -32,12 +32,10 @@ def _parse_single(question: str):
         QuestionSemanticParseStatusV2.PARSED,
         f"测试问题应被 Parser 解析为单一 signature: {question}",
     )
-
     _assert_true(
         parsed.signature is not None,
         f"PARSED 状态必须带 signature: {question}",
     )
-
     return parsed.signature
 
 
@@ -66,11 +64,72 @@ def test_parser_to_pipeline_matches_gmv() -> None:
         CandidateDecisionStatusV2.MATCHED,
         "GMV 应在 Parser -> Pipeline 后 MATCHED。",
     )
-
     _assert_equal(
         result.metric_name,
         "gmv",
         "GMV 应命中 gmv。",
+    )
+
+
+def test_parser_partial_gmv_alias_is_grounded_without_embedding() -> None:
+    """
+    Day92 真实回归的 deterministic reproduction：
+    模拟 Live Parser 漏掉 SUM，只保留 paid_amount。
+    """
+    question = "2025年GMV是多少？"
+
+    def partial_gmv_llm(
+        *,
+        messages,
+        temperature,
+    ) -> str:
+        return (
+            '{"operator": null, '
+            '"left_operand": "paid_amount", '
+            '"right_operand": null, '
+            '"intrinsic_partition": null, '
+            '"qualifiers": []}'
+        )
+
+    parsed = parse_question_semantics_v2(
+        question,
+        llm_call=partial_gmv_llm,
+    )
+
+    _assert_equal(
+        parsed.status,
+        QuestionSemanticParseStatusV2.PARSED,
+        "欠解析 GMV payload 仍应形成合法 PARSED signature。",
+    )
+    _assert_true(
+        parsed.signature is not None,
+        "PARSED 必须包含 signature。",
+    )
+    _assert_equal(
+        parsed.signature.operator,
+        None,
+        "本测试必须真实模拟 operator 丢失。",
+    )
+
+    result = resolve_candidate_decision_v2(
+        question=question,
+        question_signature=parsed.signature,
+        ranker=_fail_if_called,
+    )
+
+    _assert_equal(
+        result.status,
+        CandidateDecisionStatusV2.MATCHED,
+        "显式 GMV 应由 deterministic Alias Grounding 恢复 MATCHED。",
+    )
+    _assert_equal(
+        result.metric_name,
+        "gmv",
+        "欠解析 GMV 最终应稳定命中 gmv。",
+    )
+    _assert_true(
+        not result.ranking_applied,
+        "确定性 Grounding 成功后不应调用 Embedding。",
     )
 
 
@@ -88,7 +147,6 @@ def test_parser_to_pipeline_matches_ipt() -> None:
         CandidateDecisionStatusV2.MATCHED,
         "IPT 应在 Parser -> Pipeline 后 MATCHED。",
     )
-
     _assert_equal(
         result.metric_name,
         "ipt",
@@ -110,7 +168,6 @@ def test_parser_to_pipeline_matches_roi() -> None:
         CandidateDecisionStatusV2.MATCHED,
         "ROI 应在 Parser -> Pipeline 后 MATCHED。",
     )
-
     _assert_equal(
         result.metric_name,
         "roi",
@@ -129,24 +186,14 @@ def test_parser_to_pipeline_narrows_generic_average() -> None:
     ):
         _assert_equal(
             set(allowed_metric_names),
-            {
-                "spending_per_buyer",
-                "aus",
-            },
+            {"spending_per_buyer", "aus"},
             "Embedding 只能看到 average narrowing 后的两个候选。",
         )
-
         return {
             "method": "embedding_v2",
             "candidates": [
-                {
-                    "name": "spending_per_buyer",
-                    "score": 0.9,
-                },
-                {
-                    "name": "aus",
-                    "score": 0.8,
-                },
+                {"name": "spending_per_buyer", "score": 0.9},
+                {"name": "aus", "score": 0.8},
             ],
         }
 
@@ -161,13 +208,9 @@ def test_parser_to_pipeline_narrows_generic_average() -> None:
         CandidateDecisionStatusV2.NEEDS_CLARIFICATION,
         "平均消费仍应需要澄清。",
     )
-
     _assert_equal(
         set(result.candidates),
-        {
-            "spending_per_buyer",
-            "aus",
-        },
+        {"spending_per_buyer", "aus"},
         "平均消费应只剩两个金额平均口径。",
     )
 
@@ -189,18 +232,11 @@ def test_parser_to_pipeline_narrows_generic_new_customer() -> None:
             },
             "Embedding 只能看到两个新客候选。",
         )
-
         return {
             "method": "embedding_v2",
             "candidates": [
-                {
-                    "name": "brand_paid_new_customer_count",
-                    "score": 0.9,
-                },
-                {
-                    "name": "channel_paid_new_customer_count",
-                    "score": 0.8,
-                },
+                {"name": "brand_paid_new_customer_count", "score": 0.9},
+                {"name": "channel_paid_new_customer_count", "score": 0.8},
             ],
         }
 
@@ -215,7 +251,6 @@ def test_parser_to_pipeline_narrows_generic_new_customer() -> None:
         CandidateDecisionStatusV2.NEEDS_CLARIFICATION,
         "普通“新客”仍应需要澄清。",
     )
-
     _assert_equal(
         set(result.candidates),
         {
@@ -244,6 +279,7 @@ def test_parser_to_pipeline_keeps_unsupported_ratio_unsupported() -> None:
 
 _TESTS = (
     test_parser_to_pipeline_matches_gmv,
+    test_parser_partial_gmv_alias_is_grounded_without_embedding,
     test_parser_to_pipeline_matches_ipt,
     test_parser_to_pipeline_matches_roi,
     test_parser_to_pipeline_narrows_generic_average,
@@ -270,9 +306,7 @@ def run_tests() -> None:
             print(exc)
 
     print("=" * 80)
-    print(
-        "Candidate Decision V2 Gate 3I Parser Pipeline Test Summary"
-    )
+    print("Candidate Decision V2 Gate 3I Parser Pipeline Test Summary")
     print(f"Total: {len(_TESTS)}")
     print(f"Passed: {passed}")
     print(f"Failed: {failed}")
