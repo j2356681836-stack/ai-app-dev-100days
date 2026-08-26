@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from datetime import datetime
 from typing import Any
 
@@ -274,68 +273,6 @@ def _execute_governed_query_impl_v2(
                 engine_override=engine_override,
             )
 
-            if (
-                os.getenv(
-                    "DAY92_CLOUD_SQL_DIAGNOSTIC",
-                    "",
-                )
-                .strip()
-                .lower()
-                in {"1", "true", "yes", "on"}
-            ):
-                error_type = getattr(
-                    execution.error_type,
-                    "value",
-                    execution.error_type,
-                )
-
-                password = os.getenv(
-                    "AI_QUERY_POSTGRES_PASSWORD"
-                )
-
-                print(
-                    "DAY92_GOVERNED_EXECUTION_DIAGNOSTIC:",
-                    {
-                        "success": execution.success,
-                        "error_type": error_type,
-                        "row_count": execution.row_count,
-                        "observed_row_count": (
-                            execution.observed_row_count
-                        ),
-                        "execution_time_ms": (
-                            execution.execution_time_ms
-                        ),
-                        "message": execution.message,
-                        "target_schema": (
-                            execution.target_schema
-                        ),
-                        "host": repr(
-                            os.getenv("POSTGRES_HOST")
-                        ),
-                        "port": repr(
-                            os.getenv("POSTGRES_PORT")
-                        ),
-                        "database": repr(
-                            os.getenv("POSTGRES_DB")
-                        ),
-                        "query_user": repr(
-                            os.getenv(
-                                "AI_QUERY_POSTGRES_USER"
-                            )
-                        ),
-                        "query_password_set": bool(
-                            password
-                        ),
-                        "query_password_outer_quotes": (
-                            bool(password)
-                            and len(password) >= 2
-                            and password[0]
-                            == password[-1]
-                            == '"'
-                        ),
-                    },
-                    flush=True,
-                )
         except Exception as exc:
             update_safe_observation_v2(
                 sql_span,

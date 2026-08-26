@@ -1,5 +1,3 @@
-import os
-import re
 from time import perf_counter
 from typing import Any, Mapping
 
@@ -18,129 +16,6 @@ from app.governance.execution_policy import (
     GovernedExecutionPolicy,
     GovernedExecutionResult,
 )
-
-
-def _day92_cloud_sql_diagnostic_enabled() -> bool:
-    return (
-        os.getenv(
-            "DAY92_CLOUD_SQL_DIAGNOSTIC",
-            "",
-        )
-        .strip()
-        .lower()
-        in {
-            "1",
-            "true",
-            "yes",
-            "on",
-        }
-    )
-
-
-def _sanitize_database_error_text(
-    value: object,
-) -> str:
-    # 只保留首行，并清理常见 credential 形态。
-    text_value = str(value).splitlines()[0][:500]
-
-    text_value = re.sub(
-        r"(?i)(postgres(?:ql)?://[^:\\s/]+:)[^@\\s]+@",
-        r"\\1***@",
-        text_value,
-    )
-    text_value = re.sub(
-        r"(?i)(password\\s*=\\s*)[^\\s,;]+",
-        r"\\1***",
-        text_value,
-    )
-
-    return text_value
-
-
-def _emit_day92_cloud_sql_diagnostic(
-    *,
-    category: str,
-    error: BaseException | None = None,
-) -> None:
-    # 临时 Render Cloud 诊断：不打印 SQL、参数、密码、URL、结果行。
-    if not _day92_cloud_sql_diagnostic_enabled():
-        return
-
-    password = os.getenv(
-        "AI_QUERY_POSTGRES_PASSWORD"
-    )
-
-    payload = {
-        "category": category,
-        "host": repr(
-            os.getenv("POSTGRES_HOST")
-        ),
-        "port": repr(
-            os.getenv("POSTGRES_PORT")
-        ),
-        "database": repr(
-            os.getenv("POSTGRES_DB")
-        ),
-        "query_user": repr(
-            os.getenv("AI_QUERY_POSTGRES_USER")
-        ),
-        "query_password_set": bool(password),
-        "query_password_outer_quotes": (
-            bool(password)
-            and len(password) >= 2
-            and password[0] == password[-1] == '"'
-        ),
-    }
-
-    if error is not None:
-        original = getattr(
-            error,
-            "orig",
-            None,
-        )
-        diagnostic_source = (
-            original
-            if original is not None
-            else error
-        )
-
-        payload.update(
-            {
-                "error_type": type(
-                    error
-                ).__name__,
-                "original_error_type": (
-                    type(
-                        original
-                    ).__name__
-                    if original is not None
-                    else None
-                ),
-                "sqlstate": (
-                    getattr(
-                        original,
-                        "sqlstate",
-                        None,
-                    )
-                    or getattr(
-                        original,
-                        "pgcode",
-                        None,
-                    )
-                ),
-                "safe_error": (
-                    _sanitize_database_error_text(
-                        diagnostic_source
-                    )
-                ),
-            }
-        )
-
-    print(
-        "DAY92_CLOUD_SQL_DIAGNOSTIC:",
-        payload,
-        flush=True,
-    )
 
 
 def _elapsed_ms(started_at: float) -> float:
@@ -367,11 +242,7 @@ def run_governed_sql(
                 policy_version=active_policy.policy_version,
             )
 
-    except SQLAlchemyTimeoutError as error:
-        _emit_day92_cloud_sql_diagnostic(
-            category="pool_timeout",
-            error=error,
-        )
+    except SQLAlchemyTimeoutError:
         return _failure(
             policy=active_policy,
             started_at=started_at,
@@ -381,11 +252,7 @@ def run_governed_sql(
             ),
         )
 
-    except ResourceClosedError as error:
-        _emit_day92_cloud_sql_diagnostic(
-            category="result_not_readable",
-            error=error,
-        )
+    except ResourceClosedError:
         return _failure(
             policy=active_policy,
             started_at=started_at,
@@ -399,10 +266,6 @@ def run_governed_sql(
         )
 
     except DBAPIError as error:
-        _emit_day92_cloud_sql_diagnostic(
-            category="dbapi_error",
-            error=error,
-        )
         error_type = classify_dbapi_error(error)
 
         messages = {
@@ -425,11 +288,7 @@ def run_governed_sql(
             message=messages[error_type],
         )
 
-    except SQLAlchemyError as error:
-        _emit_day92_cloud_sql_diagnostic(
-            category="sqlalchemy_error",
-            error=error,
-        )
+    except SQLAlchemyError:
         return _failure(
             policy=active_policy,
             started_at=started_at,
