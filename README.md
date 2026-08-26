@@ -805,6 +805,96 @@ docs/evaluation/day91_delivery_performance_evidence.md
 - Latest Stable 仍保持 Day60 / `beauty_bi_v1` / `6701323`；
 - Dataset V2 继续保持 Candidate。
 
+
+### Day92 Cloud Deployment / Public Demo
+
+Day92 将 Decision Console 正式部署到 Render，并完成真实公网业务查询验证：
+
+```text
+GitHub main
+↓ Auto Deploy
+Render Docker Web Service
+↓ Internal Network
+Render PostgreSQL
+↓
+beauty_bi_query read-only role
+↓
+Governed Query / Result Protection / Audit Finalization
+↓
+Public Decision Console
+```
+
+Public Demo：
+
+```text
+https://beauty-bi-agent-demo.onrender.com
+```
+
+当前云端运行边界：
+- Web Service 与 PostgreSQL 均位于 Singapore Region；
+- 应用使用 Render Internal Database Host，不使用 External Database URL 作为 Runtime Host；
+- 数据库：`beauty_agent`；
+- 应用查询角色：`beauty_bi_query`；
+- Query Role 保持独立只读权限；
+- secret 仅通过 Render Environment 注入，不进入 Git / image / README；
+- `statement_timeout`、`max_rows`、connection pool、Investigation Round / Session Budget、Result Protection 与 Audit Finalization 继续生效；
+- Observability 继续是 non-blocking side channel，不能改变业务 Runtime correctness。
+
+Day92 公开 Smoke：
+
+```text
+2025年GMV是多少？
+→ 11,430,211.41
+→ PASS
+
+2025年各渠道的GMV是多少
+→ protected channel breakdown
+→ independent overall = 11,430,211.41
+→ PASS
+
+Monthly MOM / 2025-07-31
+current GMV = 719,931.12
+reference GMV = 1,257,216.31
+delta = -537,285.19
+delta rate = -42.74%
+channel contribution / reconciliation = available
+→ PASS
+```
+
+Day92 同时关闭了数个只有真实 Cloud Runtime 才暴露的问题：
+- Cloud Embedding shared client 未进入 Git；
+- explicit metric semantic path 的历史隐藏风险；
+- actual Query Plan 与 Approved Tool Binding 的多 Plan 选择边界；
+- Overall scalar 与 breakdown / multi-field result 的 UI projection 边界；
+- Cloud PostgreSQL Query Role password 与 Render secret drift。
+
+最终 Query Role credential 对齐后，公网 Governed Result 正常释放。临时安全诊断只输出 host / database / query user / error category 等 allowlisted metadata，不记录密码、URL、SQL、parameters 或 rows，根因关闭后已从 production code 清理。
+
+Day92 Regression：
+
+```text
+Unified Regression V2：
+13 modules / 99 cases PASS
+
+pip check：
+PASS
+
+git diff --check：
+PASS
+
+GitHub Actions：
+Day92 formal repair commit observed PASS
+```
+
+当前 Day92 后仍明确保留：
+- Blind / Fresh Generalization → Day93；
+- Phase4 Full Regression / Public Delivery Hard Gate → Day94；
+- Periodic Report date-widget year state 需要进一步收束；
+- metric-level semantic clarification 仍需用户可选择的安全 UX；
+- public edge rate-limit / observability final readiness 继续在 Day94 hardening review；
+- Dataset V2 继续是 Candidate，Latest Stable 仍是 Day60 V1。
+
+
 # Demo
 
 用户输入：哪个品类退款率最高？
@@ -1451,7 +1541,7 @@ Query Plan V2 当前可显式声明：
 | automated_insight_evaluator_acceptance_v2.py | 6/6 PASS |
 | business_decision_judge_calibration_acceptance_v2.py | 10/10 PASS |
 | business_decision_rubric_calibration_acceptance_v2.py | 7/7 PASS |
-| unified_regression_v2.py | 7 modules / 64 cases PASS |
+| unified_regression_v2.py | 13 modules / 99 cases PASS（Day92） |
 
 ### Day74 Dataset V2 Generalization Evidence
 
@@ -1926,7 +2016,7 @@ Phase3 最终定位：一个运行在 Beauty BI Dataset V2 上、具备可解释
 
 Evidence-based Business Insight Engine + Public Delivery
 
-状态：🚧 进行中（Day91 Observability / Unified Regression / CI / Delivery Performance 已完成）
+状态：🚧 进行中（Day92 Cloud Deployment / Public Demo 已完成）
 
 当前 Day82-Day94 目标：
 - ✅ Day82：Insight Contract / Tool Contract / Time Comparison / Business Decision Evaluation Contract；
@@ -1939,7 +2029,7 @@ Evidence-based Business Insight Engine + Public Delivery
 - ✅ Day89：Streamlit Decision Console / Runtime HITL / Daily-Weekly-Monthly Periodic Delivery / Final Delivery Gate；
 - ✅ Day90：Docker Compose / One-command Startup / Fresh-volume Reproducibility；
 - ✅ Day91：Observability / Unified Regression / CI / Delivery Performance；
-- Day92：Cloud Deployment / Public Demo；
+- ✅ Day92：Cloud Deployment / Public Demo / Public Business Smoke；
 - Day93：Blind Test / Human Expert Proxy Review；
 - Day94：Phase4 Full Regression / Public Delivery Hard Gate。
 
@@ -2050,9 +2140,9 @@ Decision Console / Answer / Audit Trace
 # 当前版本
 
 Version: v0.60
-完成度：Day91 / 100
+完成度：Day92 / 100
 Phase3：CLOSED
-Phase4：IN_PROGRESS（Day91 completed）
+Phase4：IN_PROGRESS（Day92 completed）
 
 Latest Stable Baseline：
 
@@ -2236,9 +2326,27 @@ GitHub Actions Deterministic CI：PASS
 Delivery Performance Evidence：documented
 ```
 
+
+Day92 Cloud Deployment / Public Demo：
+
+```text
+Render Auto Deploy：PASS
+Public Decision Console：PASS
+Cloud Query Role Login / Read：PASS
+Overall GMV Public Smoke：PASS
+Channel GMV Public Smoke：PASS
+Monthly MOM Public Smoke：PASS
+Unified Regression：13 modules / 99 cases PASS
+Final Git State：main == origin/main / working tree clean
+Final Day92 Commit：50f15f2
+```
+
 当前已知限制：
 - `SEM-REL-GAP-001`：live Structured Semantic Parser repeatability；
 - `TIME-REL-GAP-001`：显式年份表达存在 whitespace / silent fallback 风险；Day88 只修 observed probe fixture，生产 Time Resolver 尚待 Public Delivery 前关闭；
+- Periodic Report Date Widget：Day92 公网手工测试观察到年份切换后的首次日期选择可能回到当前年份，必须在 Day94 Hard Gate 前收束；
+- Semantic Metric Clarification UX：模糊指标问题可以 fail-closed，但尚未把 metric-level `NEEDS_CLARIFICATION` 投影成 server-owned selectable choices；
+- Cloud Observability / public edge rate-limit：Day92 不把它们冒充已完成 production hardening，Day94 只根据真实证据做最终声明；
 - `SCOPE-GAP-001`：Requested Region / Channel Value Filter 尚未正式结构化；
 - Scope Canonical Value Validation；
 - 4 个 Query Plan 继续按 Scope Contract fail-closed；
@@ -2247,4 +2355,4 @@ Delivery Performance Evidence：documented
 - V2 automatic SQL Repair Runtime disabled；
 - real LLM token usage 已由 Day91 Langfuse Generation Capture 完成；可信 cost mapping 尚未验证，Token Usage 尚未接入在线 Execution Budget；Observability ↔ Audit 的进一步 correlation 仍可增强。
 
-下一步：Day92 进入 Cloud Deployment / Public Demo，基于 Day91 已通过的 Observability / Unified Regression / CI Gate 部署 Decision Console，并验证 secret / network / rate-limit / deployment smoke boundary。
+下一步：Day93 进入 Blind Test / Human Expert Proxy Review，使用真正 unseen business cases 通过公网 Decision Console 验证 Business Decision Quality、Judge ↔ Human calibration 与 success / partial / failure / unsupported 的诚实交付。
