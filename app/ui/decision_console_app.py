@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+from uuid import uuid4
 
 import pandas as pd
 import streamlit as st
@@ -119,6 +120,59 @@ def _periodic_result() -> MonthlyContributionDeliveryResultV2 | None:
     if isinstance(value, MonthlyContributionDeliveryResultV2):
         return value
     return None
+
+
+def _periodic_runtime_failure() -> dict[str, str] | None:
+    """
+    读取 Periodic Runtime 的安全失败摘要。
+
+    这里只保存允许公开到 UI 的诊断字段：
+    - failure_stage
+    - exception_type
+    - diagnostic_id
+
+    不保存 SQL、parameters、rows、数据库 URL 或 secret。
+    """
+
+    value = st.session_state.get("periodic_runtime_failure")
+
+    if not isinstance(value, dict):
+        return None
+
+    required_keys = {
+        "failure_stage",
+        "exception_type",
+        "diagnostic_id",
+    }
+
+    if not required_keys.issubset(value):
+        return None
+
+    if not all(
+        isinstance(value[key], str) and value[key].strip()
+        for key in required_keys
+    ):
+        return None
+
+    return {
+        key: value[key]
+        for key in (
+            "failure_stage",
+            "exception_type",
+            "diagnostic_id",
+        )
+    }
+
+
+def _periodic_anchor_state_key_v2(cadence: str) -> str:
+    """
+    为每一种报表周期建立独立的 Streamlit widget state。
+
+    Daily / Weekly / Monthly 分开保存，避免切换 cadence 或 rerun 时
+    把用户已经确认的历史 anchor 静默重置为默认 completed period。
+    """
+
+    return f"periodic_anchor_date::{cadence}"
 
 
 def _breakdown_summary_result(
@@ -862,9 +916,29 @@ def _render_business_view() -> None:
     if request.entry_mode == DecisionConsoleEntryModeV2.PERIODIC_REPORT:
         result = _periodic_result()
         if result is None:
-            st.info(
-                "当前还没有真实 Periodic Runtime Delivery。"
-            )
+            failure = _periodic_runtime_failure()
+
+            if failure is None:
+                st.info(
+                    "当前还没有真实 Periodic Runtime Delivery。"
+                )
+            else:
+                st.error(
+                    "Periodic Runtime 未形成可交付结果；"
+                    "安全诊断摘要已保留，可用于定位而不泄露敏感数据。"
+                )
+                st.write(
+                    "失败阶段：",
+                    failure["failure_stage"],
+                )
+                st.write(
+                    "异常类型：",
+                    failure["exception_type"],
+                )
+                st.caption(
+                    "诊断 ID："
+                    f'{failure["diagnostic_id"]}'
+                )
             return
 
         _render_periodic_comparison_business(
@@ -1288,7 +1362,17 @@ def _render_engineering_view() -> None:
     ):
         periodic = _periodic_result()
         if periodic is None:
-            st.info("当前还没有 Periodic Runtime Result。")
+            failure = _periodic_runtime_failure()
+
+            if failure is None:
+                st.info("当前还没有 Periodic Runtime Result。")
+            else:
+                st.error("Periodic Runtime Failure（安全摘要）")
+                st.json(failure)
+                st.caption(
+                    "只保留 failure stage / exception type / diagnostic id；"
+                    "不显示 raw SQL、parameters、rows、URL 或 secret。"
+                )
             return
 
         st.metric("运行时交付状态", periodic.status.value)
@@ -1423,6 +1507,7 @@ def _submit_investigation(question: str) -> None:
 
     st.session_state["runtime_delivery"] = result
     st.session_state.pop("periodic_runtime_delivery", None)
+    st.session_state.pop("periodic_runtime_failure", None)
     st.session_state.pop("breakdown_summary", None)
 
     if (
@@ -1861,6 +1946,7 @@ def _submit_periodic_report(
     st.session_state.pop("runtime_delivery", None)
     st.session_state.pop("breakdown_summary", None)
     st.session_state.pop("periodic_runtime_delivery", None)
+    st.session_state.pop("periodic_runtime_failure", None)
     st.session_state.pop("agentic_delivery", None)
     _clear_agentic_hitl_state()
 
@@ -1877,18 +1963,32 @@ def _submit_periodic_report(
                 )
             )
         except GovernanceConfigurationError as exc:
+            diagnostic_id = f"d93-periodic-{uuid4().hex[:12]}"
+            st.session_state["periodic_runtime_failure"] = {
+                "failure_stage": "governance_configuration",
+                "exception_type": type(exc).__name__,
+                "diagnostic_id": diagnostic_id,
+            }
             st.error("Governance Runtime 配置未准备好。")
-            st.code(str(exc))
+            st.caption(f"诊断 ID：{diagnostic_id}")
             return
         except Exception as exc:  # noqa: BLE001
+            diagnostic_id = f"d93-periodic-{uuid4().hex[:12]}"
+            st.session_state["periodic_runtime_failure"] = {
+                "failure_stage": "periodic_runtime_call",
+                "exception_type": type(exc).__name__,
+                "diagnostic_id": diagnostic_id,
+            }
             st.error(
                 "Periodic Runtime 调用发生未预期错误；"
                 "没有生成替代报表。"
             )
-            st.code(f"{type(exc).__name__}: {exc}")
+            st.write("异常类型：", type(exc).__name__)
+            st.caption(f"诊断 ID：{diagnostic_id}")
             return
 
     st.session_state["periodic_runtime_delivery"] = result
+    st.session_state.pop("periodic_runtime_failure", None)
 
 
 def main() -> None:
@@ -1945,11 +2045,28 @@ def main() -> None:
                 anchor_help,
             ) = _periodic_anchor_ui_v2(cadence)
 
+            anchor_state_key = (
+                _periodic_anchor_state_key_v2(cadence)
+            )
+
+            if anchor_state_key not in st.session_state:
+                st.session_state[anchor_state_key] = (
+                    default_anchor
+                )
+            elif (
+                st.session_state[anchor_state_key]
+                > max_anchor
+            ):
+                # 防止系统日期推进后残留一个超出当前允许范围的值。
+                st.session_state[anchor_state_key] = (
+                    max_anchor
+                )
+
             anchor_date = st.date_input(
                 anchor_label,
-                value=default_anchor,
                 max_value=max_anchor,
                 help=anchor_help,
+                key=anchor_state_key,
             )
 
             submitted = st.form_submit_button(
