@@ -117,7 +117,24 @@ def _runtime_result() -> RuntimeDeliveryBridgeResultV2 | None:
 
 def _periodic_result() -> MonthlyContributionDeliveryResultV2 | None:
     value = st.session_state.get("periodic_runtime_delivery")
-    if isinstance(value, MonthlyContributionDeliveryResultV2):
+    matched = isinstance(
+        value,
+        MonthlyContributionDeliveryResultV2,
+    )
+
+    _update_periodic_runtime_trace_v2(
+        render_session_has_delivery=(
+            "periodic_runtime_delivery" in st.session_state
+        ),
+        render_session_value_type=(
+            type(value).__name__
+            if value is not None
+            else None
+        ),
+        render_isinstance_match=matched,
+    )
+
+    if matched:
         return value
     return None
 
@@ -173,6 +190,71 @@ def _periodic_anchor_state_key_v2(cadence: str) -> str:
     """
 
     return f"periodic_anchor_date::{cadence}"
+
+
+def _update_periodic_runtime_trace_v2(
+    **fields: object,
+) -> None:
+    """
+    更新 Day93 Periodic Lifecycle Trace。
+
+    Trace 只记录控制流与类型级信息，不记录：
+    - SQL / parameters；
+    - raw rows；
+    - 数据库连接信息；
+    - secret；
+    - exception message。
+    """
+
+    current = st.session_state.get(
+        "periodic_runtime_trace",
+        {},
+    )
+
+    if not isinstance(current, dict):
+        current = {}
+
+    updated = dict(current)
+
+    for key, value in fields.items():
+        if value is None:
+            updated[key] = None
+        elif isinstance(value, (str, int, float, bool)):
+            updated[key] = value
+        elif isinstance(value, date):
+            updated[key] = value.isoformat()
+        else:
+            updated[key] = str(value)
+
+    st.session_state["periodic_runtime_trace"] = updated
+
+
+def _periodic_runtime_trace_v2() -> dict[str, object] | None:
+    value = st.session_state.get("periodic_runtime_trace")
+
+    if not isinstance(value, dict) or not value:
+        return None
+
+    return dict(value)
+
+
+def _render_periodic_runtime_trace_v2() -> None:
+    trace = _periodic_runtime_trace_v2()
+
+    if trace is None:
+        st.caption("当前没有 Day93 Periodic Lifecycle Trace。")
+        return
+
+    with st.expander(
+        "Day93 诊断｜Periodic Lifecycle Trace",
+        expanded=True,
+    ):
+        st.json(trace)
+
+    st.caption(
+        "Trace 仅包含 widget / request / runtime / session-state "
+        "生命周期信息；不包含 SQL、parameters、raw rows 或 secret。"
+    )
 
 
 def _breakdown_summary_result(
@@ -939,12 +1021,14 @@ def _render_business_view() -> None:
                     "诊断 ID："
                     f'{failure["diagnostic_id"]}'
                 )
+            _render_periodic_runtime_trace_v2()
             return
 
         _render_periodic_comparison_business(
             result,
             cadence=request.report_cadence,
         )
+        _render_periodic_runtime_trace_v2()
         return
 
     result = _runtime_result()
@@ -1373,9 +1457,11 @@ def _render_engineering_view() -> None:
                     "只保留 failure stage / exception type / diagnostic id；"
                     "不显示 raw SQL、parameters、rows、URL 或 secret。"
                 )
+            _render_periodic_runtime_trace_v2()
             return
 
         st.metric("运行时交付状态", periodic.status.value)
+        _render_periodic_runtime_trace_v2()
 
         with st.expander("查看本期 Channel Safe Runtime Result"):
             st.json(
@@ -1931,16 +2017,41 @@ def _submit_periodic_report(
     *,
     cadence: str,
     anchor_date: date,
+    widget_state_value: date | None = None,
 ) -> None:
+    submit_id = f"d93-submit-{uuid4().hex[:12]}"
+
+    st.session_state["periodic_runtime_trace"] = {
+        "submit_id": submit_id,
+        "stage": "submit_received",
+        "cadence": cadence,
+        "widget_return_anchor": anchor_date.isoformat(),
+        "widget_session_anchor": (
+            widget_state_value.isoformat()
+            if isinstance(widget_state_value, date)
+            else None
+        ),
+    }
+
     try:
         request = _build_periodic_report_request(
             cadence=cadence,
             anchor_date=anchor_date,
         )
     except (ValidationError, ValueError) as exc:
+        _update_periodic_runtime_trace_v2(
+            stage="entry_validation_failed",
+            exception_type=type(exc).__name__,
+        )
         st.error("入口请求未通过合同校验。")
         st.code(str(exc))
         return
+
+    _update_periodic_runtime_trace_v2(
+        stage="request_built",
+        request_anchor=request.report_anchor_date,
+        request_cadence=request.report_cadence.value,
+    )
 
     st.session_state["entry_request"] = request
     st.session_state.pop("runtime_delivery", None)
@@ -1950,12 +2061,25 @@ def _submit_periodic_report(
     st.session_state.pop("agentic_delivery", None)
     _clear_agentic_hitl_state()
 
+    _update_periodic_runtime_trace_v2(
+        stage="runtime_call_starting",
+        entry_request_in_session=(
+            "entry_request" in st.session_state
+        ),
+        delivery_present_before_runtime=(
+            "periodic_runtime_delivery" in st.session_state
+        ),
+    )
+
     with st.spinner(
         "正在执行 Overall / Channel Governed Query → "
         "Result Protection → Evidence → Periodic Comparison "
         "→ Contribution（如允许）..."
     ):
         try:
+            _update_periodic_runtime_trace_v2(
+                stage="runtime_call_started",
+            )
             result = (
                 run_day89_periodic_gmv_channel_contribution_v2(
                     cadence=request.report_cadence,
@@ -1964,6 +2088,11 @@ def _submit_periodic_report(
             )
         except GovernanceConfigurationError as exc:
             diagnostic_id = f"d93-periodic-{uuid4().hex[:12]}"
+            _update_periodic_runtime_trace_v2(
+                stage="runtime_exception",
+                exception_type=type(exc).__name__,
+                diagnostic_id=diagnostic_id,
+            )
             st.session_state["periodic_runtime_failure"] = {
                 "failure_stage": "governance_configuration",
                 "exception_type": type(exc).__name__,
@@ -1974,6 +2103,11 @@ def _submit_periodic_report(
             return
         except Exception as exc:  # noqa: BLE001
             diagnostic_id = f"d93-periodic-{uuid4().hex[:12]}"
+            _update_periodic_runtime_trace_v2(
+                stage="runtime_exception",
+                exception_type=type(exc).__name__,
+                diagnostic_id=diagnostic_id,
+            )
             st.session_state["periodic_runtime_failure"] = {
                 "failure_stage": "periodic_runtime_call",
                 "exception_type": type(exc).__name__,
@@ -1987,7 +2121,38 @@ def _submit_periodic_report(
             st.caption(f"诊断 ID：{diagnostic_id}")
             return
 
+    _update_periodic_runtime_trace_v2(
+        stage="runtime_returned",
+        runtime_result_type=type(result).__name__,
+        runtime_result_status=(
+            result.status.value
+            if hasattr(result, "status")
+            else None
+        ),
+    )
+
     st.session_state["periodic_runtime_delivery"] = result
+
+    stored = st.session_state.get(
+        "periodic_runtime_delivery"
+    )
+
+    _update_periodic_runtime_trace_v2(
+        stage="session_written",
+        session_has_delivery_after_write=(
+            "periodic_runtime_delivery" in st.session_state
+        ),
+        session_value_type_after_write=(
+            type(stored).__name__
+            if stored is not None
+            else None
+        ),
+        session_isinstance_after_write=isinstance(
+            stored,
+            MonthlyContributionDeliveryResultV2,
+        ),
+    )
+
     st.session_state.pop("periodic_runtime_failure", None)
 
 
@@ -2075,9 +2240,18 @@ def main() -> None:
             )
 
         if submitted:
+            widget_state_value = st.session_state.get(
+                anchor_state_key
+            )
+
             _submit_periodic_report(
                 cadence=cadence,
                 anchor_date=anchor_date,
+                widget_state_value=(
+                    widget_state_value
+                    if isinstance(widget_state_value, date)
+                    else None
+                ),
             )
 
     st.divider()
