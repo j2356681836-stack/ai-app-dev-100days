@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from uuid import uuid4
 
 import pandas as pd
@@ -236,6 +236,56 @@ def _periodic_runtime_trace_v2() -> dict[str, object] | None:
         return None
 
     return dict(value)
+
+
+def _log_periodic_lifecycle_v2(
+    *,
+    submit_id: str,
+    event: str,
+    anchor_date: date | None = None,
+    cadence: str | None = None,
+    result_type: str | None = None,
+    result_status: str | None = None,
+    exception_type: str | None = None,
+    diagnostic_id: str | None = None,
+) -> None:
+    """
+    输出 Day93 Periodic server-side lifecycle 日志。
+
+    仅记录控制流与类型级信息；禁止记录：
+    - SQL / parameters；
+    - raw rows；
+    - database URL；
+    - secret；
+    - exception message。
+    """
+
+    fields = {
+        "ts_utc": datetime.now(timezone.utc).isoformat(),
+        "submit_id": submit_id,
+        "event": event,
+        "anchor": (
+            anchor_date.isoformat()
+            if isinstance(anchor_date, date)
+            else None
+        ),
+        "cadence": cadence,
+        "result_type": result_type,
+        "result_status": result_status,
+        "exception_type": exception_type,
+        "diagnostic_id": diagnostic_id,
+    }
+
+    payload = " ".join(
+        f"{key}={value}"
+        for key, value in fields.items()
+        if value is not None
+    )
+
+    print(
+        f"[D93_PERIODIC] {payload}",
+        flush=True,
+    )
 
 
 def _render_periodic_runtime_trace_v2() -> None:
@@ -2033,6 +2083,13 @@ def _submit_periodic_report(
         ),
     }
 
+    _log_periodic_lifecycle_v2(
+        submit_id=submit_id,
+        event="submit_received",
+        anchor_date=anchor_date,
+        cadence=cadence,
+    )
+
     try:
         request = _build_periodic_report_request(
             cadence=cadence,
@@ -2043,6 +2100,13 @@ def _submit_periodic_report(
             stage="entry_validation_failed",
             exception_type=type(exc).__name__,
         )
+        _log_periodic_lifecycle_v2(
+            submit_id=submit_id,
+            event="entry_validation_failed",
+            anchor_date=anchor_date,
+            cadence=cadence,
+            exception_type=type(exc).__name__,
+        )
         st.error("入口请求未通过合同校验。")
         st.code(str(exc))
         return
@@ -2051,6 +2115,13 @@ def _submit_periodic_report(
         stage="request_built",
         request_anchor=request.report_anchor_date,
         request_cadence=request.report_cadence.value,
+    )
+
+    _log_periodic_lifecycle_v2(
+        submit_id=submit_id,
+        event="request_built",
+        anchor_date=request.report_anchor_date,
+        cadence=request.report_cadence.value,
     )
 
     st.session_state["entry_request"] = request
@@ -2080,6 +2151,12 @@ def _submit_periodic_report(
             _update_periodic_runtime_trace_v2(
                 stage="runtime_call_started",
             )
+            _log_periodic_lifecycle_v2(
+                submit_id=submit_id,
+                event="runtime_start",
+                anchor_date=request.report_anchor_date,
+                cadence=request.report_cadence.value,
+            )
             result = (
                 run_day89_periodic_gmv_channel_contribution_v2(
                     cadence=request.report_cadence,
@@ -2090,6 +2167,14 @@ def _submit_periodic_report(
             diagnostic_id = f"d93-periodic-{uuid4().hex[:12]}"
             _update_periodic_runtime_trace_v2(
                 stage="runtime_exception",
+                exception_type=type(exc).__name__,
+                diagnostic_id=diagnostic_id,
+            )
+            _log_periodic_lifecycle_v2(
+                submit_id=submit_id,
+                event="runtime_exception",
+                anchor_date=request.report_anchor_date,
+                cadence=request.report_cadence.value,
                 exception_type=type(exc).__name__,
                 diagnostic_id=diagnostic_id,
             )
@@ -2108,6 +2193,14 @@ def _submit_periodic_report(
                 exception_type=type(exc).__name__,
                 diagnostic_id=diagnostic_id,
             )
+            _log_periodic_lifecycle_v2(
+                submit_id=submit_id,
+                event="runtime_exception",
+                anchor_date=request.report_anchor_date,
+                cadence=request.report_cadence.value,
+                exception_type=type(exc).__name__,
+                diagnostic_id=diagnostic_id,
+            )
             st.session_state["periodic_runtime_failure"] = {
                 "failure_stage": "periodic_runtime_call",
                 "exception_type": type(exc).__name__,
@@ -2121,14 +2214,25 @@ def _submit_periodic_report(
             st.caption(f"诊断 ID：{diagnostic_id}")
             return
 
+    result_status = (
+        result.status.value
+        if hasattr(result, "status")
+        else None
+    )
+
     _update_periodic_runtime_trace_v2(
         stage="runtime_returned",
         runtime_result_type=type(result).__name__,
-        runtime_result_status=(
-            result.status.value
-            if hasattr(result, "status")
-            else None
-        ),
+        runtime_result_status=result_status,
+    )
+
+    _log_periodic_lifecycle_v2(
+        submit_id=submit_id,
+        event="runtime_return",
+        anchor_date=request.report_anchor_date,
+        cadence=request.report_cadence.value,
+        result_type=type(result).__name__,
+        result_status=result_status,
     )
 
     st.session_state["periodic_runtime_delivery"] = result
@@ -2150,6 +2254,26 @@ def _submit_periodic_report(
         session_isinstance_after_write=isinstance(
             stored,
             MonthlyContributionDeliveryResultV2,
+        ),
+    )
+
+    _log_periodic_lifecycle_v2(
+        submit_id=submit_id,
+        event="session_written",
+        anchor_date=request.report_anchor_date,
+        cadence=request.report_cadence.value,
+        result_type=(
+            type(stored).__name__
+            if stored is not None
+            else None
+        ),
+        result_status=(
+            stored.status.value
+            if (
+                stored is not None
+                and hasattr(stored, "status")
+            )
+            else None
         ),
     )
 
