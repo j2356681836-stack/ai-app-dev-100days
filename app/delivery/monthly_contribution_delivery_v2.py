@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import Any
@@ -85,6 +86,50 @@ from app.semantic_layer.time_comparison_contract_v2 import (
 MONTHLY_CONTRIBUTION_DELIVERY_VERSION = (
     "day89_monthly_contribution_delivery_v2_0"
 )
+
+
+def _log_day93_periodic_internal_stage_v2(
+    *,
+    trace_id: str,
+    anchor_date,
+    stage: str,
+    status: str | None = None,
+) -> None:
+    """
+    输出 Day93 Periodic Runtime 内部分段日志。
+
+    仅记录：
+    - trace_id；
+    - UTC 时间；
+    - anchor；
+    - stage；
+    - status（如有）。
+
+    不记录 SQL、parameters、raw rows、数据库连接信息或 secret。
+    """
+
+    fields = {
+        "ts_utc": datetime.now(timezone.utc).isoformat(),
+        "trace_id": trace_id,
+        "anchor": (
+            anchor_date.isoformat()
+            if hasattr(anchor_date, "isoformat")
+            else str(anchor_date)
+        ),
+        "stage": stage,
+        "status": status,
+    }
+
+    payload = " ".join(
+        f"{key}={value}"
+        for key, value in fields.items()
+        if value is not None
+    )
+
+    print(
+        f"[D93_PERIODIC_INTERNAL] {payload}",
+        flush=True,
+    )
 
 
 class MonthlyContributionDeliveryStatusV2(str, Enum):
@@ -681,10 +726,32 @@ def run_day89_monthly_gmv_channel_contribution_v2(
     本函数不计算 Anomaly，不声明 causality。
     """
 
+    internal_trace_id = (
+        f"d93-internal-{uuid4().hex[:12]}"
+    )
+
+    _log_day93_periodic_internal_stage_v2(
+        trace_id=internal_trace_id,
+        anchor_date=anchor_date,
+        stage="config_start",
+    )
+
     active_config = (
         runtime_config
         if runtime_config is not None
         else load_governance_runtime_config()
+    )
+
+    _log_day93_periodic_internal_stage_v2(
+        trace_id=internal_trace_id,
+        anchor_date=anchor_date,
+        stage="config_done",
+    )
+
+    _log_day93_periodic_internal_stage_v2(
+        trace_id=internal_trace_id,
+        anchor_date=anchor_date,
+        stage="overall_comparison_start",
     )
 
     comparison_delivery = run_day89_monthly_gmv_report_v2(
@@ -693,12 +760,25 @@ def run_day89_monthly_gmv_channel_contribution_v2(
         execution_policy=execution_policy,
     )
 
+    _log_day93_periodic_internal_stage_v2(
+        trace_id=internal_trace_id,
+        anchor_date=anchor_date,
+        stage="overall_comparison_done",
+        status=comparison_delivery.status.value,
+    )
+
     if (
         comparison_delivery.status
         != RuntimeComparisonDeliveryStatusV2.READY
         or comparison_delivery.delivery is None
         or comparison_delivery.metric_comparison_result is None
     ):
+        _log_day93_periodic_internal_stage_v2(
+            trace_id=internal_trace_id,
+            anchor_date=anchor_date,
+            stage="function_return",
+            status="comparison_not_ready",
+        )
         return _failed(
             status=(
                 MonthlyContributionDeliveryStatusV2
@@ -712,7 +792,20 @@ def run_day89_monthly_gmv_channel_contribution_v2(
         )
 
     comparison = comparison_delivery.comparison
+
+    _log_day93_periodic_internal_stage_v2(
+        trace_id=internal_trace_id,
+        anchor_date=anchor_date,
+        stage="channel_binding_start",
+    )
+
     binding = build_day89_channel_tool_binding_v2()
+
+    _log_day93_periodic_internal_stage_v2(
+        trace_id=internal_trace_id,
+        anchor_date=anchor_date,
+        stage="channel_binding_done",
+    )
 
     base_id = (
         f"day89-monthly-contribution-"
@@ -720,6 +813,12 @@ def run_day89_monthly_gmv_channel_contribution_v2(
     )
 
     current_request_id = f"{base_id}-current-channel"
+
+    _log_day93_periodic_internal_stage_v2(
+        trace_id=internal_trace_id,
+        anchor_date=anchor_date,
+        stage="current_channel_start",
+    )
 
     current_channel_result = invoke_governed_plan_delivery_v2(
         context=build_day89_local_access_context_v2(
@@ -736,11 +835,24 @@ def run_day89_monthly_gmv_channel_contribution_v2(
         event_id=current_request_id,
     )
 
+    _log_day93_periodic_internal_stage_v2(
+        trace_id=internal_trace_id,
+        anchor_date=anchor_date,
+        stage="current_channel_done",
+        status=current_channel_result.status.value,
+    )
+
     if (
         current_channel_result.status
         != RuntimeDeliveryBridgeStatusV2.READY
         or current_channel_result.delivery is None
     ):
+        _log_day93_periodic_internal_stage_v2(
+            trace_id=internal_trace_id,
+            anchor_date=anchor_date,
+            stage="function_return",
+            status="current_channel_not_ready",
+        )
         return _failed(
             status=(
                 MonthlyContributionDeliveryStatusV2
@@ -755,6 +867,12 @@ def run_day89_monthly_gmv_channel_contribution_v2(
         )
 
     reference_request_id = f"{base_id}-reference-channel"
+
+    _log_day93_periodic_internal_stage_v2(
+        trace_id=internal_trace_id,
+        anchor_date=anchor_date,
+        stage="reference_channel_start",
+    )
 
     reference_channel_result = invoke_governed_plan_delivery_v2(
         context=build_day89_local_access_context_v2(
@@ -771,11 +889,24 @@ def run_day89_monthly_gmv_channel_contribution_v2(
         event_id=reference_request_id,
     )
 
+    _log_day93_periodic_internal_stage_v2(
+        trace_id=internal_trace_id,
+        anchor_date=anchor_date,
+        stage="reference_channel_done",
+        status=reference_channel_result.status.value,
+    )
+
     if (
         reference_channel_result.status
         != RuntimeDeliveryBridgeStatusV2.READY
         or reference_channel_result.delivery is None
     ):
+        _log_day93_periodic_internal_stage_v2(
+            trace_id=internal_trace_id,
+            anchor_date=anchor_date,
+            stage="function_return",
+            status="reference_channel_not_ready",
+        )
         return _failed(
             status=(
                 MonthlyContributionDeliveryStatusV2
@@ -791,6 +922,12 @@ def run_day89_monthly_gmv_channel_contribution_v2(
         )
 
     try:
+        _log_day93_periodic_internal_stage_v2(
+            trace_id=internal_trace_id,
+            anchor_date=anchor_date,
+            stage="trust_linkage_start",
+        )
+
         current_overall, reference_overall = (
             _comparison_overall_records(
                 comparison_delivery
@@ -822,8 +959,20 @@ def run_day89_monthly_gmv_channel_contribution_v2(
             comparison=comparison,
         )
 
+        _log_day93_periodic_internal_stage_v2(
+            trace_id=internal_trace_id,
+            anchor_date=anchor_date,
+            stage="trust_linkage_done",
+        )
+
         metric_comparison = (
             comparison_delivery.metric_comparison_result
+        )
+
+        _log_day93_periodic_internal_stage_v2(
+            trace_id=internal_trace_id,
+            anchor_date=anchor_date,
+            stage="contribution_start",
         )
 
         contribution = analyze_additive_contribution_v2(
@@ -842,6 +991,13 @@ def run_day89_monthly_gmv_channel_contribution_v2(
             reference_members=_channel_observations(
                 reference_channel
             ),
+        )
+
+        _log_day93_periodic_internal_stage_v2(
+            trace_id=internal_trace_id,
+            anchor_date=anchor_date,
+            stage="contribution_done",
+            status=contribution.reconciliation_status.value,
         )
 
         parent_ids = (
@@ -869,6 +1025,12 @@ def run_day89_monthly_gmv_channel_contribution_v2(
             )
         )
 
+        _log_day93_periodic_internal_stage_v2(
+            trace_id=internal_trace_id,
+            anchor_date=anchor_date,
+            stage="evidence_build_start",
+        )
+
         derived = build_contribution_evidence_record_v2(
             evidence_reference=contribution_ref,
             current_overall_evidence_id=(
@@ -885,12 +1047,25 @@ def run_day89_monthly_gmv_channel_contribution_v2(
             ),
         )
 
+        _log_day93_periodic_internal_stage_v2(
+            trace_id=internal_trace_id,
+            anchor_date=anchor_date,
+            stage="evidence_build_done",
+            status=derived.status.value,
+        )
+
         if (
             not derived.success
             or derived.status
             != DerivedEvidenceBuildStatusV2.BUILT
             or derived.record is None
         ):
+            _log_day93_periodic_internal_stage_v2(
+                trace_id=internal_trace_id,
+                anchor_date=anchor_date,
+                stage="function_return",
+                status="evidence_build_failed",
+            )
             return _failed(
                 status=(
                     MonthlyContributionDeliveryStatusV2
@@ -909,6 +1084,12 @@ def run_day89_monthly_gmv_channel_contribution_v2(
             current_overall.provenance.scope_summary
             if current_overall.provenance is not None
             else None
+        )
+
+        _log_day93_periodic_internal_stage_v2(
+            trace_id=internal_trace_id,
+            anchor_date=anchor_date,
+            stage="delivery_assembly_start",
         )
 
         scope = AnalysisScopeV2(
@@ -984,7 +1165,19 @@ def run_day89_monthly_gmv_channel_contribution_v2(
             console_view=console,
         )
 
+        _log_day93_periodic_internal_stage_v2(
+            trace_id=internal_trace_id,
+            anchor_date=anchor_date,
+            stage="delivery_assembly_done",
+        )
+
     except ValueError as exc:
+        _log_day93_periodic_internal_stage_v2(
+            trace_id=internal_trace_id,
+            anchor_date=anchor_date,
+            stage="function_return",
+            status="trust_linkage_mismatch",
+        )
         return _failed(
             status=(
                 MonthlyContributionDeliveryStatusV2
@@ -995,6 +1188,13 @@ def run_day89_monthly_gmv_channel_contribution_v2(
             current_channel_result=current_channel_result,
             reference_channel_result=reference_channel_result,
         )
+
+    _log_day93_periodic_internal_stage_v2(
+        trace_id=internal_trace_id,
+        anchor_date=anchor_date,
+        stage="function_return",
+        status="ready",
+    )
 
     return MonthlyContributionDeliveryResultV2(
         status=MonthlyContributionDeliveryStatusV2.READY,
