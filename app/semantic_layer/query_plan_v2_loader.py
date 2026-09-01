@@ -1,3 +1,4 @@
+from functools import lru_cache
 from pathlib import Path
 
 import yaml
@@ -24,6 +25,7 @@ def _query_plan_v2_path() -> Path:
     )
 
 
+@lru_cache(maxsize=1)
 def load_query_plan_v2_catalog() -> QueryPlanCatalogV2:
     """
     加载并验证 Dataset V2 Query Plan Catalog。
@@ -33,7 +35,8 @@ def load_query_plan_v2_catalog() -> QueryPlanCatalogV2:
     - 不回退到 V1 metadata/query_plans.yaml；
     - YAML 解析错误直接暴露；
     - Pydantic Contract 校验错误直接暴露；
-    - 成功后返回不可变 QueryPlanCatalogV2。
+    - 成功后返回不可变 QueryPlanCatalogV2；
+    - 进程内只解析一次，避免每次 lookup 重读并重验整份 Catalog。
     """
     query_plans_path = _query_plan_v2_path()
 
@@ -45,6 +48,19 @@ def load_query_plan_v2_catalog() -> QueryPlanCatalogV2:
 
     return QueryPlanCatalogV2.model_validate(data)
 
+
+
+def clear_query_plan_v2_catalog_cache() -> None:
+    """
+    显式清理进程内 Query Plan Catalog 缓存。
+
+    生产运行中 metadata/beauty_bi_v2/query_plans.yaml 应视为
+    server-owned immutable contract；正常请求不需要清理缓存。
+
+    仅在开发 / 测试流程中重新生成 query_plans.yaml 后，
+    如同一 Python 进程仍需读取新版本，才调用本函数。
+    """
+    load_query_plan_v2_catalog.cache_clear()
 
 def get_query_plan_v2_by_name(
     plan_name: str,

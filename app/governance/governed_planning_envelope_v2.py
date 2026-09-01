@@ -24,6 +24,9 @@ from app.governance.sensitive_data import (
     ResultProtectionContract,
 )
 from app.semantic_layer.query_plan_v2_models import QueryPlanV2
+from app.semantic_layer.requested_scope_resolution_v2 import (
+    RequestedScopeResolutionV2,
+)
 from app.semantic_layer.time_window_binding_v2 import (
     TimeBindingContractV2,
     TimeBindingDecisionV2,
@@ -208,6 +211,7 @@ class GovernedPlanningEnvelopeV2(BaseModel):
     resource_authorization: AuthorizationDecision
 
     time_binding: TimeBindingContractV2
+    requested_scope: RequestedScopeResolutionV2 | None = None
     scope_binding: QueryPlanScopeBindingContractV2
     result_protection_contract: ResultProtectionContract
 
@@ -401,6 +405,7 @@ class GovernedPlanningEnvelopeV2(BaseModel):
                 time_binding_fingerprint=(
                     self.time_binding.contract_fingerprint
                 ),
+                requested_scope=self.requested_scope,
                 scope_binding_fingerprint=(
                     self.scope_binding.contract_fingerprint
                 ),
@@ -568,6 +573,7 @@ def _build_envelope_fingerprint(
     required_columns: frozenset[str],
     authorization_policy_version: str,
     time_binding_fingerprint: str,
+    requested_scope: RequestedScopeResolutionV2 | None,
     scope_binding_fingerprint: str,
     time_policy_name: str,
     time_policy_version: str,
@@ -597,6 +603,13 @@ def _build_envelope_fingerprint(
             ),
             "time_binding_fingerprint": (
                 time_binding_fingerprint
+            ),
+            **(
+                {
+                    "requested_scope": requested_scope,
+                }
+                if requested_scope is not None
+                else {}
             ),
             "scope_binding_fingerprint": (
                 scope_binding_fingerprint
@@ -656,6 +669,7 @@ def build_governed_planning_envelope_v2(
     context: AccessContext,
     plan: QueryPlanV2,
     time_resolution: TimeWindowResolutionV2,
+    requested_scope: RequestedScopeResolutionV2 | None = None,
 ) -> GovernedPlanningDecisionV2:
     """
     Build the only pre-compilation contract that may cross the
@@ -777,6 +791,7 @@ def build_governed_planning_envelope_v2(
         bind_query_plan_scope_v2(
             context=context,
             plan=plan,
+            requested_scope=requested_scope,
         )
     )
 
@@ -863,6 +878,7 @@ def build_governed_planning_envelope_v2(
             time_binding_fingerprint=(
                 time_contract.contract_fingerprint
             ),
+            requested_scope=requested_scope,
             scope_binding_fingerprint=(
                 scope_contract.contract_fingerprint
             ),
@@ -897,6 +913,7 @@ def build_governed_planning_envelope_v2(
         metric_authorization=metric_authorization,
         resource_authorization=resource_authorization,
         time_binding=time_contract,
+        requested_scope=requested_scope,
         scope_binding=scope_contract,
         result_protection_contract=(
             plan.to_result_protection_contract()

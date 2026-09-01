@@ -3,13 +3,18 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal
 from enum import Enum
+from hashlib import sha256
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
 from app.agents.evidence_pack_delivery_v2 import (
     EvidencePackDeliveryV2,
+)
+from app.agents.focused_change_breakdown_v2 import (
+    FocusedChangeDimensionV2,
 )
 from app.agents.clarification_resolution_v2 import (
     ClarificationResolutionContractV2,
@@ -50,6 +55,23 @@ from app.agents.investigation_planner_v2 import (
     PlannerDecisionTypeV2,
     PlannerDecisionV2,
 )
+from app.agents.investigation_route_v2 import (
+    GeographyLevelV2,
+    InvestigationDecisionOwnerV2,
+    InvestigationNextDimensionV2,
+    InvestigationRouteV2,
+    InvestigationScopeStrategyV2,
+)
+from app.agents.geography_hierarchy_v2 import (
+    GeographyFocusScopeV2,
+    build_geography_focus_scope_v2,
+    get_geography_member_v2,
+    merge_requested_scope_with_geography_focus_v2,
+    next_geography_level_v2,
+)
+from app.agents.investigation_step_assessment_v2 import (
+    ChangeConcentrationPatternV2,
+)
 from app.agents.investigation_tool_executor_v2 import (
     InvestigationToolExecutionResultV2,
     TrustedToolExecutionBindingV2,
@@ -76,6 +98,7 @@ from app.governance.governed_planning_envelope_v2 import (
     build_governed_planning_envelope_v2,
 )
 from app.governance.governed_finalization import (
+    FinalizationOutcome,
     GovernedFinalizationResult,
 )
 from app.governance.governed_query_execution_v2 import (
@@ -93,7 +116,24 @@ from app.semantic_layer.query_plan_compiler_v2 import (
 from app.semantic_layer.query_plan_v2_loader import (
     get_query_plan_v2_by_name,
 )
+from app.semantic_layer.requested_scope_resolution_v2 import (
+    RequestedScopeResolutionV2,
+)
+from app.delivery.investigation_focus_scope_v1 import (
+    InvestigationFocusScopeV1,
+    merge_requested_scope_with_investigation_focus_v1,
+)
+from app.delivery.focused_change_breakdown_delivery_v2 import (
+    FocusedChangeBreakdownDeliveryV2,
+    build_focused_change_breakdown_delivery_v2,
+    build_geography_focused_change_breakdown_delivery_v2,
+    build_global_change_breakdown_delivery_v2,
+)
+from app.delivery.decision_console_view_v2 import (
+    ProtectedBreakdownViewV2,
+)
 from app.semantic_layer.time_comparison_contract_v2 import (
+    TimeComparisonContractV2,
     TimeWindowReferenceV2,
 )
 from app.semantic_layer.time_window_resolver_v2 import (
@@ -207,6 +247,26 @@ class Day89InvestigationRuntimeStepResultV2(BaseModel):
         Day89GovernedQueryEvidenceContextV2 | None
     ) = None
 
+    # 由 Seed / Continuation / Clarification Resume 继承的
+    # server-trusted Requested Scope。不能从 UI 文本反向解析。
+    requested_scope: RequestedScopeResolutionV2 | None = None
+
+    # 受治理 Evidence 推荐并经后续调查动作确认的结构化焦点。
+    # 与用户原始 Requested Scope 分离保存。
+    investigation_focus_scope: InvestigationFocusScopeV1 | None = None
+
+    # Geography Focus is separate from Channel Investigation Focus.
+    geography_focus_scope: GeographyFocusScopeV2 | None = None
+
+    # Day93 F02:
+    # Planner 仍只选择一个 investigation action；
+    # 对 comparison-bearing Focus，Runtime 可追加一次 server-owned
+    # reference companion read，形成安全的两期变化分解。
+    # 这里只保存安全 Delivery，不包含 SQL / parameters。
+    focused_change_breakdown: (
+        FocusedChangeBreakdownDeliveryV2 | None
+    ) = None
+
     @model_validator(mode="after")
     def validate_result(
         self,
@@ -232,6 +292,7 @@ class Day89InvestigationRuntimeStepResultV2(BaseModel):
                     self.next_planner_decision,
                     self.stop_status,
                     self.governed_query_context,
+                    self.focused_change_breakdown,
                 )
             ):
                 raise ValueError(
@@ -316,7 +377,8 @@ class Day89PendingClarificationStateV2(BaseModel):
 
     只包含：
     - Day86 structured Investigation Session；
-    - server-owned Resolution Contract。
+    - server-owned Resolution Contract；
+    - server-trusted Requested Scope。
 
     不包含 governed_query_context / compiled SQL / parameters / secrets。
     """
@@ -328,6 +390,9 @@ class Day89PendingClarificationStateV2(BaseModel):
 
     session: InvestigationSessionStateV2
     resolution_contract: ClarificationResolutionContractV2
+    requested_scope: RequestedScopeResolutionV2 | None = None
+    investigation_focus_scope: InvestigationFocusScopeV1 | None = None
+    geography_focus_scope: GeographyFocusScopeV2 | None = None
 
     @model_validator(mode="after")
     def validate_state(
@@ -428,6 +493,9 @@ def build_day89_pending_clarification_state_v2(
     return Day89PendingClarificationStateV2(
         session=runtime_step.session_before,
         resolution_contract=resolution_contract,
+        requested_scope=runtime_step.requested_scope,
+        investigation_focus_scope=runtime_step.investigation_focus_scope,
+        geography_focus_scope=runtime_step.geography_focus_scope,
     )
 
 
@@ -443,7 +511,8 @@ class Day89InvestigationContinuationStateV2(BaseModel):
     - Executor closure；
     - Governance secret。
 
-    只保存 Day86 已定义的结构化 Session / STOP / Transition，
+    保存 Day86 已定义的结构化 Session / STOP / Transition，
+    并携带 server-trusted Requested Scope，
     供用户明确点击 Continue 后恢复下一轮。
     """
 
@@ -458,6 +527,9 @@ class Day89InvestigationContinuationStateV2(BaseModel):
     prior_transitions: tuple[
         InvestigationLoopTransitionV2, ...
     ]
+    requested_scope: RequestedScopeResolutionV2 | None = None
+    investigation_focus_scope: InvestigationFocusScopeV1 | None = None
+    geography_focus_scope: GeographyFocusScopeV2 | None = None
 
     @model_validator(mode="after")
     def validate_state(
@@ -528,6 +600,9 @@ def build_day89_continuation_state_v2(
         stopped_transition=runtime_step.transition,
         stop_status=runtime_step.stop_status,
         prior_transitions=transitions,
+        requested_scope=runtime_step.requested_scope,
+        investigation_focus_scope=runtime_step.investigation_focus_scope,
+        geography_focus_scope=runtime_step.geography_focus_scope,
     )
 
 
@@ -704,6 +779,9 @@ def run_one_investigation_step_v2(
     ],
     planner: PlannerInvokerV2,
     evidence_sufficient_after_step: bool = False,
+    trusted_remaining_actions_after_selected: tuple[
+        AvailableInvestigationActionV2, ...
+    ] | None = None,
 ) -> Day89InvestigationRuntimeStepResultV2:
     """
     执行恰好一个 Tool Step。
@@ -780,11 +858,63 @@ def run_one_investigation_step_v2(
     selected_action = first_decision.selected_action
     assert selected_action is not None
 
-    remaining_actions = tuple(
-        action
-        for action in planner_state.available_actions
-        if action.action_id != selected_action.action_id
-    )
+    if trusted_remaining_actions_after_selected is None:
+        remaining_actions = tuple(
+            action
+            for action in planner_state.available_actions
+            if action.action_id != selected_action.action_id
+        )
+    else:
+        # Clarification Resume 的执行 State 会被 deterministic resolver
+        # 临时收窄到用户明确选择的一个 Action。
+        # 但“本轮只能执行该 Action”不等于用户放弃 Session 中
+        # 原本剩余的其他合法调查方向。
+        #
+        # 这个 override 只允许在本动作执行后必然触发本轮 Budget STOP
+        # 时使用，避免把尚未建立 trusted bindings 的动作带入同一轮
+        # 自动 REPLAN。
+        next_steps_used = (
+            session.loop_state.investigation_steps_used + 1
+        )
+        if (
+            next_steps_used
+            < session.loop_state.budget_policy.max_investigation_steps
+        ):
+            raise ValueError(
+                "trusted_remaining_actions_after_selected 只能用于"
+                "当前动作后必然耗尽本轮 Investigation Budget 的路径。"
+            )
+
+        remaining_ids = tuple(
+            action.action_id
+            for action in trusted_remaining_actions_after_selected
+        )
+
+        if len(set(remaining_ids)) != len(remaining_ids):
+            raise ValueError(
+                "Clarification Resume remaining actions 不能重复。"
+            )
+
+        if selected_action.action_id in set(remaining_ids):
+            raise ValueError(
+                "用户已经执行的 Action 不能继续留在 Session remaining actions。"
+            )
+
+        completed_ids = set(
+            planner_state.completed_action_ids
+        )
+        leaked_completed = completed_ids.intersection(
+            remaining_ids
+        )
+        if leaked_completed:
+            raise ValueError(
+                "Clarification Resume 不能重新开放已完成 Action："
+                f"{sorted(leaked_completed)}"
+            )
+
+        remaining_actions = (
+            trusted_remaining_actions_after_selected
+        )
 
     with start_safe_span_v2(
         name="loop_control",
@@ -902,71 +1032,210 @@ def _day89_tool_contract_v2(
     )
 
 
+
+def _day93_gmv_action_v2(
+    *, action_id: str, plan_name: str, result_grain: str,
+) -> AvailableInvestigationActionV2:
+    return AvailableInvestigationActionV2(
+        action_id=action_id,
+        tool_contract=_day89_tool_contract_v2(result_grain=result_grain),
+        arguments=(
+            BoundToolArgumentV2(name="metric_name", value="gmv"),
+            BoundToolArgumentV2(name="query_plan_name", value=plan_name),
+            BoundToolArgumentV2(name="result_grain", value=result_grain),
+        ),
+    )
+
+
+def _day93_geography_action_v2(
+    level: GeographyLevelV2,
+) -> AvailableInvestigationActionV2:
+    action_id, plan_name, grain = {
+        GeographyLevelV2.AREA: ("drill_area", "gmv_area_v2", "area"),
+        GeographyLevelV2.PROVINCE: ("drill_province", "gmv_province_v2", "province"),
+        GeographyLevelV2.CITY: ("drill_city", "gmv_city_v2", "city"),
+    }[level]
+    return _day93_gmv_action_v2(
+        action_id=action_id, plan_name=plan_name, result_grain=grain
+    )
+
+
+
+
+def _day93_planner_for_action_id_v2(
+    action_id: str,
+    *,
+    rationale: str,
+) -> PlannerInvokerV2:
+    def planner(state: InvestigationStateV2) -> PlannerDecisionV2:
+        action = next(
+            (item for item in state.available_actions if item.action_id == action_id),
+            None,
+        )
+        if action is None:
+            raise ValueError(
+                f"Preferred Geography action 不在当前合法 Action Space：{action_id}"
+            )
+        if not state.insight.evidence:
+            raise ValueError("Preferred Geography action 需要 trusted evidence。")
+
+        return PlannerDecisionV2(
+            decision_type=PlannerDecisionTypeV2.SELECT_TOOL,
+            selected_action=action,
+            clarification_prompt=None,
+            rationale=rationale,
+            supporting_evidence_ids=(state.insight.evidence[-1].evidence_id,),
+        )
+
+    return planner
+
+
 def build_day89_gmv_investigation_actions_v2(
     *,
     delivery: EvidencePackDeliveryV2,
+    requested_scope: RequestedScopeResolutionV2 | None = None,
     include_category: bool = False,
+    include_legacy_region: bool = False,
 ) -> tuple[AvailableInvestigationActionV2, ...]:
+    """Initial production space: channel + area + optional category.
+
+    Province / City are NOT initial actions. They are dynamically unlocked only
+    by a reconciled DOMINANT parent Geography step. Legacy drill_region remains
+    opt-in only for the old clarification compatibility path.
     """
-    Day89 第一版生产 Action Catalog。
-
-    只开放已经在 Day86 PostgreSQL Loop 中验证过的：
-    - drill_channel -> gmv_channel_v2
-    - drill_region  -> gmv_region_v2
-
-    若 Seed Delivery 已经是某个 grain，则不重复开放相同方向。
-    """
-
     scope = delivery.evidence_pack.analysis_scope
-
     if scope.metric_name != "gmv":
-        raise ValueError(
-            "Day89 Agentic Runtime v2_0 只注册 GMV Investigation Actions。"
-        )
+        raise ValueError("Day93 Agentic Runtime 当前只注册 GMV Investigation Actions。")
 
     specs = [
         ("drill_channel", "gmv_channel_v2", "channel"),
-        ("drill_region", "gmv_region_v2", "region"),
+        ("drill_area", "gmv_area_v2", "area"),
+        ("drill_campaign", "gmv_campaign_v2", "campaign"),
     ]
-
+    if include_legacy_region:
+        specs.append(("drill_region", "gmv_region_v2", "region"))
     if include_category:
-        # HITL production path 显式开放已经存在于
-        # Dataset V2 Query Plan Catalog 的 GMV Category drill-down。
-        # 默认仍为 False，避免改变既有 one-step production contract。
-        specs.append(
-            ("drill_category", "gmv_category_v2", "category")
-        )
+        specs.append(("drill_category", "gmv_category_v2", "category"))
 
-    actions: list[AvailableInvestigationActionV2] = []
+    region_locked = bool(requested_scope is not None and requested_scope.region_codes)
+    channel_locked = bool(requested_scope is not None and requested_scope.channel_codes)
 
-    for action_id, plan_name, result_grain in specs:
-        if scope.result_grain == result_grain:
+    actions = []
+    for action_id, plan_name, grain in specs:
+        if scope.result_grain == grain:
             continue
+        if action_id in {"drill_area", "drill_region"} and region_locked:
+            continue
+        if action_id == "drill_channel" and channel_locked:
+            continue
+        actions.append(_day93_gmv_action_v2(
+            action_id=action_id, plan_name=plan_name, result_grain=grain
+        ))
+    return tuple(actions)
 
-        actions.append(
-            AvailableInvestigationActionV2(
-                action_id=action_id,
-                tool_contract=_day89_tool_contract_v2(
-                    result_grain=result_grain,
-                ),
-                arguments=(
-                    BoundToolArgumentV2(
-                        name="metric_name",
-                        value="gmv",
-                    ),
-                    BoundToolArgumentV2(
-                        name="query_plan_name",
-                        value=plan_name,
-                    ),
-                    BoundToolArgumentV2(
-                        name="result_grain",
-                        value=result_grain,
-                    ),
-                ),
+
+def _day93_action_id_from_route_v2(
+    route: InvestigationRouteV2,
+) -> str:
+    if route.next_dimension == InvestigationNextDimensionV2.CATEGORY:
+        return "drill_category"
+
+    if route.next_dimension == InvestigationNextDimensionV2.GEOGRAPHY:
+        level = route.geography_level or GeographyLevelV2.AREA
+        if level != GeographyLevelV2.AREA:
+            raise ValueError(
+                "Seed Geography Route 必须从 AREA 开始；Province / City "
+                "只能由上一层 Evidence 动态解锁。"
             )
+        return "drill_area"
+
+    raise ValueError(f"Unsupported route dimension: {route.next_dimension}")
+
+
+def _day93_planner_for_route_v2(
+    route: InvestigationRouteV2,
+) -> PlannerInvokerV2:
+    action_id = _day93_action_id_from_route_v2(route)
+
+    def planner(
+        state: InvestigationStateV2,
+    ) -> PlannerDecisionV2:
+        action = next(
+            (
+                item
+                for item in state.available_actions
+                if item.action_id == action_id
+            ),
+            None,
         )
 
-    return tuple(actions)
+        if action is None:
+            raise ValueError(
+                "Investigation Route 指向的 Action "
+                f"不在当前合法 Action Space：{action_id}"
+            )
+
+        available_evidence_ids = {
+            item.evidence_id
+            for item in state.insight.evidence
+        }
+        missing = (
+            set(route.supporting_evidence_ids)
+            - available_evidence_ids
+        )
+
+        if missing:
+            raise ValueError(
+                "Investigation Route supporting evidence "
+                "不在当前 Insight："
+                f"{sorted(missing)}"
+            )
+
+        return PlannerDecisionV2(
+            decision_type=PlannerDecisionTypeV2.SELECT_TOOL,
+            selected_action=action,
+            clarification_prompt=None,
+            rationale=route.rationale,
+            supporting_evidence_ids=(
+                route.supporting_evidence_ids
+            ),
+        )
+
+    return planner
+
+
+def _validate_day93_route_focus_binding_v2(
+    *,
+    route: InvestigationRouteV2,
+    investigation_focus_scope: InvestigationFocusScopeV1 | None,
+) -> None:
+    if route.decision_owner != InvestigationDecisionOwnerV2.SYSTEM:
+        raise ValueError(
+            "Production system-route entry 当前只接受 SYSTEM Route。"
+        )
+
+    if (
+        route.scope_strategy
+        == InvestigationScopeStrategyV2.KEEP_REQUESTED_SCOPE
+    ):
+        if investigation_focus_scope is not None:
+            raise ValueError(
+                "KEEP_REQUESTED_SCOPE Route 不能同时携带 Member Focus。"
+            )
+        return
+
+    if investigation_focus_scope is None:
+        raise ValueError(
+            "FOCUS_MEMBER Route 必须绑定 server-trusted Investigation Focus。"
+        )
+
+    if (
+        route.focus_member_key != investigation_focus_scope.member_key
+        or route.focus_member_label != investigation_focus_scope.member_label
+    ):
+        raise ValueError(
+            "Investigation Route Focus 与 server-trusted Focus Scope 不一致。"
+        )
 
 
 def _structured_time_resolution_v2(
@@ -1035,6 +1304,7 @@ def _prepare_day89_trusted_binding_v2(
     runtime_config: GovernanceRuntimeConfig,
     execution_policy: GovernedExecutionPolicy | None,
     event_id: str,
+    requested_scope: RequestedScopeResolutionV2 | None = None,
 ) -> _PreparedInvestigationBindingV2:
     """
     准备 server-trusted Tool Binding，同时保留 Evidence Builder
@@ -1059,6 +1329,7 @@ def _prepare_day89_trusted_binding_v2(
         time_resolution=_structured_time_resolution_v2(
             analysis_window
         ),
+        requested_scope=requested_scope,
     )
 
     if (
@@ -1129,6 +1400,381 @@ def _prepare_day89_trusted_binding_v2(
     )
 
 
+
+def _day93_scope_summary_from_envelope_v2(
+    envelope: GovernedPlanningEnvelopeV2,
+) -> str | None:
+    """
+    从实际 Governed Scope Binding 生成安全范围摘要。
+
+    Current / Reference companion read 必须得到同一摘要，
+    Focused Change Delivery 才允许继续计算。
+    """
+
+    scoped = envelope.scope_binding.scoped_query_contract
+    parameter_values = {
+        parameter.name: str(parameter.value)
+        for parameter in scoped.parameters
+    }
+
+    collected: dict[str, set[str]] = {}
+
+    for predicate in scoped.predicates:
+        dimension = predicate.dimension.value
+        values = collected.setdefault(dimension, set())
+
+        for name in predicate.parameter_names:
+            if name not in parameter_values:
+                raise ValueError(
+                    "Scope predicate references a missing parameter: "
+                    f"{name}"
+                )
+            values.add(parameter_values[name])
+
+    regions = tuple(sorted(collected.get("region", set())))
+    channels = tuple(sorted(collected.get("channel", set())))
+
+    parts: list[str] = []
+
+    if regions:
+        parts.append("地区代码：" + "、".join(regions))
+
+    if channels:
+        parts.append("渠道代码：" + "、".join(channels))
+
+    return "；".join(parts) if parts else None
+
+
+def _day93_query_evidence_id_v2(
+    *,
+    action_id: str,
+    finalization: GovernedFinalizationResult,
+) -> str:
+    """
+    与 Investigation Tool Executor 使用相同的安全 evidence-id 规则：
+    action_id + persisted audit fingerprint。
+    """
+
+    fingerprint = finalization.audit_event_fingerprint
+
+    if fingerprint is None:
+        raise ValueError(
+            "Focused Change Query 必须存在 audit_event_fingerprint。"
+        )
+
+    digest = sha256(
+        f"{action_id}|{fingerprint}".encode("utf-8")
+    ).hexdigest()[:16]
+
+    return f"ev_tool_{digest}"
+
+
+def _day93_protected_breakdown_from_prepared_v2(
+    *,
+    prepared: _PreparedInvestigationBindingV2,
+    analysis_window: TimeWindowReferenceV2,
+) -> ProtectedBreakdownViewV2:
+    """
+    将一次已经成功 Finalization 的 Governed Query
+    投影成 Focused Change Core 可消费的安全 Protected Breakdown。
+
+    不读取 raw executor rows；这里只读取 Finalization 已允许释放的 rows。
+    """
+
+    finalization = prepared.capture.finalization
+
+    if finalization is None:
+        raise ValueError(
+            "Focused Change Query 没有捕获 GovernedFinalizationResult。"
+        )
+
+    if (
+        finalization.outcome != FinalizationOutcome.SUCCEEDED
+        or not finalization.success
+    ):
+        raise ValueError(
+            "Focused Change companion query 未形成可释放结果："
+            f"outcome={finalization.outcome.value}; "
+            f"reason={finalization.reason_code.value}"
+        )
+
+    if finalization.row_count == 0:
+        raise ValueError(
+            "Focused Change companion query 没有可释放数据，"
+            "不能伪造两期变化分解。"
+        )
+
+    if finalization.audit_event_id is None:
+        raise ValueError(
+            "Focused Change Query 缺少 persisted audit_event_id。"
+        )
+
+    expected_fields = prepared.compiled.visible_output_fields
+    expected_field_set = set(expected_fields)
+
+    for index, row in enumerate(finalization.rows):
+        if set(row) != expected_field_set:
+            raise ValueError(
+                "Focused Change Finalization row 与 visible output "
+                "contract 不一致："
+                f"row_index={index}"
+            )
+
+    evidence_id = _day93_query_evidence_id_v2(
+        action_id=prepared.action_id,
+        finalization=finalization,
+    )
+
+    return ProtectedBreakdownViewV2(
+        evidence_id=evidence_id,
+        metric_name=prepared.envelope.metric_name,
+        result_grain=prepared.envelope.result_grain,
+        analysis_window=analysis_window,
+        scope_summary=_day93_scope_summary_from_envelope_v2(
+            prepared.envelope
+        ),
+        field_names=expected_fields,
+        rows=tuple(
+            dict(row)
+            for row in finalization.rows
+        ),
+        row_count=finalization.row_count,
+        dataset_name=prepared.envelope.dataset_name,
+        plan_name=prepared.envelope.plan_name,
+        tool_name=prepared.tool_contract.identity.name,
+        tool_version=prepared.tool_contract.identity.version,
+        audit_event_id=finalization.audit_event_id,
+    )
+
+
+def _day93_focused_dimension_for_action_v2(
+    action_id: str,
+) -> FocusedChangeDimensionV2 | None:
+    return {
+        "drill_channel": FocusedChangeDimensionV2.CHANNEL,
+        "drill_category": FocusedChangeDimensionV2.CATEGORY,
+        "drill_region": FocusedChangeDimensionV2.REGION,
+        "drill_area": FocusedChangeDimensionV2.AREA,
+        "drill_province": FocusedChangeDimensionV2.PROVINCE,
+        "drill_city": FocusedChangeDimensionV2.CITY,
+        "drill_campaign": FocusedChangeDimensionV2.CAMPAIGN,
+    }.get(action_id)
+
+
+def _day93_overall_gmv_values_from_delivery_v2(
+    *,
+    delivery: EvidencePackDeliveryV2,
+    comparison: TimeComparisonContractV2 | None,
+) -> tuple[Decimal, Decimal] | None:
+    """
+    从 Evidence Pack 的两侧 Overall Governed Result 恢复可信 GMV。
+
+    返回 (reference, current)。
+    任一侧不是唯一、受保护、单值 Overall GMV 时 fail closed 为 None。
+    """
+
+    if comparison is None:
+        return None
+
+    def value_for(window: TimeWindowReferenceV2) -> Decimal | None:
+        matches = []
+
+        for record in delivery.evidence_pack.evidence_records:
+            provenance = record.provenance
+            protected = record.protected_result
+
+            if provenance is None or protected is None:
+                continue
+
+            if (
+                provenance.metric_name != "gmv"
+                or provenance.result_grain != "overall"
+                or provenance.analysis_window != window
+            ):
+                continue
+
+            if (
+                protected.field_names != ("gmv",)
+                or protected.row_count != 1
+                or len(protected.rows) != 1
+                or set(protected.rows[0]) != {"gmv"}
+            ):
+                continue
+
+            raw = protected.rows[0].get("gmv")
+            if raw is None or isinstance(raw, bool):
+                continue
+
+            try:
+                matches.append(Decimal(str(raw)))
+            except Exception:
+                continue
+
+        if len(matches) != 1:
+            return None
+
+        return matches[0]
+
+    reference_value = value_for(comparison.reference_window)
+    current_value = value_for(comparison.current_window)
+
+    if reference_value is None or current_value is None:
+        return None
+
+    return reference_value, current_value
+
+
+def _build_day93_focused_change_companion_v2(
+    *,
+    selected_action: AvailableInvestigationActionV2,
+    current_prepared: _PreparedInvestigationBindingV2,
+    current_execution: InvestigationToolExecutionResultV2,
+    context: AccessContext,
+    comparison: TimeComparisonContractV2 | None,
+    investigation_focus_scope: InvestigationFocusScopeV1 | None,
+    geography_focus_scope: GeographyFocusScopeV2 | None = None,
+    overall_reference_value: Decimal | None = None,
+    overall_current_value: Decimal | None = None,
+    runtime_config: GovernanceRuntimeConfig,
+    execution_policy: GovernedExecutionPolicy | None,
+    request_id: str,
+    requested_scope: RequestedScopeResolutionV2 | None,
+) -> FocusedChangeBreakdownDeliveryV2 | None:
+    """
+    F02 Focused Change 的 deterministic companion read。
+
+    Planner 仍只选择一个 action（category / region）。
+    只有满足以下条件才追加 reference read：
+    - Seed 本身有 comparison；
+    - Investigation Focus 已锁定且带可信两期值；
+    - 当前 Tool 已真实产生可释放 Evidence。
+
+    reference read 使用：
+    - 同一个 Action / Query Plan；
+    - 同一个 Authorized + Requested + Focus effective scope；
+    - comparison.reference_window。
+
+    它不是新的 Planner 决策，也不开放新的 Action Space。
+    """
+
+    dimension = _day93_focused_dimension_for_action_v2(
+        selected_action.action_id
+    )
+
+    if dimension is None or comparison is None:
+        return None
+
+    channel_reference_value = getattr(investigation_focus_scope, "reference_value", None)
+    channel_current_value = getattr(investigation_focus_scope, "current_value", None)
+    channel_delta = getattr(investigation_focus_scope, "delta", None)
+
+    has_channel_focus_values = (
+        investigation_focus_scope is not None
+        and channel_reference_value is not None
+        and channel_current_value is not None
+        and channel_delta is not None
+    )
+    has_geography_focus_values = (
+        geography_focus_scope is not None
+        and geography_focus_scope.reference_value is not None
+        and geography_focus_scope.current_value is not None
+        and geography_focus_scope.delta is not None
+    )
+    has_overall_values = (
+        investigation_focus_scope is None
+        and geography_focus_scope is None
+        and overall_reference_value is not None
+        and overall_current_value is not None
+    )
+
+    if not (has_channel_focus_values or has_geography_focus_values or has_overall_values):
+        return None
+
+    if current_execution.evidence_reference is None:
+        # 当前期本身没有可释放 Evidence 时，不执行 reference companion。
+        return None
+
+    current_breakdown = (
+        _day93_protected_breakdown_from_prepared_v2(
+            prepared=current_prepared,
+            analysis_window=comparison.current_window,
+        )
+    )
+
+    if (
+        current_breakdown.evidence_id
+        != current_execution.evidence_reference.evidence_id
+    ):
+        raise ValueError(
+            "Focused Change current evidence identity "
+            "与 Investigation Tool Evidence 不一致。"
+        )
+
+    reference_prepared = _prepare_day89_trusted_binding_v2(
+        action=selected_action,
+        context=context,
+        analysis_window=comparison.reference_window,
+        runtime_config=runtime_config,
+        execution_policy=execution_policy,
+        event_id=(
+            f"{request_id}-{selected_action.action_id}-reference"
+        ),
+        requested_scope=requested_scope,
+    )
+
+    # server-owned deterministic companion read：
+    # 不经过 Planner，也不消耗一个新的 Investigation Action。
+    reference_finalization = reference_prepared.binding.executor()
+
+    if not isinstance(
+        reference_finalization,
+        GovernedFinalizationResult,
+    ):
+        raise TypeError(
+            "Focused Change reference executor "
+            "必须返回 GovernedFinalizationResult。"
+        )
+
+    reference_breakdown = (
+        _day93_protected_breakdown_from_prepared_v2(
+            prepared=reference_prepared,
+            analysis_window=comparison.reference_window,
+        )
+    )
+
+    if has_geography_focus_values:
+        assert geography_focus_scope is not None
+        return build_geography_focused_change_breakdown_delivery_v2(
+            current_breakdown=current_breakdown,
+            reference_breakdown=reference_breakdown,
+            focus_scope=geography_focus_scope,
+            comparison=comparison,
+            dimension=dimension,
+        )
+
+    if has_channel_focus_values:
+        assert investigation_focus_scope is not None
+        return build_focused_change_breakdown_delivery_v2(
+            current_breakdown=current_breakdown,
+            reference_breakdown=reference_breakdown,
+            focus_scope=investigation_focus_scope,
+            comparison=comparison,
+            dimension=dimension,
+        )
+
+    assert overall_reference_value is not None
+    assert overall_current_value is not None
+
+    return build_global_change_breakdown_delivery_v2(
+        current_breakdown=current_breakdown,
+        reference_breakdown=reference_breakdown,
+        comparison=comparison,
+        overall_reference_value=overall_reference_value,
+        overall_current_value=overall_current_value,
+        dimension=dimension,
+    )
+
+
 def _build_day89_trusted_binding_v2(
     *,
     action: AvailableInvestigationActionV2,
@@ -1137,6 +1783,7 @@ def _build_day89_trusted_binding_v2(
     runtime_config: GovernanceRuntimeConfig,
     execution_policy: GovernedExecutionPolicy | None,
     event_id: str,
+    requested_scope: RequestedScopeResolutionV2 | None = None,
 ) -> TrustedToolExecutionBindingV2:
     return _prepare_day89_trusted_binding_v2(
         action=action,
@@ -1145,6 +1792,7 @@ def _build_day89_trusted_binding_v2(
         runtime_config=runtime_config,
         execution_policy=execution_policy,
         event_id=event_id,
+        requested_scope=requested_scope,
     ).binding
 
 
@@ -1156,6 +1804,7 @@ def build_day89_gmv_investigation_bindings_v2(
     runtime_config: GovernanceRuntimeConfig,
     execution_policy: GovernedExecutionPolicy | None,
     request_id: str,
+    requested_scope: RequestedScopeResolutionV2 | None = None,
 ) -> dict[str, TrustedToolExecutionBindingV2]:
     return {
         action.action_id: _build_day89_trusted_binding_v2(
@@ -1167,6 +1816,7 @@ def build_day89_gmv_investigation_bindings_v2(
             event_id=(
                 f"{request_id}-{action.action_id}"
             ),
+            requested_scope=requested_scope,
         )
         for action in actions
     }
@@ -1180,6 +1830,7 @@ def _prepare_day89_gmv_investigation_bindings_v2(
     runtime_config: GovernanceRuntimeConfig,
     execution_policy: GovernedExecutionPolicy | None,
     request_id: str,
+    requested_scope: RequestedScopeResolutionV2 | None = None,
 ) -> dict[str, _PreparedInvestigationBindingV2]:
     return {
         action.action_id: _prepare_day89_trusted_binding_v2(
@@ -1191,10 +1842,261 @@ def _prepare_day89_gmv_investigation_bindings_v2(
             event_id=(
                 f"{request_id}-{action.action_id}"
             ),
+            requested_scope=requested_scope,
         )
         for action in actions
     }
 
+
+
+def _day93_geography_level_for_action_v2(action_id: str) -> GeographyLevelV2 | None:
+    return {
+        "drill_area": GeographyLevelV2.AREA,
+        "drill_province": GeographyLevelV2.PROVINCE,
+        "drill_city": GeographyLevelV2.CITY,
+    }.get(action_id)
+
+
+def _day93_parent_geography_member_v2(
+    focus: GeographyFocusScopeV2 | None,
+):
+    if focus is None:
+        return None
+    return get_geography_member_v2(
+        level=focus.level, member_key=focus.member_key
+    )
+
+
+def _day93_promote_geography_focus_v2(
+    *,
+    focused_change: FocusedChangeBreakdownDeliveryV2 | None,
+    selected_action_id: str,
+    current_geography_focus: GeographyFocusScopeV2 | None,
+) -> tuple[GeographyFocusScopeV2 | None, AvailableInvestigationActionV2 | None]:
+    level = _day93_geography_level_for_action_v2(selected_action_id)
+    if level is None or focused_change is None:
+        return current_geography_focus, None
+
+    assessment = focused_change.assessment
+    if (
+        assessment is None
+        or assessment.pattern != ChangeConcentrationPatternV2.DOMINANT
+        or assessment.leader_member_key is None
+    ):
+        return current_geography_focus, None
+
+    # CITY is the Geography leaf. We do not need to promote another focus,
+    # and region_name is intentionally not treated as a fabricated region_code.
+    if level == GeographyLevelV2.CITY:
+        return current_geography_focus, None
+
+    leader = next(
+        (item for item in focused_change.result.members
+         if item.member_key == assessment.leader_member_key),
+        None,
+    )
+    if leader is None:
+        raise ValueError("DOMINANT Geography leader 不存在于可信 Change Breakdown。")
+
+    parent = None
+    if level != GeographyLevelV2.AREA:
+        parent = _day93_parent_geography_member_v2(current_geography_focus)
+        if parent is None:
+            raise ValueError("Province / City promotion 缺少上一层 Geography Focus。")
+        if next_geography_level_v2(parent.level) != level:
+            raise ValueError("Geography promotion 不能跳层。")
+
+    member = get_geography_member_v2(
+        level=level, member_key=leader.member_key, parent=parent
+    )
+    promoted = build_geography_focus_scope_v2(
+        member=member,
+        source_evidence_id=focused_change.current_evidence_id,
+        reference_value=leader.reference_value,
+        current_value=leader.current_value,
+        delta=leader.delta,
+    )
+    next_level = next_geography_level_v2(level)
+    next_action = _day93_geography_action_v2(next_level) if next_level is not None else None
+    return promoted, next_action
+
+
+def _day93_append_unlocked_action_to_step_v2(
+    *,
+    step: Day89InvestigationRuntimeStepResultV2,
+    action: AvailableInvestigationActionV2 | None,
+) -> Day89InvestigationRuntimeStepResultV2:
+    if action is None:
+        return step
+    if step.transition is None:
+        raise ValueError("无法向没有 transition 的 Runtime Step 解锁 Geography Action。")
+
+    planner_state = step.transition.next_state.planner_state
+    if action.action_id in set(planner_state.completed_action_ids):
+        raise ValueError("已完成的 Geography Action 不能重新解锁。")
+
+    existing = {item.action_id: item for item in planner_state.available_actions}
+    if action.action_id in existing:
+        if existing[action.action_id] != action:
+            raise ValueError("同一 action_id 的 trusted Action Contract 不一致。")
+        return step
+
+    next_planner = planner_state.model_copy(
+        update={"available_actions": (*planner_state.available_actions, action)}
+    )
+    next_loop = step.transition.next_state.model_copy(
+        update={"planner_state": next_planner}
+    )
+    next_transition = step.transition.model_copy(update={"next_state": next_loop})
+    next_session_after = step.session_after.model_copy(update={"loop_state": next_loop})
+
+    stop_status = step.stop_status
+    if stop_status is not None:
+        remaining_ids = tuple(item.action_id for item in next_planner.available_actions)
+        can_continue = (
+            not stop_status.evidence_sufficient
+            and bool(remaining_ids)
+            and stop_status.current_round < stop_status.max_rounds
+            and stop_status.total_steps_used < stop_status.max_total_investigation_steps
+        )
+        stop_status = stop_status.model_copy(update={
+            "uninvestigated_action_ids": remaining_ids,
+            "can_continue": can_continue,
+            "detail": (
+                "本轮 Budget 已停止；上一层 Geography Evidence 已安全解锁下一层，"
+                "只有用户明确继续下一轮才会执行。"
+            ),
+        })
+
+    return step.model_copy(update={
+        "transition": next_transition,
+        "session_after": next_session_after,
+        "stop_status": stop_status,
+    })
+
+
+def run_day93_geography_exploration_v2(
+    *,
+    seed_result: RuntimeDeliveryBridgeResultV2,
+    level: GeographyLevelV2,
+    runtime_config: GovernanceRuntimeConfig | None = None,
+    execution_policy: GovernedExecutionPolicy | None = None,
+) -> FocusedChangeBreakdownDeliveryV2:
+    """
+    Geography Exploration escape hatch。
+
+    与 Investigation 严格分离：
+    - 不创建 / 推进 InvestigationSession；
+    - 不消耗 Investigation Step Budget；
+    - 不使用上一层 Top1 作为隐式 Focus；
+    - 只在原 Requested Scope 内执行用户明确要求的更细层级；
+    - 仍完整经过 Governed Planning / Compilation / Execution /
+      Result Protection / Audit；
+    - 返回两期 Global Change Breakdown，明确只是探索性查看。
+    """
+
+    if level not in {
+        GeographyLevelV2.PROVINCE,
+        GeographyLevelV2.CITY,
+    }:
+        raise ValueError(
+            "Geography Exploration escape hatch 当前只允许 Province / City。"
+        )
+
+    if (
+        seed_result.status != RuntimeDeliveryBridgeStatusV2.READY
+        or seed_result.delivery is None
+    ):
+        raise ValueError(
+            "Geography Exploration 必须从 READY trusted Delivery 启动。"
+        )
+
+    delivery = seed_result.delivery
+    scope = delivery.evidence_pack.analysis_scope
+    comparison = scope.comparison
+
+    if scope.metric_name != "gmv" or comparison is None:
+        raise ValueError(
+            "Geography Exploration 当前需要带两期 Comparison 的 GMV Seed。"
+        )
+
+    overall_values = _day93_overall_gmv_values_from_delivery_v2(
+        delivery=delivery,
+        comparison=comparison,
+    )
+    if overall_values is None:
+        raise ValueError(
+            "Geography Exploration 缺少唯一可信的两期 Overall GMV。"
+        )
+
+    action = _day93_geography_action_v2(level)
+    dimension = _day93_focused_dimension_for_action_v2(action.action_id)
+    if dimension is None:
+        raise ValueError("Geography Exploration Action 缺少 dimension mapping。")
+
+    active_config = (
+        runtime_config
+        if runtime_config is not None
+        else load_governance_runtime_config()
+    )
+
+    request_id = f"day93-geography-explore-{uuid4().hex}"
+    context = build_day89_local_access_context_v2(
+        request_id=request_id,
+    )
+
+    # 只继承原 Requested Scope；故意不继承上一层 Geography Top1 Focus。
+    requested_scope = seed_result.requested_scope
+
+    current_prepared = _prepare_day89_trusted_binding_v2(
+        action=action,
+        context=context,
+        analysis_window=comparison.current_window,
+        runtime_config=active_config,
+        execution_policy=execution_policy,
+        event_id=f"{request_id}-{action.action_id}-current",
+        requested_scope=requested_scope,
+    )
+    current_finalization = current_prepared.binding.executor()
+    if not isinstance(current_finalization, GovernedFinalizationResult):
+        raise TypeError(
+            "Geography Exploration current executor 必须返回 GovernedFinalizationResult。"
+        )
+
+    reference_prepared = _prepare_day89_trusted_binding_v2(
+        action=action,
+        context=context,
+        analysis_window=comparison.reference_window,
+        runtime_config=active_config,
+        execution_policy=execution_policy,
+        event_id=f"{request_id}-{action.action_id}-reference",
+        requested_scope=requested_scope,
+    )
+    reference_finalization = reference_prepared.binding.executor()
+    if not isinstance(reference_finalization, GovernedFinalizationResult):
+        raise TypeError(
+            "Geography Exploration reference executor 必须返回 GovernedFinalizationResult。"
+        )
+
+    current_breakdown = _day93_protected_breakdown_from_prepared_v2(
+        prepared=current_prepared,
+        analysis_window=comparison.current_window,
+    )
+    reference_breakdown = _day93_protected_breakdown_from_prepared_v2(
+        prepared=reference_prepared,
+        analysis_window=comparison.reference_window,
+    )
+
+    reference_value, current_value = overall_values
+
+    return build_global_change_breakdown_delivery_v2(
+        current_breakdown=current_breakdown,
+        reference_breakdown=reference_breakdown,
+        comparison=comparison,
+        overall_reference_value=reference_value,
+        overall_current_value=current_value,
+        dimension=dimension,
+    )
 
 def run_day89_agentic_investigation_step_v2(
     *,
@@ -1205,6 +2107,9 @@ def run_day89_agentic_investigation_step_v2(
     planner: PlannerInvokerV2 | None = None,
     planner_model: str | None = None,
     planner_client=None,
+    investigation_focus_scope: InvestigationFocusScopeV1 | None = None,
+    geography_focus_scope: GeographyFocusScopeV2 | None = None,
+    investigation_route: InvestigationRouteV2 | None = None,
     clarification_requirement: (
         ClarificationRequirementV2 | None
     ) = None,
@@ -1249,10 +2154,31 @@ def run_day89_agentic_investigation_step_v2(
     context = build_day89_local_access_context_v2(
         request_id=request_id,
     )
+    requested_scope = seed_result.requested_scope
+    if investigation_route is not None:
+        _validate_day93_route_focus_binding_v2(
+            route=investigation_route,
+            investigation_focus_scope=investigation_focus_scope,
+        )
+
+    effective_investigation_scope = (
+        merge_requested_scope_with_investigation_focus_v1(
+            requested_scope=requested_scope,
+            investigation_focus=investigation_focus_scope,
+        )
+    )
+    effective_investigation_scope = (
+        merge_requested_scope_with_geography_focus_v2(
+            requested_scope=effective_investigation_scope,
+            geography_focus=geography_focus_scope,
+        )
+    )
 
     actions = build_day89_gmv_investigation_actions_v2(
         delivery=seed_result.delivery,
+        requested_scope=effective_investigation_scope,
         include_category=include_category_action,
+        include_legacy_region=(clarification_requirement is not None),
     )
 
     if (
@@ -1306,6 +2232,7 @@ def run_day89_agentic_investigation_step_v2(
                 runtime_config=active_config,
                 execution_policy=execution_policy,
                 request_id=request_id,
+                requested_scope=effective_investigation_scope,
             )
         )
 
@@ -1314,7 +2241,16 @@ def run_day89_agentic_investigation_step_v2(
             for action_id, prepared in prepared_bindings.items()
         }
 
-        if planner is None:
+        if investigation_route is not None:
+            if planner is not None:
+                raise ValueError(
+                    "System Investigation Route 与 injected planner "
+                    "不能同时提供。"
+                )
+            active_planner = _day93_planner_for_route_v2(
+                investigation_route
+            )
+        elif planner is None:
             def active_planner(
                 state: InvestigationStateV2,
             ) -> PlannerDecisionV2:
@@ -1386,7 +2322,13 @@ def run_day89_agentic_investigation_step_v2(
             == Day89InvestigationRuntimeStatusV2
             .CLARIFICATION_REQUIRED
         ):
-            return step
+            return step.model_copy(
+                update={
+                    "requested_scope": requested_scope,
+                    "investigation_focus_scope": investigation_focus_scope,
+                    "geography_focus_scope": geography_focus_scope,
+                }
+            )
 
         if selected_action is None:
             raise ValueError(
@@ -1416,9 +2358,59 @@ def run_day89_agentic_investigation_step_v2(
             finalization=finalization,
         )
 
+        overall_values = _day93_overall_gmv_values_from_delivery_v2(
+            delivery=seed_result.delivery,
+            comparison=(
+                seed_result.delivery.evidence_pack
+                .analysis_scope.comparison
+            ),
+        )
+
+        focused_change_breakdown = (
+            _build_day93_focused_change_companion_v2(
+                selected_action=selected_action,
+                current_prepared=prepared,
+                current_execution=step.execution_result,
+                context=context,
+                comparison=(
+                    seed_result.delivery.evidence_pack
+                    .analysis_scope.comparison
+                ),
+                investigation_focus_scope=investigation_focus_scope,
+                geography_focus_scope=geography_focus_scope,
+                overall_reference_value=(
+                    overall_values[0]
+                    if overall_values is not None
+                    else None
+                ),
+                overall_current_value=(
+                    overall_values[1]
+                    if overall_values is not None
+                    else None
+                ),
+                runtime_config=active_config,
+                execution_policy=execution_policy,
+                request_id=request_id,
+                requested_scope=effective_investigation_scope,
+            )
+        )
+
+        promoted_geography_focus, unlocked_action = _day93_promote_geography_focus_v2(
+            focused_change=focused_change_breakdown,
+            selected_action_id=selected_action.action_id,
+            current_geography_focus=geography_focus_scope,
+        )
+        step = _day93_append_unlocked_action_to_step_v2(
+            step=step, action=unlocked_action
+        )
+
         return step.model_copy(
             update={
                 "governed_query_context": governed_context,
+                "requested_scope": requested_scope,
+                "investigation_focus_scope": investigation_focus_scope,
+                "geography_focus_scope": promoted_geography_focus,
+                "focused_change_breakdown": focused_change_breakdown,
             }
         )
 
@@ -1504,6 +2496,21 @@ def continue_day89_agentic_investigation_step_v2(
     context = build_day89_local_access_context_v2(
         request_id=request_id,
     )
+    requested_scope = continuation_state.requested_scope
+    investigation_focus_scope = continuation_state.investigation_focus_scope
+    geography_focus_scope = continuation_state.geography_focus_scope
+    effective_investigation_scope = (
+        merge_requested_scope_with_investigation_focus_v1(
+            requested_scope=requested_scope,
+            investigation_focus=investigation_focus_scope,
+        )
+    )
+    effective_investigation_scope = (
+        merge_requested_scope_with_geography_focus_v2(
+            requested_scope=effective_investigation_scope,
+            geography_focus=geography_focus_scope,
+        )
+    )
 
     prepared_bindings = (
         _prepare_day89_gmv_investigation_bindings_v2(
@@ -1513,6 +2520,7 @@ def continue_day89_agentic_investigation_step_v2(
             runtime_config=active_config,
             execution_policy=execution_policy,
             request_id=request_id,
+            requested_scope=effective_investigation_scope,
         )
     )
 
@@ -1521,7 +2529,25 @@ def continue_day89_agentic_investigation_step_v2(
         for action_id, prepared in prepared_bindings.items()
     }
 
-    if planner is None:
+    preferred_geography_action_id = None
+    if geography_focus_scope is not None:
+        next_level = next_geography_level_v2(
+            geography_focus_scope.level
+        )
+        if next_level is not None:
+            candidate = _day93_geography_action_v2(next_level)
+            if candidate.action_id in {item.action_id for item in actions}:
+                preferred_geography_action_id = candidate.action_id
+
+    if planner is None and preferred_geography_action_id is not None:
+        active_planner = _day93_planner_for_action_id_v2(
+            preferred_geography_action_id,
+            rationale=(
+                "上一层 Geography Change Evidence 已达到 DOMINANT，"
+                "因此只沿已解锁的下一层 Geography Action 继续。"
+            ),
+        )
+    elif planner is None:
         def active_planner(
             state: InvestigationStateV2,
         ) -> PlannerDecisionV2:
@@ -1545,7 +2571,13 @@ def continue_day89_agentic_investigation_step_v2(
         == Day89InvestigationRuntimeStatusV2
         .CLARIFICATION_REQUIRED
     ):
-        return step
+        return step.model_copy(
+            update={
+                "requested_scope": requested_scope,
+                "investigation_focus_scope": investigation_focus_scope,
+                "geography_focus_scope": geography_focus_scope,
+            }
+        )
 
     selected_action = step.planner_decision.selected_action
     if selected_action is None:
@@ -1575,9 +2607,53 @@ def continue_day89_agentic_investigation_step_v2(
         finalization=finalization,
     )
 
+    overall_values = _day93_overall_gmv_values_from_delivery_v2(
+        delivery=delivery,
+        comparison=delivery_scope.comparison,
+    )
+
+    focused_change_breakdown = (
+        _build_day93_focused_change_companion_v2(
+            selected_action=selected_action,
+            current_prepared=prepared,
+            current_execution=step.execution_result,
+            context=context,
+            comparison=delivery_scope.comparison,
+            investigation_focus_scope=investigation_focus_scope,
+            geography_focus_scope=geography_focus_scope,
+            overall_reference_value=(
+                overall_values[0]
+                if overall_values is not None
+                else None
+            ),
+            overall_current_value=(
+                overall_values[1]
+                if overall_values is not None
+                else None
+            ),
+            runtime_config=active_config,
+            execution_policy=execution_policy,
+            request_id=request_id,
+            requested_scope=effective_investigation_scope,
+        )
+    )
+
+    promoted_geography_focus, unlocked_action = _day93_promote_geography_focus_v2(
+        focused_change=focused_change_breakdown,
+        selected_action_id=selected_action.action_id,
+        current_geography_focus=geography_focus_scope,
+    )
+    step = _day93_append_unlocked_action_to_step_v2(
+        step=step, action=unlocked_action
+    )
+
     return step.model_copy(
         update={
             "governed_query_context": context_record,
+            "requested_scope": requested_scope,
+            "investigation_focus_scope": investigation_focus_scope,
+            "geography_focus_scope": promoted_geography_focus,
+            "focused_change_breakdown": focused_change_breakdown,
         }
     )
 
@@ -1585,6 +2661,7 @@ def resume_day89_agentic_investigation_after_clarification_v2(
     *,
     pending: Day89PendingClarificationStateV2,
     response: ClarificationResponseV2,
+    seed_result: RuntimeDeliveryBridgeResultV2 | None = None,
     runtime_config: GovernanceRuntimeConfig | None = None,
     execution_policy: GovernedExecutionPolicy | None = None,
     planner: PlannerInvokerV2 | None = None,
@@ -1626,10 +2703,10 @@ def resume_day89_agentic_investigation_after_clarification_v2(
     resolved_state = resolution.resolved_state
     assert resolved_state is not None
 
-    session = _session_with_resolved_planner_state_v2(
-        session=pending.session,
-        resolved_state=resolved_state,
-    )
+    # Resolver 的职责只是把“本轮执行选择”收窄到一个 Action。
+    # Pending Session 仍然是 server-trusted 的完整调查空间；
+    # 用户选择一个首轮方向不应被解释为放弃其余合法方向。
+    original_actions = planner_state.available_actions
 
     actions = resolved_state.available_actions
     if len(actions) != 1:
@@ -1637,6 +2714,44 @@ def resume_day89_agentic_investigation_after_clarification_v2(
             "Day89 Direction Clarification Resolution "
             "必须收窄到恰好一个合法 Action。"
         )
+
+    selected_for_execution = actions[0]
+    original_by_id = {
+        action.action_id: action
+        for action in original_actions
+    }
+    original_selected = original_by_id.get(
+        selected_for_execution.action_id
+    )
+
+    if original_selected is None:
+        raise ValueError(
+            "Clarification Resolver 选择的 Action "
+            "必须来自原 Pending Session available_actions。"
+        )
+
+    if original_selected != selected_for_execution:
+        raise ValueError(
+            "Clarification Resolver 不能修改原 Action 的 "
+            "Tool Contract 或 trusted arguments。"
+        )
+
+    completed_ids = set(
+        planner_state.completed_action_ids
+    )
+    remaining_session_actions = tuple(
+        action
+        for action in original_actions
+        if (
+            action.action_id != selected_for_execution.action_id
+            and action.action_id not in completed_ids
+        )
+    )
+
+    session = _session_with_resolved_planner_state_v2(
+        session=pending.session,
+        resolved_state=resolved_state,
+    )
 
     active_config = (
         runtime_config
@@ -1650,6 +2765,21 @@ def resume_day89_agentic_investigation_after_clarification_v2(
     context = build_day89_local_access_context_v2(
         request_id=request_id,
     )
+    requested_scope = pending.requested_scope
+    investigation_focus_scope = pending.investigation_focus_scope
+    geography_focus_scope = pending.geography_focus_scope
+    effective_investigation_scope = (
+        merge_requested_scope_with_investigation_focus_v1(
+            requested_scope=requested_scope,
+            investigation_focus=investigation_focus_scope,
+        )
+    )
+    effective_investigation_scope = (
+        merge_requested_scope_with_geography_focus_v2(
+            requested_scope=effective_investigation_scope,
+            geography_focus=geography_focus_scope,
+        )
+    )
 
     prepared_bindings = (
         _prepare_day89_gmv_investigation_bindings_v2(
@@ -1662,6 +2792,7 @@ def resume_day89_agentic_investigation_after_clarification_v2(
             runtime_config=active_config,
             execution_policy=execution_policy,
             request_id=request_id,
+            requested_scope=effective_investigation_scope,
         )
     )
 
@@ -1688,6 +2819,9 @@ def resume_day89_agentic_investigation_after_clarification_v2(
         bindings=bindings,
         planner=active_planner,
         evidence_sufficient_after_step=False,
+        trusted_remaining_actions_after_selected=(
+            remaining_session_actions
+        ),
     )
 
     if (
@@ -1729,9 +2863,63 @@ def resume_day89_agentic_investigation_after_clarification_v2(
         finalization=finalization,
     )
 
+    overall_values = None
+    if (
+        seed_result is not None
+        and seed_result.status == RuntimeDeliveryBridgeStatusV2.READY
+        and seed_result.delivery is not None
+    ):
+        overall_values = _day93_overall_gmv_values_from_delivery_v2(
+            delivery=seed_result.delivery,
+            comparison=(
+                resolved_state.insight.analysis_scope.comparison
+            ),
+        )
+
+    focused_change_breakdown = (
+        _build_day93_focused_change_companion_v2(
+            selected_action=selected_action,
+            current_prepared=prepared,
+            current_execution=step.execution_result,
+            context=context,
+            comparison=(
+                resolved_state.insight.analysis_scope.comparison
+            ),
+            investigation_focus_scope=investigation_focus_scope,
+            geography_focus_scope=geography_focus_scope,
+            overall_reference_value=(
+                overall_values[0]
+                if overall_values is not None
+                else None
+            ),
+            overall_current_value=(
+                overall_values[1]
+                if overall_values is not None
+                else None
+            ),
+            runtime_config=active_config,
+            execution_policy=execution_policy,
+            request_id=request_id,
+            requested_scope=effective_investigation_scope,
+        )
+    )
+
+    promoted_geography_focus, unlocked_action = _day93_promote_geography_focus_v2(
+        focused_change=focused_change_breakdown,
+        selected_action_id=selected_action.action_id,
+        current_geography_focus=geography_focus_scope,
+    )
+    step = _day93_append_unlocked_action_to_step_v2(
+        step=step, action=unlocked_action
+    )
+
     step_with_context = step.model_copy(
         update={
             "governed_query_context": governed_context,
+            "requested_scope": requested_scope,
+            "investigation_focus_scope": investigation_focus_scope,
+            "geography_focus_scope": promoted_geography_focus,
+            "focused_change_breakdown": focused_change_breakdown,
         }
     )
 

@@ -4,17 +4,13 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
+from app.semantic_layer.analysis_mode_contract_v2 import (
+    AnalysisModeV2,
+)
 from app.semantic_layer.time_comparison_contract_v2 import (
     TimeComparisonContractV2,
     TimeWindowReferenceV2,
 )
-
-
-class AnalysisModeV2(str, Enum):
-    FACT = "fact"
-    COMPARISON = "comparison"
-    DIAGNOSTIC = "diagnostic"
-    INVESTIGATION = "investigation"
 
 
 class AnalysisScopeV2(BaseModel):
@@ -258,11 +254,16 @@ class InsightContractV2(BaseModel):
     @model_validator(mode="after")
     def validate_contract(self) -> "InsightContractV2":
         if (
-            self.analysis_mode == AnalysisModeV2.FACT
+            self.analysis_mode
+            in {
+                AnalysisModeV2.FACT,
+                AnalysisModeV2.COMPOSITION,
+            }
             and self.analysis_scope.comparison is not None
         ):
             raise ValueError(
-                "FACT mode cannot carry a comparison contract."
+                "FACT / COMPOSITION mode cannot carry "
+                "a comparison contract."
             )
 
         if (
@@ -275,6 +276,7 @@ class InsightContractV2(BaseModel):
 
         if self.analysis_mode in {
             AnalysisModeV2.FACT,
+            AnalysisModeV2.COMPOSITION,
             AnalysisModeV2.COMPARISON,
         }:
             if any(
@@ -286,8 +288,9 @@ class InsightContractV2(BaseModel):
                 )
             ):
                 raise ValueError(
-                    "FACT / COMPARISON mode cannot silently "
-                    "escalate into diagnostic or investigation output."
+                    "FACT / COMPOSITION / COMPARISON mode cannot "
+                    "silently escalate into diagnostic or "
+                    "investigation output."
                 )
 
         evidence_ids = [

@@ -66,13 +66,24 @@ EXPECTED_METRICS = {
     "purchase_frequency",
     "repeat_customer_count",
     "multi_order_customer_count",
+    "r12_base_customer_count",
+    "r12_repurchase_customer_count",
+    "r12_repurchase_rate",
+    "r12_repurchase_amount",
+    "r12_repurchase_spending",
 }
 
 NEW_CONFIDENTIAL = {
-    "refund_rate_overall_v2": "refund_rate",
     "roi_channel_v2": "roi",
     "cac_channel_v2": "cac",
 }
+
+REFUND_AGGREGATED_CONFIDENTIAL_PLANS = (
+    "refund_rate_overall_v2",
+    "refund_rate_channel_v2",
+    "refund_rate_region_v2",
+    "refund_rate_category_v2",
+)
 
 GLOBAL_HISTORY_PLANS = {
     "cac_channel_v2",
@@ -97,9 +108,10 @@ def build_context(
     plan,
     *,
     allow_cost_data: bool = False,
+    allow_aggregated_business_metrics: bool = False,
 ) -> AccessContext:
     return AccessContext(
-        request_id="req-day73-static-runtime-048",
+        request_id="req-day73-static-runtime-056",
         actor_id="analyst-001",
         role=AccessRole.SCOPED_ANALYST,
         dataset_name="beauty_bi_v2",
@@ -123,24 +135,27 @@ def build_context(
         ),
         sensitive_data_policy=SensitiveDataPolicy(
             allow_cost_data=allow_cost_data,
+            allow_aggregated_business_metrics=(
+                allow_aggregated_business_metrics
+            ),
         ),
         policy_version="governance_v1",
-        scope_source="day73_static_runtime_048",
+        scope_source="day73_static_runtime_056",
     )
 
 
-def test_runtime_catalog_loads_48_plans() -> None:
+def test_runtime_catalog_loads_59_plans() -> None:
     assert_equal(
         len(
             load_query_plan_v2_catalog()
             .query_plans
         ),
-        48,
-        "Runtime Loader 必须加载 48 个静态 Plan。",
+        59,
+        "Runtime Loader 必须加载 59 个静态 Plan。",
     )
 
 
-def test_runtime_catalog_has_exact_19_metrics() -> None:
+def test_runtime_catalog_has_exact_24_metrics() -> None:
     metrics = {
         plan.metric
         for plan in (
@@ -152,7 +167,7 @@ def test_runtime_catalog_has_exact_19_metrics() -> None:
     assert_equal(
         metrics,
         EXPECTED_METRICS,
-        "Runtime Metric 集合必须精确覆盖 19 Metrics。",
+        "Runtime Metric 集合必须精确覆盖 24 Metrics。",
     )
 
 
@@ -214,8 +229,8 @@ def test_runtime_logic_type_counts() -> None:
             )
             for plan in plans
         ),
-        40,
-        "Runtime 应包含 40 个 QueryLogic Plan。",
+        42,
+        "Runtime 应包含 42 个 QueryLogic Plan。",
     )
 
     assert_equal(
@@ -226,8 +241,8 @@ def test_runtime_logic_type_counts() -> None:
             )
             for plan in plans
         ),
-        8,
-        "Runtime 应包含 8 个 StagedQueryLogic Plan。",
+        17,
+        "Runtime 应包含 17 个 StagedQueryLogic Plan。",
     )
 
 
@@ -238,21 +253,79 @@ def test_metric_lookup_covers_new_metrics() -> None:
                 "gmv"
             )
         ),
-        4,
-        "GMV 应继续返回 4 个 Plan。",
+        6,
+        "GMV 当前应返回 6 个正式 Plan。",
+    )
+
+    order_count_plans = get_query_plans_v2_by_metric(
+        "order_count"
+    )
+    assert_equal(
+        len(order_count_plans),
+        5,
+        "Order Count 应包含 overall/channel/region/category + customer composition 共 5 个 Plan。",
     )
 
     for metric in (
-        "refund_rate",
+        "r12_base_customer_count",
+        "r12_repurchase_customer_count",
+        "r12_repurchase_rate",
+        "r12_repurchase_amount",
+        "r12_repurchase_spending",
+    ):
+        plans = get_query_plans_v2_by_metric(metric)
+
+        assert_equal(
+            len(plans),
+            1,
+            f"{metric} 当前应有 1 个正式静态 Plan。",
+        )
+
+        assert_true(
+            isinstance(
+                plans[0].query_logic,
+                StagedQueryLogic,
+            ),
+            f"{metric} 必须保持 StagedQueryLogic。",
+        )
+
+    refund_plans = get_query_plans_v2_by_metric(
+        "refund_rate"
+    )
+
+    assert_equal(
+        {
+            plan.result_grain
+            for plan in refund_plans
+        },
+        {
+            "overall",
+            "channel",
+            "region",
+            "category",
+        },
+        "Refund Rate 必须覆盖四种正式 Grain。",
+    )
+
+    assert_true(
+        all(
+            isinstance(
+                plan.query_logic,
+                StagedQueryLogic,
+            )
+            for plan in refund_plans
+        ),
+        "四个 Refund Rate Plan 都必须保持 StagedQueryLogic。",
+    )
+
+    for metric in (
         "roi",
         "cac",
         "brand_paid_new_customer_count",
         "channel_paid_new_customer_count",
     ):
-        plans = (
-            get_query_plans_v2_by_metric(
-                metric
-            )
+        plans = get_query_plans_v2_by_metric(
+            metric
         )
 
         assert_equal(
@@ -270,7 +343,7 @@ def test_metric_lookup_covers_new_metrics() -> None:
         )
 
 
-def test_all_48_static_plans_are_resource_authorizable() -> None:
+def test_all_56_static_plans_are_resource_authorizable() -> None:
     for plan in (
         load_query_plan_v2_catalog()
         .query_plans
@@ -311,8 +384,8 @@ def test_legacy_43_and_refund_have_current_row_scope_paths() -> None:
 
     assert_equal(
         len(plans),
-        44,
-        "当前应有旧 43 + Refund 共 44 个 Path-safe Plan。",
+        55,
+        "排除 ROI/CAC/Brand New/Channel New 后应有 55 个当前可绑定 Row Scope 的 Plan。",
     )
 
     for plan in plans:
@@ -345,8 +418,11 @@ def test_legacy_43_and_refund_have_current_row_scope_paths() -> None:
 
         assert_equal(
             len(binding.contract.predicates),
-            2,
-            f"{plan.name} 应获得 Region + Channel Predicate。",
+            2 * len(plan.scope_contract.targets),
+            (
+                f"{plan.name} 每个 ScopeTarget 都应获得 "
+                "Region + Channel 两个 Predicate。"
+            ),
         )
 
 
@@ -551,45 +627,64 @@ def test_cross_fact_time_windows_survive_static_catalog() -> None:
 
 
 def test_refund_semantics_survive_static_catalog() -> None:
-    plan = get_query_plan_v2_by_name(
-        "refund_rate_overall_v2"
-    )
+    expected_fields = {
+        "refund_rate_overall_v2": None,
+        "refund_rate_channel_v2": "channel_name",
+        "refund_rate_region_v2": "region_name",
+        "refund_rate_category_v2": "category",
+    }
 
-    first_stage = (
-        plan.query_logic.stages[0]
-    )
+    for plan_name, dimension_field in expected_fields.items():
+        plan = get_query_plan_v2_by_name(
+            plan_name
+        )
 
-    refund_join = next(
-        join
-        for join in first_stage.joins
-        if getattr(join, "table", None)
-        == "fact_refunds"
-    )
+        first_stage = plan.query_logic.stages[0]
 
-    assert_equal(
-        refund_join.join_type,
-        "left",
-        "Static Refund Rate 必须保持 LEFT JOIN。",
-    )
+        refund_join = next(
+            join
+            for join in first_stage.joins
+            if getattr(join, "table", None)
+            == "fact_refunds"
+        )
 
-    expression = next(
-        output.expression
-        for output in first_stage.outputs
-        if output.field
-        == "completed_refund_amount"
-    )
+        assert_equal(
+            refund_join.join_type,
+            "left",
+            f"{plan_name} 必须保持 LEFT JOIN。",
+        )
 
-    assert_true(
-        "SUM(fr.refund_amount) FILTER"
-        in expression,
-        "Static Refund Rate 必须保留 Item-level refund preaggregation。",
-    )
+        expression = next(
+            output.expression
+            for output in first_stage.outputs
+            if output.field
+            == "completed_refund_amount"
+        )
 
-    assert_true(
-        "fr.refund_status = 'completed'"
-        in expression,
-        "Static Refund Rate 必须保持 completed-only。",
-    )
+        assert_true(
+            "SUM(fr.refund_amount) FILTER"
+            in expression,
+            (
+                f"{plan_name} 必须保留 Item-level "
+                "refund preaggregation。"
+            ),
+        )
+
+        assert_true(
+            "fr.refund_status = 'completed'"
+            in expression,
+            f"{plan_name} 必须保持 completed-only。",
+        )
+
+        if dimension_field is not None:
+            final_fields = {
+                output.field
+                for output in plan.query_logic.stages[-1].outputs
+            }
+            assert_true(
+                dimension_field in final_fields,
+                f"{plan_name} 必须输出 {dimension_field}。",
+            )
 
 
 def test_aus_category_remains_absent() -> None:
@@ -644,6 +739,110 @@ def test_repeat_and_member_semantics_survive_static_catalog() -> None:
     )
 
 
+def test_refund_rate_uses_aggregated_business_confidential_policy() -> None:
+    for plan_name in REFUND_AGGREGATED_CONFIDENTIAL_PLANS:
+        plan = get_query_plan_v2_by_name(
+            plan_name
+        )
+
+        binding = next(
+            item
+            for item in plan.result_contract.field_bindings
+            if item.output_field == "refund_rate"
+        )
+
+        assert_equal(
+            binding.category,
+            (
+                SensitiveDataCategory
+                .AGGREGATED_BUSINESS_CONFIDENTIAL
+            ),
+            (
+                f"{plan_name} 必须使用 Aggregated Business "
+                "Confidential，而不是 raw cost 权限。"
+            ),
+        )
+
+
+def _refund_sample_row(plan_name: str) -> dict:
+    base = {
+        "refund_rate": 0.08,
+        "__group_size": 100,
+    }
+
+    if plan_name == "refund_rate_channel_v2":
+        base["channel_name"] = "示例渠道"
+    elif plan_name == "refund_rate_region_v2":
+        base["region_name"] = "示例地区"
+    elif plan_name == "refund_rate_category_v2":
+        base["category"] = "护肤"
+
+    return base
+
+
+def test_refund_rate_is_denied_without_aggregated_permission() -> None:
+    for plan_name in REFUND_AGGREGATED_CONFIDENTIAL_PLANS:
+        plan = get_query_plan_v2_by_name(
+            plan_name
+        )
+
+        result = protect_result_rows(
+            context=build_context(plan),
+            rows=[
+                _refund_sample_row(plan_name)
+            ],
+            contract=plan.result_contract,
+        )
+
+        assert_equal(
+            result.success,
+            False,
+            f"{plan_name} 默认必须拒绝聚合经营敏感指标。",
+        )
+
+        assert_equal(
+            result.reason_code,
+            (
+                ProtectionReason
+                .AGGREGATED_BUSINESS_METRIC_NOT_ALLOWED
+            ),
+            (
+                f"{plan_name} 必须返回独立的 aggregated "
+                "business permission reason。"
+            ),
+        )
+
+
+def test_refund_rate_is_allowed_only_with_aggregated_permission() -> None:
+    for plan_name in REFUND_AGGREGATED_CONFIDENTIAL_PLANS:
+        plan = get_query_plan_v2_by_name(
+            plan_name
+        )
+
+        result = protect_result_rows(
+            context=build_context(
+                plan,
+                allow_aggregated_business_metrics=True,
+            ),
+            rows=[
+                _refund_sample_row(plan_name)
+            ],
+            contract=plan.result_contract,
+        )
+
+        assert_equal(
+            result.success,
+            True,
+            f"{plan_name} 显式聚合指标授权后应通过保护层。",
+        )
+
+        assert_true(
+            "__group_size"
+            not in result.rows[0],
+            f"{plan_name} 必须隐藏 __group_size。",
+        )
+
+
 def test_new_confidential_bindings_survive_static_catalog() -> None:
     for plan_name, field in (
         NEW_CONFIDENTIAL.items()
@@ -669,10 +868,6 @@ def test_new_confidential_bindings_survive_static_catalog() -> None:
 
 def test_new_confidential_metrics_are_denied_by_default() -> None:
     samples = {
-        "refund_rate_overall_v2": {
-            "refund_rate": 0.08,
-            "__group_size": 100,
-        },
         "roi_channel_v2": {
             "channel_name": "示例渠道",
             "roi": 3.2,
@@ -711,10 +906,6 @@ def test_new_confidential_metrics_are_denied_by_default() -> None:
 
 def test_new_confidential_metrics_can_be_explicitly_allowed() -> None:
     samples = {
-        "refund_rate_overall_v2": {
-            "refund_rate": 0.08,
-            "__group_size": 100,
-        },
         "roi_channel_v2": {
             "channel_name": "示例渠道",
             "roi": 3.2,
@@ -791,7 +982,7 @@ def test_brand_and_channel_new_results_are_ordinary() -> None:
         )
 
 
-def test_all_48_plans_enable_minimum_group_size() -> None:
+def test_all_59_plans_enable_minimum_group_size() -> None:
     for plan in (
         load_query_plan_v2_catalog()
         .query_plans
@@ -843,13 +1034,13 @@ def test_runtime_catalog_and_plans_are_immutable() -> None:
 
 def run_tests() -> None:
     tests = [
-        test_runtime_catalog_loads_48_plans,
-        test_runtime_catalog_has_exact_19_metrics,
+        test_runtime_catalog_loads_59_plans,
+        test_runtime_catalog_has_exact_24_metrics,
         test_static_catalog_semantically_matches_canonical_builder,
         test_static_yaml_bytes_match_canonical_writer,
         test_runtime_logic_type_counts,
         test_metric_lookup_covers_new_metrics,
-        test_all_48_static_plans_are_resource_authorizable,
+        test_all_56_static_plans_are_resource_authorizable,
         test_legacy_43_and_refund_have_current_row_scope_paths,
         test_roi_and_cac_region_paths_fail_closed,
         test_global_history_plans_fail_closed_on_scope_placement,
@@ -859,11 +1050,14 @@ def run_tests() -> None:
         test_refund_semantics_survive_static_catalog,
         test_aus_category_remains_absent,
         test_repeat_and_member_semantics_survive_static_catalog,
+        test_refund_rate_uses_aggregated_business_confidential_policy,
+        test_refund_rate_is_denied_without_aggregated_permission,
+        test_refund_rate_is_allowed_only_with_aggregated_permission,
         test_new_confidential_bindings_survive_static_catalog,
         test_new_confidential_metrics_are_denied_by_default,
         test_new_confidential_metrics_can_be_explicitly_allowed,
         test_brand_and_channel_new_results_are_ordinary,
-        test_all_48_plans_enable_minimum_group_size,
+        test_all_59_plans_enable_minimum_group_size,
         test_runtime_catalog_and_plans_are_immutable,
     ]
 

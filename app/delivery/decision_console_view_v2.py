@@ -43,9 +43,23 @@ from app.semantic_layer.time_comparison_contract_v2 import (
     TimeWindowReferenceV2,
 )
 from app.agents.evidence_pack_v2 import EvidenceTypeV2
+from app.delivery.contribution_investigation_recommendation_v1 import (
+    ContributionInvestigationRecommendationV1,
+)
+from app.delivery.contribution_investigation_route_v2 import (
+    ContributionInvestigationRouteRecommendationV2,
+)
+from app.delivery.ranking_answer_delivery_v1 import (
+    MetricRankingPreferenceV1,
+    PriorityAssessmentV1,
+    PriorityEvidenceStatusV1,
+    RankingConclusionV1,
+    RankingIntentV1,
+    RankingSelectionDirectionV1,
+)
 
 
-VIEW_CONTRACT_VERSION = "day89_decision_console_view_v2_7"
+VIEW_CONTRACT_VERSION = "day89_decision_console_view_v2_8"
 
 
 class VerificationEvidenceViewV2(BaseModel):
@@ -171,6 +185,67 @@ class ProtectedBreakdownViewV2(BaseModel):
     audit_event_id: str
 
 
+class RankingConclusionViewV1(BaseModel):
+    """
+    Ranking Answer Delivery 的 UI 只读投影。
+
+    UI 只能展示已计算结论，不能对 Breakdown rows 再做 max/min。
+    """
+
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+    )
+
+    metric_name: str
+    result_grain: str
+    ranking_intent: RankingIntentV1
+    ranking_preference: MetricRankingPreferenceV1
+    selection_direction: RankingSelectionDirectionV1
+
+    winning_member_labels: tuple[str, ...]
+    winning_value: Decimal
+    is_tie: bool
+
+    evidence_id: str
+    analysis_window: TimeWindowReferenceV2
+    scope_summary: str | None = None
+
+
+class PriorityAssessmentViewV1(BaseModel):
+    """
+    F03 Priority + Evidence Sufficiency 的 UI 只读投影。
+
+    页面只能展示 Delivery 已经形成的调查优先候选与结论边界，
+    不能从 Breakdown rows 自行推导业务优先级。
+    """
+
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+    )
+
+    policy_version: str
+
+    metric_name: str
+    result_grain: str
+
+    candidate_member_labels: tuple[str, ...]
+    candidate_value: Decimal
+    is_tie: bool
+
+    screening_rule: str
+    evidence_status: PriorityEvidenceStatusV1
+
+    can_confirm: tuple[str, ...]
+    cannot_confirm: tuple[str, ...]
+    next_evidence_needed: tuple[str, ...]
+
+    evidence_id: str
+    analysis_window: TimeWindowReferenceV2
+    scope_summary: str | None = None
+
+
 class InvestigationTraceStepViewV2(BaseModel):
     """
     Day89 Investigation Trace 的一条业务可见步骤。
@@ -197,6 +272,28 @@ class InvestigationTraceStepViewV2(BaseModel):
 
     next_directive: LoopDirectiveV2
     stop_reason: InvestigationStopReasonV2 | None
+
+
+class InvestigationBusinessResultViewV2(BaseModel):
+    """
+    一条已执行 Investigation Step 的安全业务结果投影。
+
+    breakdown 只能来自该 Step 自己 produced_evidence_ids 中
+    唯一的 GOVERNED_QUERY_RESULT / ProtectedResultV2。
+
+    本层不重新执行 SQL、不重新聚合、不从 Observation 文本猜结果。
+    """
+
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+    )
+
+    sequence_number: int
+    selected_action_id: str
+    observation_status: ToolObservationStatusV2
+    summary: str
+    breakdown: ProtectedBreakdownViewV2 | None = None
 
 
 class InvestigationRuntimeControlViewV2(BaseModel):
@@ -380,6 +477,42 @@ class ContributionViewV2(BaseModel):
     reconciliation_status: ContributionReconciliationStatusV2
 
 
+class ContributionInvestigationRecommendationViewV1(BaseModel):
+    """
+    F02 Contribution -> Investigation Recommendation 的 UI 只读投影。
+
+    UI 只能展示 Delivery 已形成的调查候选；
+    不能从 Contribution rows / ranking 自行选择渠道。
+    """
+
+    model_config = ConfigDict(
+        frozen=True,
+        extra="forbid",
+    )
+
+    policy_version: str
+
+    metric_name: str
+    dimension_name: str
+
+    member_key: str
+    member_label: str
+
+    reference_value: Decimal
+    current_value: Decimal
+    delta: Decimal
+    contribution_rate: Decimal | None
+
+    overall_delta: Decimal
+    direction: str
+
+    rationale: str
+    can_confirm: tuple[str, ...]
+    cannot_confirm: tuple[str, ...]
+
+    contribution_evidence_id: str
+
+
 class AnomalyPolicyViewV2(BaseModel):
     """
     Day89 Anomaly Policy 的只读投影。
@@ -466,10 +599,21 @@ class DecisionConsoleViewV2(BaseModel):
     comparison: MetricComparisonViewV2 | None = None
     verification: DataVerificationViewV2 | None = None
     breakdown: ProtectedBreakdownViewV2 | None = None
+    ranking_conclusion: RankingConclusionViewV1 | None = None
+    priority_assessment: PriorityAssessmentViewV1 | None = None
     investigation_trace: tuple[InvestigationTraceStepViewV2, ...] = ()
+    investigation_results: tuple[
+        InvestigationBusinessResultViewV2, ...
+    ] = ()
     runtime_control: InvestigationRuntimeControlViewV2 | None = None
     clarification: RuntimeClarificationViewV2 | None = None
     contribution: ContributionViewV2 | None = None
+    contribution_investigation_recommendation: (
+        ContributionInvestigationRecommendationViewV1 | None
+    ) = None
+    contribution_investigation_route_recommendation: (
+        ContributionInvestigationRouteRecommendationV2 | None
+    ) = None
     anomaly: AnomalyViewV2 | None = None
 
 
@@ -1090,6 +1234,84 @@ def _build_investigation_trace_v2(
     return tuple(steps), runtime_control
 
 
+def _build_investigation_business_results_v2(
+    *,
+    delivery: EvidencePackDeliveryV2,
+    trace: tuple[InvestigationTraceStepViewV2, ...],
+) -> tuple[InvestigationBusinessResultViewV2, ...]:
+    """
+    把每个 Investigation Trace Step 的 produced Evidence
+    投影成用户可见的 Protected Business Result。
+
+    EVIDENCE Step：
+    - 必须恰好关联一条 GOVERNED_QUERY_RESULT；
+    - 该结果必须已经包含 provenance + protected_result；
+    - 通过既有 ProtectedBreakdownViewV2 安全投影。
+
+    NO_DATA / FAILURE Step：
+    - 不伪造业务表格；
+    - 只保留 Observation summary。
+    """
+
+    results: list[InvestigationBusinessResultViewV2] = []
+
+    for step in trace:
+        governed_query_ids: list[str] = []
+
+        for evidence_id in step.produced_evidence_ids:
+            record = _evidence_record_by_id(
+                delivery=delivery,
+                evidence_id=evidence_id,
+            )
+
+            if record is None:
+                raise ValueError(
+                    "Investigation produced Evidence "
+                    "不存在于当前 Evidence Pack。"
+                )
+
+            if (
+                record.evidence_type
+                == EvidenceTypeV2.GOVERNED_QUERY_RESULT
+            ):
+                governed_query_ids.append(evidence_id)
+
+        breakdown = None
+
+        if (
+            step.observation_status
+            == ToolObservationStatusV2.EVIDENCE
+        ):
+            if len(governed_query_ids) != 1:
+                raise ValueError(
+                    "每个 EVIDENCE Investigation Step "
+                    "必须唯一关联一条 GOVERNED_QUERY_RESULT。"
+                )
+
+            breakdown = _build_protected_breakdown_view_v2(
+                delivery=delivery,
+                breakdown_evidence_id=governed_query_ids[0],
+            )
+
+        elif governed_query_ids:
+            raise ValueError(
+                "NO_DATA / FAILURE Investigation Step "
+                "不能释放 Governed Query Breakdown。"
+            )
+
+        results.append(
+            InvestigationBusinessResultViewV2(
+                sequence_number=step.sequence_number,
+                selected_action_id=step.selected_action_id,
+                observation_status=step.observation_status,
+                summary=step.summary,
+                breakdown=breakdown,
+            )
+        )
+
+    return tuple(results)
+
+
 def _build_runtime_clarification_view_v2(
     *,
     planner_state: InvestigationStateV2 | None,
@@ -1427,10 +1649,18 @@ def build_decision_console_view_v2(
     delivery: EvidencePackDeliveryV2,
     contribution_result: ContributionAnalysisResultV2 | None = None,
     contribution_evidence_id: str | None = None,
+    contribution_investigation_recommendation: (
+        ContributionInvestigationRecommendationV1 | None
+    ) = None,
+    contribution_investigation_route_recommendation: (
+        ContributionInvestigationRouteRecommendationV2 | None
+    ) = None,
     anomaly_decision: AnomalyDecisionV2 | None = None,
     anomaly_evidence_id: str | None = None,
     metric_comparison_result: MetricComparisonResultV2 | None = None,
     breakdown_evidence_id: str | None = None,
+    ranking_conclusion: RankingConclusionV1 | None = None,
+    priority_assessment: PriorityAssessmentV1 | None = None,
     investigation_transitions: tuple[
         InvestigationLoopTransitionV2, ...
     ] = (),
@@ -1503,6 +1733,114 @@ def build_decision_console_view_v2(
             breakdown_evidence_id=breakdown_evidence_id,
         )
 
+    ranking_view = None
+
+    if ranking_conclusion is not None:
+        if breakdown_view is None:
+            raise ValueError(
+                "Ranking Conclusion requires a Protected Breakdown."
+            )
+
+        if ranking_conclusion.evidence_id != breakdown_view.evidence_id:
+            raise ValueError(
+                "Ranking Conclusion must bind the displayed Breakdown evidence."
+            )
+
+        if ranking_conclusion.metric_name != breakdown_view.metric_name:
+            raise ValueError(
+                "Ranking Conclusion metric must match Breakdown metric."
+            )
+
+        if ranking_conclusion.result_grain != breakdown_view.result_grain:
+            raise ValueError(
+                "Ranking Conclusion grain must match Breakdown grain."
+            )
+
+        if (
+            ranking_conclusion.analysis_window
+            != breakdown_view.analysis_window
+        ):
+            raise ValueError(
+                "Ranking Conclusion window must match Breakdown window."
+            )
+
+        ranking_view = RankingConclusionViewV1(
+            metric_name=ranking_conclusion.metric_name,
+            result_grain=ranking_conclusion.result_grain,
+            ranking_intent=ranking_conclusion.ranking_intent,
+            ranking_preference=ranking_conclusion.ranking_preference,
+            selection_direction=ranking_conclusion.selection_direction,
+            winning_member_labels=(
+                ranking_conclusion.winning_member_labels
+            ),
+            winning_value=ranking_conclusion.winning_value,
+            is_tie=ranking_conclusion.is_tie,
+            evidence_id=ranking_conclusion.evidence_id,
+            analysis_window=ranking_conclusion.analysis_window,
+            scope_summary=ranking_conclusion.scope_summary,
+        )
+
+    priority_view = None
+
+    if priority_assessment is not None:
+        if breakdown_view is None:
+            raise ValueError(
+                "Priority Assessment requires a Protected Breakdown."
+            )
+
+        if (
+            priority_assessment.evidence_id
+            != breakdown_view.evidence_id
+        ):
+            raise ValueError(
+                "Priority Assessment must bind displayed Breakdown evidence."
+            )
+
+        if (
+            priority_assessment.metric_name
+            != breakdown_view.metric_name
+        ):
+            raise ValueError(
+                "Priority Assessment metric must match Breakdown metric."
+            )
+
+        if (
+            priority_assessment.result_grain
+            != breakdown_view.result_grain
+        ):
+            raise ValueError(
+                "Priority Assessment grain must match Breakdown grain."
+            )
+
+        if (
+            priority_assessment.analysis_window
+            != breakdown_view.analysis_window
+        ):
+            raise ValueError(
+                "Priority Assessment window must match Breakdown window."
+            )
+
+        priority_view = PriorityAssessmentViewV1(
+            policy_version=priority_assessment.policy_version,
+            metric_name=priority_assessment.metric_name,
+            result_grain=priority_assessment.result_grain,
+            candidate_member_labels=(
+                priority_assessment.candidate_member_labels
+            ),
+            candidate_value=priority_assessment.candidate_value,
+            is_tie=priority_assessment.is_tie,
+            screening_rule=priority_assessment.screening_rule,
+            evidence_status=priority_assessment.evidence_status,
+            can_confirm=priority_assessment.can_confirm,
+            cannot_confirm=priority_assessment.cannot_confirm,
+            next_evidence_needed=(
+                priority_assessment.next_evidence_needed
+            ),
+            evidence_id=priority_assessment.evidence_id,
+            analysis_window=priority_assessment.analysis_window,
+            scope_summary=priority_assessment.scope_summary,
+        )
+
     (
         investigation_trace,
         runtime_control,
@@ -1513,6 +1851,13 @@ def build_decision_console_view_v2(
         prior_continuation_stop_statuses=(
             investigation_prior_continuation_stop_statuses
         ),
+    )
+
+    investigation_results = (
+        _build_investigation_business_results_v2(
+            delivery=delivery,
+            trace=investigation_trace,
+        )
     )
 
     clarification_view = _build_runtime_clarification_view_v2(
@@ -1590,6 +1935,93 @@ def build_decision_console_view_v2(
             ),
         )
 
+    contribution_recommendation_view = None
+
+    if contribution_investigation_recommendation is not None:
+        recommendation = (
+            contribution_investigation_recommendation
+        )
+
+        if contribution_view is None:
+            raise ValueError(
+                "Contribution Investigation Recommendation "
+                "requires Contribution View."
+            )
+
+        if (
+            recommendation.metric_name
+            != contribution_view.metric_name
+            or recommendation.dimension_name
+            != contribution_view.dimension_name
+        ):
+            raise ValueError(
+                "Contribution Recommendation metric / dimension "
+                "must match Contribution View."
+            )
+
+        if (
+            recommendation.contribution_evidence_id
+            != contribution_view.evidence_id
+        ):
+            raise ValueError(
+                "Contribution Recommendation must bind the displayed "
+                "Contribution Evidence."
+            )
+
+        contribution_recommendation_view = (
+            ContributionInvestigationRecommendationViewV1(
+                policy_version=recommendation.policy_version,
+                metric_name=recommendation.metric_name,
+                dimension_name=recommendation.dimension_name,
+                member_key=recommendation.member_key,
+                member_label=recommendation.member_label,
+                reference_value=recommendation.reference_value,
+                current_value=recommendation.current_value,
+                delta=recommendation.delta,
+                contribution_rate=recommendation.contribution_rate,
+                overall_delta=recommendation.overall_delta,
+                direction=recommendation.direction,
+                rationale=recommendation.rationale,
+                can_confirm=recommendation.can_confirm,
+                cannot_confirm=recommendation.cannot_confirm,
+                contribution_evidence_id=(
+                    recommendation.contribution_evidence_id
+                ),
+            )
+        )
+
+    route_recommendation_view = None
+
+    if contribution_investigation_route_recommendation is not None:
+        route_recommendation = (
+            contribution_investigation_route_recommendation
+        )
+
+        if contribution_view is None:
+            raise ValueError(
+                "Contribution Investigation Route requires Contribution View."
+            )
+
+        assessment = route_recommendation.pattern_assessment
+
+        if (
+            assessment.metric_name != contribution_view.metric_name
+            or assessment.dimension_name != contribution_view.dimension_name
+        ):
+            raise ValueError(
+                "Contribution Route metric / dimension must match Contribution View."
+            )
+
+        if (
+            contribution_view.evidence_id
+            not in route_recommendation.route.supporting_evidence_ids
+        ):
+            raise ValueError(
+                "Contribution Route must bind the displayed Contribution Evidence."
+            )
+
+        route_recommendation_view = route_recommendation
+
     anomaly_view = None
 
     if anomaly_decision is not None:
@@ -1625,9 +2057,18 @@ def build_decision_console_view_v2(
         comparison=comparison_view,
         verification=verification_view,
         breakdown=breakdown_view,
+        ranking_conclusion=ranking_view,
+        priority_assessment=priority_view,
         investigation_trace=investigation_trace,
+        investigation_results=investigation_results,
         runtime_control=runtime_control,
         clarification=clarification_view,
         contribution=contribution_view,
+        contribution_investigation_recommendation=(
+            contribution_recommendation_view
+        ),
+        contribution_investigation_route_recommendation=(
+            route_recommendation_view
+        ),
         anomaly=anomaly_view,
     )

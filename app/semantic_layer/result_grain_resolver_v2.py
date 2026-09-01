@@ -108,6 +108,8 @@ class ResultGrainResolutionV2(BaseModel):
             if self.inference_method not in {
                 "explicit_overall",
                 "implicit_overall",
+                "contextual_fact_overall",
+                "contextual_seed_overall",
                 "explicit_single",
                 "explicit_composite",
             }:
@@ -156,6 +158,29 @@ _EXPLICIT_DIMENSION_PATTERNS: dict[
 ] = {
     ResultDimensionV2.CHANNEL: (
         (
+            (
+                r"(?:表现(?:最好|最佳|最优|最差|最弱)(?:的)?"
+                r"|最好(?:的)?|最佳(?:的)?|最优(?:的)?"
+                r"|最差(?:的)?|最弱(?:的)?)(?:渠道|平台)"
+            ),
+            "ranked_channel_expression",
+        ),
+        (
+            (
+                r"(?:哪个|哪一个)?(?:渠道|平台)"
+                r"(?:表现)?(?:最好|最佳|最优|最差|最弱)"
+            ),
+            "ranked_channel_expression",
+        ),
+        (
+            (
+                r"(?:哪个|哪一个)?(?:渠道|平台)"
+                r".{0,12}?"
+                r"(?:最高|最低|最大|最小|最多|最少)"
+            ),
+            "ranked_channel_metric_expression",
+        ),
+        (
             r"(?:按|分)(?:不同|各|每个)?(?:渠道|平台)",
             "grouped_channel_expression",
         ),
@@ -170,6 +195,29 @@ _EXPLICIT_DIMENSION_PATTERNS: dict[
     ),
     ResultDimensionV2.REGION: (
         (
+            (
+                r"(?:表现(?:最好|最佳|最优|最差|最弱)(?:的)?"
+                r"|最好(?:的)?|最佳(?:的)?|最优(?:的)?"
+                r"|最差(?:的)?|最弱(?:的)?)(?:地区|区域)"
+            ),
+            "ranked_region_expression",
+        ),
+        (
+            (
+                r"(?:哪个|哪一个)?(?:地区|区域)"
+                r"(?:表现)?(?:最好|最佳|最优|最差|最弱)"
+            ),
+            "ranked_region_expression",
+        ),
+        (
+            (
+                r"(?:哪个|哪一个)?(?:地区|区域)"
+                r".{0,12}?"
+                r"(?:最高|最低|最大|最小|最多|最少)"
+            ),
+            "ranked_region_metric_expression",
+        ),
+        (
             r"(?:按|分)(?:不同|各|每个)?(?:地区|区域)",
             "grouped_region_expression",
         ),
@@ -183,6 +231,29 @@ _EXPLICIT_DIMENSION_PATTERNS: dict[
         ),
     ),
     ResultDimensionV2.CATEGORY: (
+        (
+            (
+                r"(?:表现(?:最好|最佳|最优|最差|最弱)(?:的)?"
+                r"|最好(?:的)?|最佳(?:的)?|最优(?:的)?"
+                r"|最差(?:的)?|最弱(?:的)?)(?:品类|类别)"
+            ),
+            "ranked_category_expression",
+        ),
+        (
+            (
+                r"(?:哪个|哪一个)?(?:品类|类别)"
+                r"(?:表现)?(?:最好|最佳|最优|最差|最弱)"
+            ),
+            "ranked_category_expression",
+        ),
+        (
+            (
+                r"(?:哪个|哪一个)?(?:品类|类别)"
+                r".{0,12}?"
+                r"(?:最高|最低|最大|最小|最多|最少)"
+            ),
+            "ranked_category_metric_expression",
+        ),
         (
             r"(?:按|分)(?:不同|各|每个)?(?:品类|类别)",
             "grouped_category_expression",
@@ -505,6 +576,103 @@ def resolve_result_grain_v2(
         ),
     )
 
+
+_SEED_OVERALL_FALLBACK_MODES_V2 = frozenset(
+    {
+        "fact",
+        "comparison",
+        "diagnostic",
+        "investigation",
+    }
+)
+
+
+def apply_seed_overall_fallback_v2(
+    *,
+    resolution: ResultGrainResolutionV2,
+    analysis_mode: str,
+) -> ResultGrainResolutionV2:
+    """
+    为更深层分析前的可信 Seed Query 做最小安全 Overall 回退。
+
+    这里只决定 Seed Query 的输出 Grain，不决定后续 Investigation
+    Target Grain。
+
+    允许模式：
+    - fact
+    - comparison
+    - diagnostic
+    - investigation
+
+    必须同时满足：
+    - 原始 Grain Resolver 返回 UNSPECIFIED；
+    - 原始解析没有任何维度 Evidence；
+    - 当前 Analysis Mode 属于允许集合。
+
+    不覆盖：
+    - 显式 channel / region / category；
+    - multi-plan / ambiguous；
+    - composition。
+    """
+
+    normalized_mode = str(
+        analysis_mode
+    ).strip().casefold()
+
+    if (
+        normalized_mode
+        not in _SEED_OVERALL_FALLBACK_MODES_V2
+    ):
+        return resolution
+
+    if (
+        resolution.status
+        != ResultGrainResolutionStatusV2.UNSPECIFIED
+    ):
+        return resolution
+
+    if resolution.dimensions or resolution.evidence:
+        return resolution
+
+    inference_method = (
+        "contextual_fact_overall"
+        if normalized_mode == "fact"
+        else "contextual_seed_overall"
+    )
+
+    return ResultGrainResolutionV2(
+        status=ResultGrainResolutionStatusV2.RESOLVED,
+        dimensions=(),
+        grain_key="overall",
+        evidence=(),
+        inference_method=inference_method,
+        error=None,
+    )
+
+
+def apply_fact_overall_fallback_v2(
+    *,
+    resolution: ResultGrainResolutionV2,
+    analysis_mode: str,
+) -> ResultGrainResolutionV2:
+    """
+    Backward-compatible FACT-only wrapper.
+
+    Unified Analytics Planning 应使用
+    apply_seed_overall_fallback_v2()。
+    """
+
+    normalized_mode = str(
+        analysis_mode
+    ).strip().casefold()
+
+    if normalized_mode != "fact":
+        return resolution
+
+    return apply_seed_overall_fallback_v2(
+        resolution=resolution,
+        analysis_mode=normalized_mode,
+    )
 
 if __name__ == "__main__":
     samples = (

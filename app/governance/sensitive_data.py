@@ -34,6 +34,12 @@ class SensitiveDataCategory(str, Enum):
     FREE_TEXT = "free_text"
     BUSINESS_CONFIDENTIAL = "business_confidential"
 
+    # 已经经过可信聚合、且仍需要群体大小证明的业务敏感指标。
+    # 该类别不能用于 raw/detail 字段，也不继承 allow_cost_data。
+    AGGREGATED_BUSINESS_CONFIDENTIAL = (
+        "aggregated_business_confidential"
+    )
+
 
 class ProtectionAction(str, Enum):
     ALLOW = "allow"
@@ -60,6 +66,12 @@ class ProtectionReason(str, Enum):
     )
     FREE_TEXT_NOT_ALLOWED = "free_text_not_allowed"
     COST_DATA_NOT_ALLOWED = "cost_data_not_allowed"
+    AGGREGATED_BUSINESS_METRIC_NOT_ALLOWED = (
+        "aggregated_business_metric_not_allowed"
+    )
+    AGGREGATED_BUSINESS_AGGREGATION_NOT_PROVEN = (
+        "aggregated_business_aggregation_not_proven"
+    )
     MINIMUM_GROUP_SIZE_NOT_PROVEN = (
         "minimum_group_size_not_proven"
     )
@@ -444,6 +456,10 @@ def build_protection_fingerprint(
         "allow_cost_data": (
             context.sensitive_data_policy.allow_cost_data
         ),
+        "allow_aggregated_business_metrics": (
+            context.sensitive_data_policy
+            .allow_aggregated_business_metrics
+        ),
         "minimum_group_size": (
             context.sensitive_data_policy.minimum_group_size
         ),
@@ -538,6 +554,16 @@ def _resolve_action(
             else ProtectionAction.REJECT
         )
 
+    if (
+        category
+        == SensitiveDataCategory.AGGREGATED_BUSINESS_CONFIDENTIAL
+    ):
+        return (
+            ProtectionAction.ALLOW
+            if policy.allow_aggregated_business_metrics
+            else ProtectionAction.REJECT
+        )
+
     return ProtectionAction.REJECT
 
 
@@ -552,6 +578,15 @@ def _reason_for_rejected_category(
 
     if category == SensitiveDataCategory.BUSINESS_CONFIDENTIAL:
         return ProtectionReason.COST_DATA_NOT_ALLOWED
+
+    if (
+        category
+        == SensitiveDataCategory.AGGREGATED_BUSINESS_CONFIDENTIAL
+    ):
+        return (
+            ProtectionReason
+            .AGGREGATED_BUSINESS_METRIC_NOT_ALLOWED
+        )
 
     return ProtectionReason.INVALID_PROTECTION_CONTRACT
 
@@ -630,6 +665,63 @@ def protect_result_rows(
             )
 
         normalized_rows.append(row)
+
+    aggregated_business_bindings = tuple(
+        binding
+        for binding in contract.field_bindings
+        if (
+            binding.category
+            == SensitiveDataCategory.AGGREGATED_BUSINESS_CONFIDENTIAL
+        )
+    )
+
+    if aggregated_business_bindings:
+        # 第一层：必须由 AccessContext 显式授权。
+        if (
+            not context.sensitive_data_policy
+            .allow_aggregated_business_metrics
+        ):
+            return _failure(
+                context=context,
+                contract=contract,
+                reason_code=(
+                    ProtectionReason
+                    .AGGREGATED_BUSINESS_METRIC_NOT_ALLOWED
+                ),
+                message=(
+                    "Aggregated business-confidential metrics "
+                    "require explicit server-owned permission."
+                ),
+                rejected_fields=(
+                    binding.output_field
+                    for binding in aggregated_business_bindings
+                ),
+            )
+
+        # 第二层：类别本身只允许用于 aggregate + group-size proof。
+        # Detail result 或缺少 hidden control field 都不能靠权限绕过。
+        if (
+            contract.result_shape != ResultShape.AGGREGATE
+            or not contract.minimum_group_size_required
+            or contract.group_size_field is None
+        ):
+            return _failure(
+                context=context,
+                contract=contract,
+                reason_code=(
+                    ProtectionReason
+                    .AGGREGATED_BUSINESS_AGGREGATION_NOT_PROVEN
+                ),
+                message=(
+                    "Aggregated business-confidential metrics "
+                    "require aggregate result shape and mandatory "
+                    "minimum-group-size proof."
+                ),
+                rejected_fields=(
+                    binding.output_field
+                    for binding in aggregated_business_bindings
+                ),
+            )
 
     applied_protections: list[
         AppliedFieldProtection
@@ -738,6 +830,28 @@ def protect_result_rows(
             if group_sizes
             else None
         )
+
+        if (
+            aggregated_business_bindings
+            and minimum_observed_group_size is None
+        ):
+            return _failure(
+                context=context,
+                contract=contract,
+                reason_code=(
+                    ProtectionReason
+                    .MINIMUM_GROUP_SIZE_NOT_PROVEN
+                ),
+                message=(
+                    "Aggregated business-confidential result "
+                    "did not provide a governed group-size proof."
+                ),
+                rejected_fields=(
+                    binding.output_field
+                    for binding in aggregated_business_bindings
+                ),
+                minimum_group_size_checked=True,
+            )
 
         if (
             minimum_observed_group_size is not None

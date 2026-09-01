@@ -10,6 +10,11 @@ from app.agents.governed_graph_nodes_v2 import (
     GovernedAnalystStateV2,
     analytics_planning_node,
     analytics_stop_node,
+    business_preflight_stop_node,
+    business_request_preflight_node,
+    dataset_availability_fast_preflight_node,
+    dataset_availability_node,
+    dataset_availability_stop_node,
     ast_stop_node,
     budget_stop_node,
     compilation_stop_node,
@@ -23,7 +28,10 @@ from app.agents.governed_graph_nodes_v2 import (
     planning_contract_stop_node,
     resolve_time_node,
     route_analytics_planning,
+    route_business_request_preflight,
     route_compilation,
+    route_dataset_availability,
+    route_dataset_availability_fast_preflight,
     route_governed_execution,
     route_governed_planning,
     route_plan_load,
@@ -56,6 +64,14 @@ def build_governed_analyst_graph_v2():
     )
 
     graph.add_node(
+        "business_request_preflight",
+        business_request_preflight_node,
+    )
+    graph.add_node(
+        "dataset_availability_fast_preflight",
+        dataset_availability_fast_preflight_node,
+    )
+    graph.add_node(
         "analytics_planning",
         analytics_planning_node,
     )
@@ -66,6 +82,10 @@ def build_governed_analyst_graph_v2():
     graph.add_node(
         "resolve_time",
         resolve_time_node,
+    )
+    graph.add_node(
+        "dataset_availability",
+        dataset_availability_node,
     )
     graph.add_node(
         "governed_planning",
@@ -93,6 +113,14 @@ def build_governed_analyst_graph_v2():
     )
 
     graph.add_node(
+        "business_preflight_stop",
+        business_preflight_stop_node,
+    )
+    graph.add_node(
+        "dataset_availability_stop",
+        dataset_availability_stop_node,
+    )
+    graph.add_node(
         "budget_stop",
         budget_stop_node,
     )
@@ -119,7 +147,31 @@ def build_governed_analyst_graph_v2():
 
     graph.add_edge(
         START,
-        "analytics_planning",
+        "business_request_preflight",
+    )
+
+    graph.add_conditional_edges(
+        "business_request_preflight",
+        route_business_request_preflight,
+        {
+            "dataset_availability_fast_preflight": (
+                "dataset_availability_fast_preflight"
+            ),
+            "business_preflight_stop": (
+                "business_preflight_stop"
+            ),
+        },
+    )
+
+    graph.add_conditional_edges(
+        "dataset_availability_fast_preflight",
+        route_dataset_availability_fast_preflight,
+        {
+            "analytics_planning": "analytics_planning",
+            "dataset_availability_stop": (
+                "dataset_availability_stop"
+            ),
+        },
     )
 
     graph.add_conditional_edges(
@@ -148,8 +200,19 @@ def build_governed_analyst_graph_v2():
         "resolve_time",
         route_time_resolution,
         {
-            "governed_planning": "governed_planning",
+            "dataset_availability": "dataset_availability",
             "budget_stop": "budget_stop",
+        },
+    )
+
+    graph.add_conditional_edges(
+        "dataset_availability",
+        route_dataset_availability,
+        {
+            "governed_planning": "governed_planning",
+            "dataset_availability_stop": (
+                "dataset_availability_stop"
+            ),
         },
     )
 
@@ -199,6 +262,8 @@ def build_governed_analyst_graph_v2():
     )
 
     for terminal in (
+        "business_preflight_stop",
+        "dataset_availability_stop",
         "budget_stop",
         "analytics_stop",
         "planning_contract_stop",

@@ -1449,10 +1449,10 @@ query_plans:
     direction: desc
 - name: order_count_overall_v2
   metric: order_count
-  chinese_name: 整体交易量
+  chinese_name: 整体订单数
   query_type: aggregate_metric
   result_grain: overall
-  description: 按 整体 Grain 计算 交易量。
+  description: 按 整体 Grain 计算 订单数。
   semantic_contract:
     date_attribution: fact_orders.paid_at
     metric_expression: COUNT(DISTINCT fo.order_id)
@@ -1517,10 +1517,10 @@ query_plans:
     direction: desc
 - name: order_count_channel_v2
   metric: order_count
-  chinese_name: 渠道交易量
+  chinese_name: 渠道订单数
   query_type: aggregate_metric
   result_grain: channel
-  description: 按 渠道 Grain 计算 交易量。
+  description: 按 渠道 Grain 计算 订单数。
   semantic_contract:
     date_attribution: fact_orders.paid_at
     metric_expression: COUNT(DISTINCT fo.order_id)
@@ -1601,10 +1601,10 @@ query_plans:
     direction: desc
 - name: order_count_region_v2
   metric: order_count
-  chinese_name: 地区交易量
+  chinese_name: 地区订单数
   query_type: aggregate_metric
   result_grain: region
-  description: 按 地区 Grain 计算 交易量。
+  description: 按 地区 Grain 计算 订单数。
   semantic_contract:
     date_attribution: fact_orders.paid_at
     metric_expression: COUNT(DISTINCT fo.order_id)
@@ -1685,10 +1685,10 @@ query_plans:
     direction: desc
 - name: order_count_category_v2
   metric: order_count
-  chinese_name: 品类交易量
+  chinese_name: 品类订单数
   query_type: aggregate_metric
   result_grain: category
-  description: 按 品类 Grain 计算 交易量。
+  description: 按 品类 Grain 计算 订单数。
   semantic_contract:
     date_attribution: fact_orders.paid_at
     metric_expression: COUNT(DISTINCT fo.order_id)
@@ -2523,7 +2523,7 @@ query_plans:
   description: 按 整体 Grain 计算 IPT。
   semantic_contract:
     date_attribution: fact_orders.paid_at
-    metric_expression: SUM(foi.quantity) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    metric_expression: CAST(SUM(foi.quantity) AS NUMERIC) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
     base_filters:
     - fact_orders.paid_at IS NOT NULL
     time_window_columns: []
@@ -2541,7 +2541,7 @@ query_plans:
     group_by: []
     outputs:
     - field: ipt
-      expression: SUM(foi.quantity) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+      expression: CAST(SUM(foi.quantity) AS NUMERIC) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
     hidden_control_fields:
     - field: __group_size
       expression: COUNT(DISTINCT fo.customer_id)
@@ -2603,7 +2603,7 @@ query_plans:
   description: 按 渠道 Grain 计算 IPT。
   semantic_contract:
     date_attribution: fact_orders.paid_at
-    metric_expression: SUM(foi.quantity) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    metric_expression: CAST(SUM(foi.quantity) AS NUMERIC) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
     base_filters:
     - fact_orders.paid_at IS NOT NULL
     time_window_columns: []
@@ -2631,7 +2631,7 @@ query_plans:
     - field: channel_name
       expression: dc.channel_name
     - field: ipt
-      expression: SUM(foi.quantity) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+      expression: CAST(SUM(foi.quantity) AS NUMERIC) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
     hidden_control_fields:
     - field: __group_size
       expression: COUNT(DISTINCT fo.customer_id)
@@ -2699,7 +2699,7 @@ query_plans:
   description: 按 地区 Grain 计算 IPT。
   semantic_contract:
     date_attribution: fact_orders.paid_at
-    metric_expression: SUM(foi.quantity) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    metric_expression: CAST(SUM(foi.quantity) AS NUMERIC) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
     base_filters:
     - fact_orders.paid_at IS NOT NULL
     time_window_columns: []
@@ -2727,7 +2727,7 @@ query_plans:
     - field: region_name
       expression: dr.region_name
     - field: ipt
-      expression: SUM(foi.quantity) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+      expression: CAST(SUM(foi.quantity) AS NUMERIC) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
     hidden_control_fields:
     - field: __group_size
       expression: COUNT(DISTINCT fo.customer_id)
@@ -2795,7 +2795,7 @@ query_plans:
   description: 按 品类 Grain 计算 IPT。
   semantic_contract:
     date_attribution: fact_orders.paid_at
-    metric_expression: SUM(foi.quantity) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+    metric_expression: CAST(SUM(foi.quantity) AS NUMERIC) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
     base_filters:
     - fact_orders.paid_at IS NOT NULL
     time_window_columns: []
@@ -2822,7 +2822,7 @@ query_plans:
     - field: category
       expression: dp.category
     - field: ipt
-      expression: SUM(foi.quantity) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
+      expression: CAST(SUM(foi.quantity) AS NUMERIC) / NULLIF(COUNT(DISTINCT fo.order_id), 0)
     hidden_control_fields:
     - field: __group_size
       expression: COUNT(DISTINCT fo.customer_id)
@@ -3165,7 +3165,7 @@ query_plans:
   description: 按 整体 Grain 计算 FREQ。
   semantic_contract:
     date_attribution: fact_orders.paid_at
-    metric_expression: COUNT(DISTINCT fo.order_id) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    metric_expression: CAST(COUNT(DISTINCT fo.order_id) AS NUMERIC) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
     base_filters:
     - fact_orders.paid_at IS NOT NULL
     time_window_columns: []
@@ -3177,7 +3177,7 @@ query_plans:
     group_by: []
     outputs:
     - field: purchase_frequency
-      expression: COUNT(DISTINCT fo.order_id) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+      expression: CAST(COUNT(DISTINCT fo.order_id) AS NUMERIC) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
     hidden_control_fields:
     - field: __group_size
       expression: COUNT(DISTINCT fo.customer_id)
@@ -3234,7 +3234,7 @@ query_plans:
   description: 按 渠道 Grain 计算 FREQ。
   semantic_contract:
     date_attribution: fact_orders.paid_at
-    metric_expression: COUNT(DISTINCT fo.order_id) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    metric_expression: CAST(COUNT(DISTINCT fo.order_id) AS NUMERIC) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
     base_filters:
     - fact_orders.paid_at IS NOT NULL
     time_window_columns: []
@@ -3256,7 +3256,7 @@ query_plans:
     - field: channel_name
       expression: dc.channel_name
     - field: purchase_frequency
-      expression: COUNT(DISTINCT fo.order_id) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+      expression: CAST(COUNT(DISTINCT fo.order_id) AS NUMERIC) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
     hidden_control_fields:
     - field: __group_size
       expression: COUNT(DISTINCT fo.customer_id)
@@ -3319,7 +3319,7 @@ query_plans:
   description: 按 地区 Grain 计算 FREQ。
   semantic_contract:
     date_attribution: fact_orders.paid_at
-    metric_expression: COUNT(DISTINCT fo.order_id) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    metric_expression: CAST(COUNT(DISTINCT fo.order_id) AS NUMERIC) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
     base_filters:
     - fact_orders.paid_at IS NOT NULL
     time_window_columns: []
@@ -3341,7 +3341,7 @@ query_plans:
     - field: region_name
       expression: dr.region_name
     - field: purchase_frequency
-      expression: COUNT(DISTINCT fo.order_id) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+      expression: CAST(COUNT(DISTINCT fo.order_id) AS NUMERIC) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
     hidden_control_fields:
     - field: __group_size
       expression: COUNT(DISTINCT fo.customer_id)
@@ -3404,7 +3404,7 @@ query_plans:
   description: 按 品类 Grain 计算 FREQ。
   semantic_contract:
     date_attribution: fact_orders.paid_at
-    metric_expression: COUNT(DISTINCT fo.order_id) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+    metric_expression: CAST(COUNT(DISTINCT fo.order_id) AS NUMERIC) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
     base_filters:
     - fact_orders.paid_at IS NOT NULL
     time_window_columns: []
@@ -3431,7 +3431,7 @@ query_plans:
     - field: category
       expression: dp.category
     - field: purchase_frequency
-      expression: COUNT(DISTINCT fo.order_id) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
+      expression: CAST(COUNT(DISTINCT fo.order_id) AS NUMERIC) / NULLIF(COUNT(DISTINCT fo.customer_id), 0)
     hidden_control_fields:
     - field: __group_size
       expression: COUNT(DISTINCT fo.customer_id)
@@ -3492,6 +3492,388 @@ query_plans:
     policy_version: result_protection_v1
   default_sort:
     field: purchase_frequency
+    direction: desc
+- name: gmv_area_v2
+  metric: gmv
+  chinese_name: 大区GMV
+  query_type: aggregate_metric
+  result_grain: area
+  description: 按大区 Grain 计算 GMV。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_region
+      alias: dr
+      join_type: inner
+      conditions:
+      - left: fo.shipping_region_id
+        right: dr.region_id
+    group_by:
+    - dr.region_group
+    outputs:
+    - field: region_group
+      expression: dr.region_group
+    - field: gmv
+      expression: SUM(foi.item_paid_amount)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_group
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gmv_area_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: region_group
+      source_columns:
+      - dim_region.region_group
+      category: ordinary
+      token_namespace: null
+    - output_field: gmv
+      source_columns:
+      - fact_order_items.item_paid_amount
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gmv
+    direction: desc
+- name: gmv_province_v2
+  metric: gmv
+  chinese_name: 省级GMV
+  query_type: aggregate_metric
+  result_grain: province
+  description: 按省级 Grain 计算 GMV。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_region
+      alias: dr
+      join_type: inner
+      conditions:
+      - left: fo.shipping_region_id
+        right: dr.region_id
+    group_by:
+    - dr.province_name
+    outputs:
+    - field: province_name
+      expression: dr.province_name
+    - field: gmv
+      expression: SUM(foi.item_paid_amount)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.province_name
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gmv_province_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: province_name
+      source_columns:
+      - dim_region.province_name
+      category: ordinary
+      token_namespace: null
+    - output_field: gmv
+      source_columns:
+      - fact_order_items.item_paid_amount
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gmv
+    direction: desc
+- name: gmv_city_v2
+  metric: gmv
+  chinese_name: 城市GMV
+  query_type: aggregate_metric
+  result_grain: city
+  description: 按城市 Grain 计算 GMV。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_region
+      alias: dr
+      join_type: inner
+      conditions:
+      - left: fo.shipping_region_id
+        right: dr.region_id
+    group_by:
+    - dr.region_id
+    - dr.region_name
+    outputs:
+    - field: region_name
+      expression: dr.region_name
+    - field: gmv
+      expression: SUM(foi.item_paid_amount)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_result_group
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - dim_region.region_name
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gmv_city_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: region_name
+      source_columns:
+      - dim_region.region_name
+      category: ordinary
+      token_namespace: null
+    - output_field: gmv
+      source_columns:
+      - fact_order_items.item_paid_amount
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gmv
+    direction: desc
+- name: gmv_campaign_v2
+  metric: gmv
+  chinese_name: 活动实例GMV
+  query_type: aggregate_metric
+  result_grain: campaign
+  description: 按活动实例 Campaign Grain 分解 GMV；非活动订单保留为独立业务桶。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    - table: dim_campaign
+      alias: dca
+      join_type: left
+      conditions:
+      - left: fo.campaign_id
+        right: dca.campaign_id
+    group_by:
+    - dca.campaign_id
+    - dca.campaign_name
+    outputs:
+    - field: campaign_name
+      expression: COALESCE(dca.campaign_name, '非活动订单')
+    - field: gmv
+      expression: SUM(foi.item_paid_amount)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_campaign_bucket
+  resource_contract:
+    required_tables:
+    - dim_campaign
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_campaign.campaign_id
+    - dim_campaign.campaign_name
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.campaign_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gmv_campaign_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: campaign_name
+      source_columns:
+      - dim_campaign.campaign_name
+      - fact_orders.campaign_id
+      category: ordinary
+      token_namespace: null
+    - output_field: gmv
+      source_columns:
+      - fact_order_items.item_paid_amount
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gmv
     direction: desc
 - name: repeat_customer_count_overall_v2
   metric: repeat_customer_count
@@ -3695,7 +4077,7 @@ query_plans:
   description: 在指定分析范围内，跨日复购客户数占同期所有成功支付购买客户数的比例。
   semantic_contract:
     date_attribution: fact_orders.paid_at
-    metric_expression: COUNT(*) FILTER (WHERE cps.purchase_day_count >= 2) / NULLIF(COUNT(*), 0)
+    metric_expression: CAST(COUNT(*) FILTER (WHERE cps.purchase_day_count >= 2) AS NUMERIC) / NULLIF(COUNT(*), 0)
     base_filters:
     - fact_orders.paid_at IS NOT NULL
     time_window_columns: []
@@ -3733,7 +4115,7 @@ query_plans:
       having: []
       outputs:
       - field: repeat_customer_rate
-        expression: COUNT(*) FILTER (WHERE cps.purchase_day_count >= 2) / NULLIF(COUNT(*), 0)
+        expression: CAST(COUNT(*) FILTER (WHERE cps.purchase_day_count >= 2) AS NUMERIC) / NULLIF(COUNT(*), 0)
       hidden_control_fields:
       - field: __group_size
         expression: COUNT(*)
@@ -3783,6 +4165,1381 @@ query_plans:
     policy_version: result_protection_v1
   default_sort:
     field: repeat_customer_rate
+    direction: desc
+- name: r12_base_customer_count_overall_v2
+  metric: r12_base_customer_count
+  chinese_name: 整体R12 Base客户数
+  query_type: r12_cohort_staged_metric
+  result_grain: overall
+  description: 报表开始日前连续 12 个日历月内，至少发生一次 Effective Purchase 的去重客户数。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(DISTINCT bc.customer_id)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    - effective_purchase = order paid item amount - completed refund amount > 0
+    - R12 Base uses the 12 calendar months immediately before analysis_start_date
+    time_window_columns:
+    - fact_orders.paid_at
+  query_logic:
+    stages:
+    - stage_id: base_item_effective
+      stage_type: aggregate
+      source:
+        table: fact_order_items
+        stage_id: null
+        alias: bfoi
+      joins:
+      - table: fact_orders
+        alias: bfo
+        join_type: inner
+        conditions:
+        - left: bfoi.order_id
+          right: bfo.order_id
+      - table: fact_refunds
+        alias: bfr
+        join_type: left
+        conditions:
+        - left: bfoi.order_item_id
+          right: bfr.order_item_id
+        - left: bfoi.order_id
+          right: bfr.order_id
+      filters:
+      - bfo.paid_at IS NOT NULL
+      - CAST(bfo.paid_at AS DATE) >= (CAST(:analysis_start_date AS DATE) - INTERVAL '12 months')
+      - CAST(bfo.paid_at AS DATE) < CAST(:analysis_start_date AS DATE)
+      group_by:
+      - bfoi.order_item_id
+      - bfoi.order_id
+      - bfoi.item_paid_amount
+      - bfo.customer_id
+      - bfo.paid_at
+      having: []
+      outputs:
+      - field: order_item_id
+        expression: bfoi.order_item_id
+      - field: order_id
+        expression: bfoi.order_id
+      - field: customer_id
+        expression: bfo.customer_id
+      - field: paid_date
+        expression: CAST(bfo.paid_at AS DATE)
+      - field: item_effective_amount
+        expression: bfoi.item_paid_amount - COALESCE(SUM(bfr.refund_amount) FILTER (WHERE bfr.refund_status = 'completed'), 0)
+      hidden_control_fields: []
+    - stage_id: base_order_effective
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: base_item_effective
+        alias: bie
+      joins: []
+      filters: []
+      group_by:
+      - bie.customer_id
+      - bie.order_id
+      - bie.paid_date
+      having:
+      - SUM(bie.item_effective_amount) > 0
+      outputs:
+      - field: customer_id
+        expression: bie.customer_id
+      - field: order_id
+        expression: bie.order_id
+      - field: paid_date
+        expression: bie.paid_date
+      - field: order_effective_amount
+        expression: SUM(bie.item_effective_amount)
+      hidden_control_fields: []
+    - stage_id: base_customer
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: base_order_effective
+        alias: boe
+      joins: []
+      filters: []
+      group_by:
+      - boe.customer_id
+      having: []
+      outputs:
+      - field: customer_id
+        expression: boe.customer_id
+      - field: base_effective_amount
+        expression: SUM(boe.order_effective_amount)
+      hidden_control_fields: []
+    - stage_id: report_item_effective
+      stage_type: aggregate
+      source:
+        table: fact_order_items
+        stage_id: null
+        alias: rfoi
+      joins:
+      - table: fact_orders
+        alias: rfo
+        join_type: inner
+        conditions:
+        - left: rfoi.order_id
+          right: rfo.order_id
+      - table: fact_refunds
+        alias: rfr
+        join_type: left
+        conditions:
+        - left: rfoi.order_item_id
+          right: rfr.order_item_id
+        - left: rfoi.order_id
+          right: rfr.order_id
+      filters:
+      - rfo.paid_at IS NOT NULL
+      - CAST(rfo.paid_at AS DATE) BETWEEN :analysis_start_date AND :analysis_end_date
+      group_by:
+      - rfoi.order_item_id
+      - rfoi.order_id
+      - rfoi.item_paid_amount
+      - rfo.customer_id
+      - rfo.paid_at
+      having: []
+      outputs:
+      - field: order_item_id
+        expression: rfoi.order_item_id
+      - field: order_id
+        expression: rfoi.order_id
+      - field: customer_id
+        expression: rfo.customer_id
+      - field: paid_date
+        expression: CAST(rfo.paid_at AS DATE)
+      - field: item_effective_amount
+        expression: rfoi.item_paid_amount - COALESCE(SUM(rfr.refund_amount) FILTER (WHERE rfr.refund_status = 'completed'), 0)
+      hidden_control_fields: []
+    - stage_id: report_order_effective
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: report_item_effective
+        alias: rie
+      joins: []
+      filters: []
+      group_by:
+      - rie.customer_id
+      - rie.order_id
+      - rie.paid_date
+      having:
+      - SUM(rie.item_effective_amount) > 0
+      outputs:
+      - field: customer_id
+        expression: rie.customer_id
+      - field: order_id
+        expression: rie.order_id
+      - field: paid_date
+        expression: rie.paid_date
+      - field: order_effective_amount
+        expression: SUM(rie.item_effective_amount)
+      hidden_control_fields: []
+    - stage_id: report_customer
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: report_order_effective
+        alias: roe
+      joins: []
+      filters: []
+      group_by:
+      - roe.customer_id
+      having: []
+      outputs:
+      - field: customer_id
+        expression: roe.customer_id
+      - field: report_effective_amount
+        expression: SUM(roe.order_effective_amount)
+      hidden_control_fields: []
+    - stage_id: final
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: base_customer
+        alias: bc
+      joins:
+      - stage_id: report_customer
+        alias: rc
+        join_type: left
+        conditions:
+        - left: bc.customer_id
+          right: rc.customer_id
+      filters: []
+      group_by: []
+      having: []
+      outputs:
+      - field: r12_base_customer_count
+        expression: COUNT(DISTINCT bc.customer_id)
+      hidden_control_fields:
+      - field: __group_size
+        expression: COUNT(DISTINCT bc.customer_id)
+        semantics: r12_base_customer_count
+    final_stage: final
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    - fact_refunds
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_order_items.order_item_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+    - fact_refunds.order_id
+    - fact_refunds.order_item_id
+    - fact_refunds.refund_amount
+    - fact_refunds.refund_status
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: r12_base_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: bfoi
+      - table_name: fact_orders
+        alias: bfo
+    - target_id: r12_report_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: rfoi
+      - table_name: fact_orders
+        alias: rfo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: r12_base_customer_count
+      source_columns:
+      - fact_order_items.item_paid_amount
+      - fact_orders.customer_id
+      - fact_orders.paid_at
+      - fact_refunds.refund_amount
+      - fact_refunds.refund_status
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: r12_base_customer_count
+    direction: desc
+- name: r12_repurchase_customer_count_overall_v2
+  metric: r12_repurchase_customer_count
+  chinese_name: 整体R12回购客户数
+  query_type: r12_cohort_staged_metric
+  result_grain: overall
+  description: R12 Base 客户中，在当前报表窗口再次发生 Effective Purchase 的去重客户数。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(DISTINCT rc.customer_id)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    - effective_purchase = order paid item amount - completed refund amount > 0
+    - R12 Base uses the 12 calendar months immediately before analysis_start_date
+    time_window_columns:
+    - fact_orders.paid_at
+  query_logic:
+    stages:
+    - stage_id: base_item_effective
+      stage_type: aggregate
+      source:
+        table: fact_order_items
+        stage_id: null
+        alias: bfoi
+      joins:
+      - table: fact_orders
+        alias: bfo
+        join_type: inner
+        conditions:
+        - left: bfoi.order_id
+          right: bfo.order_id
+      - table: fact_refunds
+        alias: bfr
+        join_type: left
+        conditions:
+        - left: bfoi.order_item_id
+          right: bfr.order_item_id
+        - left: bfoi.order_id
+          right: bfr.order_id
+      filters:
+      - bfo.paid_at IS NOT NULL
+      - CAST(bfo.paid_at AS DATE) >= (CAST(:analysis_start_date AS DATE) - INTERVAL '12 months')
+      - CAST(bfo.paid_at AS DATE) < CAST(:analysis_start_date AS DATE)
+      group_by:
+      - bfoi.order_item_id
+      - bfoi.order_id
+      - bfoi.item_paid_amount
+      - bfo.customer_id
+      - bfo.paid_at
+      having: []
+      outputs:
+      - field: order_item_id
+        expression: bfoi.order_item_id
+      - field: order_id
+        expression: bfoi.order_id
+      - field: customer_id
+        expression: bfo.customer_id
+      - field: paid_date
+        expression: CAST(bfo.paid_at AS DATE)
+      - field: item_effective_amount
+        expression: bfoi.item_paid_amount - COALESCE(SUM(bfr.refund_amount) FILTER (WHERE bfr.refund_status = 'completed'), 0)
+      hidden_control_fields: []
+    - stage_id: base_order_effective
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: base_item_effective
+        alias: bie
+      joins: []
+      filters: []
+      group_by:
+      - bie.customer_id
+      - bie.order_id
+      - bie.paid_date
+      having:
+      - SUM(bie.item_effective_amount) > 0
+      outputs:
+      - field: customer_id
+        expression: bie.customer_id
+      - field: order_id
+        expression: bie.order_id
+      - field: paid_date
+        expression: bie.paid_date
+      - field: order_effective_amount
+        expression: SUM(bie.item_effective_amount)
+      hidden_control_fields: []
+    - stage_id: base_customer
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: base_order_effective
+        alias: boe
+      joins: []
+      filters: []
+      group_by:
+      - boe.customer_id
+      having: []
+      outputs:
+      - field: customer_id
+        expression: boe.customer_id
+      - field: base_effective_amount
+        expression: SUM(boe.order_effective_amount)
+      hidden_control_fields: []
+    - stage_id: report_item_effective
+      stage_type: aggregate
+      source:
+        table: fact_order_items
+        stage_id: null
+        alias: rfoi
+      joins:
+      - table: fact_orders
+        alias: rfo
+        join_type: inner
+        conditions:
+        - left: rfoi.order_id
+          right: rfo.order_id
+      - table: fact_refunds
+        alias: rfr
+        join_type: left
+        conditions:
+        - left: rfoi.order_item_id
+          right: rfr.order_item_id
+        - left: rfoi.order_id
+          right: rfr.order_id
+      filters:
+      - rfo.paid_at IS NOT NULL
+      - CAST(rfo.paid_at AS DATE) BETWEEN :analysis_start_date AND :analysis_end_date
+      group_by:
+      - rfoi.order_item_id
+      - rfoi.order_id
+      - rfoi.item_paid_amount
+      - rfo.customer_id
+      - rfo.paid_at
+      having: []
+      outputs:
+      - field: order_item_id
+        expression: rfoi.order_item_id
+      - field: order_id
+        expression: rfoi.order_id
+      - field: customer_id
+        expression: rfo.customer_id
+      - field: paid_date
+        expression: CAST(rfo.paid_at AS DATE)
+      - field: item_effective_amount
+        expression: rfoi.item_paid_amount - COALESCE(SUM(rfr.refund_amount) FILTER (WHERE rfr.refund_status = 'completed'), 0)
+      hidden_control_fields: []
+    - stage_id: report_order_effective
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: report_item_effective
+        alias: rie
+      joins: []
+      filters: []
+      group_by:
+      - rie.customer_id
+      - rie.order_id
+      - rie.paid_date
+      having:
+      - SUM(rie.item_effective_amount) > 0
+      outputs:
+      - field: customer_id
+        expression: rie.customer_id
+      - field: order_id
+        expression: rie.order_id
+      - field: paid_date
+        expression: rie.paid_date
+      - field: order_effective_amount
+        expression: SUM(rie.item_effective_amount)
+      hidden_control_fields: []
+    - stage_id: report_customer
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: report_order_effective
+        alias: roe
+      joins: []
+      filters: []
+      group_by:
+      - roe.customer_id
+      having: []
+      outputs:
+      - field: customer_id
+        expression: roe.customer_id
+      - field: report_effective_amount
+        expression: SUM(roe.order_effective_amount)
+      hidden_control_fields: []
+    - stage_id: final
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: base_customer
+        alias: bc
+      joins:
+      - stage_id: report_customer
+        alias: rc
+        join_type: left
+        conditions:
+        - left: bc.customer_id
+          right: rc.customer_id
+      filters: []
+      group_by: []
+      having: []
+      outputs:
+      - field: r12_repurchase_customer_count
+        expression: COUNT(DISTINCT rc.customer_id)
+      hidden_control_fields:
+      - field: __group_size
+        expression: COUNT(DISTINCT bc.customer_id)
+        semantics: r12_base_customer_count
+    final_stage: final
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    - fact_refunds
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_order_items.order_item_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+    - fact_refunds.order_id
+    - fact_refunds.order_item_id
+    - fact_refunds.refund_amount
+    - fact_refunds.refund_status
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: r12_base_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: bfoi
+      - table_name: fact_orders
+        alias: bfo
+    - target_id: r12_report_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: rfoi
+      - table_name: fact_orders
+        alias: rfo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: r12_repurchase_customer_count
+      source_columns:
+      - fact_order_items.item_paid_amount
+      - fact_orders.customer_id
+      - fact_orders.paid_at
+      - fact_refunds.refund_amount
+      - fact_refunds.refund_status
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: r12_repurchase_customer_count
+    direction: desc
+- name: r12_repurchase_rate_overall_v2
+  metric: r12_repurchase_rate
+  chinese_name: 整体R12回购率
+  query_type: r12_cohort_staged_metric
+  result_grain: overall
+  description: R12回购客户数 / R12 Base客户数。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: CAST(COUNT(DISTINCT rc.customer_id) AS NUMERIC) / NULLIF(COUNT(DISTINCT bc.customer_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    - effective_purchase = order paid item amount - completed refund amount > 0
+    - R12 Base uses the 12 calendar months immediately before analysis_start_date
+    time_window_columns:
+    - fact_orders.paid_at
+  query_logic:
+    stages:
+    - stage_id: base_item_effective
+      stage_type: aggregate
+      source:
+        table: fact_order_items
+        stage_id: null
+        alias: bfoi
+      joins:
+      - table: fact_orders
+        alias: bfo
+        join_type: inner
+        conditions:
+        - left: bfoi.order_id
+          right: bfo.order_id
+      - table: fact_refunds
+        alias: bfr
+        join_type: left
+        conditions:
+        - left: bfoi.order_item_id
+          right: bfr.order_item_id
+        - left: bfoi.order_id
+          right: bfr.order_id
+      filters:
+      - bfo.paid_at IS NOT NULL
+      - CAST(bfo.paid_at AS DATE) >= (CAST(:analysis_start_date AS DATE) - INTERVAL '12 months')
+      - CAST(bfo.paid_at AS DATE) < CAST(:analysis_start_date AS DATE)
+      group_by:
+      - bfoi.order_item_id
+      - bfoi.order_id
+      - bfoi.item_paid_amount
+      - bfo.customer_id
+      - bfo.paid_at
+      having: []
+      outputs:
+      - field: order_item_id
+        expression: bfoi.order_item_id
+      - field: order_id
+        expression: bfoi.order_id
+      - field: customer_id
+        expression: bfo.customer_id
+      - field: paid_date
+        expression: CAST(bfo.paid_at AS DATE)
+      - field: item_effective_amount
+        expression: bfoi.item_paid_amount - COALESCE(SUM(bfr.refund_amount) FILTER (WHERE bfr.refund_status = 'completed'), 0)
+      hidden_control_fields: []
+    - stage_id: base_order_effective
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: base_item_effective
+        alias: bie
+      joins: []
+      filters: []
+      group_by:
+      - bie.customer_id
+      - bie.order_id
+      - bie.paid_date
+      having:
+      - SUM(bie.item_effective_amount) > 0
+      outputs:
+      - field: customer_id
+        expression: bie.customer_id
+      - field: order_id
+        expression: bie.order_id
+      - field: paid_date
+        expression: bie.paid_date
+      - field: order_effective_amount
+        expression: SUM(bie.item_effective_amount)
+      hidden_control_fields: []
+    - stage_id: base_customer
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: base_order_effective
+        alias: boe
+      joins: []
+      filters: []
+      group_by:
+      - boe.customer_id
+      having: []
+      outputs:
+      - field: customer_id
+        expression: boe.customer_id
+      - field: base_effective_amount
+        expression: SUM(boe.order_effective_amount)
+      hidden_control_fields: []
+    - stage_id: report_item_effective
+      stage_type: aggregate
+      source:
+        table: fact_order_items
+        stage_id: null
+        alias: rfoi
+      joins:
+      - table: fact_orders
+        alias: rfo
+        join_type: inner
+        conditions:
+        - left: rfoi.order_id
+          right: rfo.order_id
+      - table: fact_refunds
+        alias: rfr
+        join_type: left
+        conditions:
+        - left: rfoi.order_item_id
+          right: rfr.order_item_id
+        - left: rfoi.order_id
+          right: rfr.order_id
+      filters:
+      - rfo.paid_at IS NOT NULL
+      - CAST(rfo.paid_at AS DATE) BETWEEN :analysis_start_date AND :analysis_end_date
+      group_by:
+      - rfoi.order_item_id
+      - rfoi.order_id
+      - rfoi.item_paid_amount
+      - rfo.customer_id
+      - rfo.paid_at
+      having: []
+      outputs:
+      - field: order_item_id
+        expression: rfoi.order_item_id
+      - field: order_id
+        expression: rfoi.order_id
+      - field: customer_id
+        expression: rfo.customer_id
+      - field: paid_date
+        expression: CAST(rfo.paid_at AS DATE)
+      - field: item_effective_amount
+        expression: rfoi.item_paid_amount - COALESCE(SUM(rfr.refund_amount) FILTER (WHERE rfr.refund_status = 'completed'), 0)
+      hidden_control_fields: []
+    - stage_id: report_order_effective
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: report_item_effective
+        alias: rie
+      joins: []
+      filters: []
+      group_by:
+      - rie.customer_id
+      - rie.order_id
+      - rie.paid_date
+      having:
+      - SUM(rie.item_effective_amount) > 0
+      outputs:
+      - field: customer_id
+        expression: rie.customer_id
+      - field: order_id
+        expression: rie.order_id
+      - field: paid_date
+        expression: rie.paid_date
+      - field: order_effective_amount
+        expression: SUM(rie.item_effective_amount)
+      hidden_control_fields: []
+    - stage_id: report_customer
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: report_order_effective
+        alias: roe
+      joins: []
+      filters: []
+      group_by:
+      - roe.customer_id
+      having: []
+      outputs:
+      - field: customer_id
+        expression: roe.customer_id
+      - field: report_effective_amount
+        expression: SUM(roe.order_effective_amount)
+      hidden_control_fields: []
+    - stage_id: final
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: base_customer
+        alias: bc
+      joins:
+      - stage_id: report_customer
+        alias: rc
+        join_type: left
+        conditions:
+        - left: bc.customer_id
+          right: rc.customer_id
+      filters: []
+      group_by: []
+      having: []
+      outputs:
+      - field: r12_repurchase_rate
+        expression: CAST(COUNT(DISTINCT rc.customer_id) AS NUMERIC) / NULLIF(COUNT(DISTINCT bc.customer_id), 0)
+      hidden_control_fields:
+      - field: __group_size
+        expression: COUNT(DISTINCT bc.customer_id)
+        semantics: r12_base_customer_count
+    final_stage: final
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    - fact_refunds
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_order_items.order_item_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+    - fact_refunds.order_id
+    - fact_refunds.order_item_id
+    - fact_refunds.refund_amount
+    - fact_refunds.refund_status
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: r12_base_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: bfoi
+      - table_name: fact_orders
+        alias: bfo
+    - target_id: r12_report_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: rfoi
+      - table_name: fact_orders
+        alias: rfo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: r12_repurchase_rate
+      source_columns:
+      - fact_order_items.item_paid_amount
+      - fact_orders.customer_id
+      - fact_orders.paid_at
+      - fact_refunds.refund_amount
+      - fact_refunds.refund_status
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: r12_repurchase_rate
+    direction: desc
+- name: r12_repurchase_amount_overall_v2
+  metric: r12_repurchase_amount
+  chinese_name: 整体R12回购有效消费金额
+  query_type: r12_cohort_staged_metric
+  result_grain: overall
+  description: R12回购客户在当前报表窗口的净有效消费金额。它不是 GMV；completed refund 会回溯扣减。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(COALESCE(rc.report_effective_amount, 0))
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    - effective_purchase = order paid item amount - completed refund amount > 0
+    - R12 Base uses the 12 calendar months immediately before analysis_start_date
+    time_window_columns:
+    - fact_orders.paid_at
+  query_logic:
+    stages:
+    - stage_id: base_item_effective
+      stage_type: aggregate
+      source:
+        table: fact_order_items
+        stage_id: null
+        alias: bfoi
+      joins:
+      - table: fact_orders
+        alias: bfo
+        join_type: inner
+        conditions:
+        - left: bfoi.order_id
+          right: bfo.order_id
+      - table: fact_refunds
+        alias: bfr
+        join_type: left
+        conditions:
+        - left: bfoi.order_item_id
+          right: bfr.order_item_id
+        - left: bfoi.order_id
+          right: bfr.order_id
+      filters:
+      - bfo.paid_at IS NOT NULL
+      - CAST(bfo.paid_at AS DATE) >= (CAST(:analysis_start_date AS DATE) - INTERVAL '12 months')
+      - CAST(bfo.paid_at AS DATE) < CAST(:analysis_start_date AS DATE)
+      group_by:
+      - bfoi.order_item_id
+      - bfoi.order_id
+      - bfoi.item_paid_amount
+      - bfo.customer_id
+      - bfo.paid_at
+      having: []
+      outputs:
+      - field: order_item_id
+        expression: bfoi.order_item_id
+      - field: order_id
+        expression: bfoi.order_id
+      - field: customer_id
+        expression: bfo.customer_id
+      - field: paid_date
+        expression: CAST(bfo.paid_at AS DATE)
+      - field: item_effective_amount
+        expression: bfoi.item_paid_amount - COALESCE(SUM(bfr.refund_amount) FILTER (WHERE bfr.refund_status = 'completed'), 0)
+      hidden_control_fields: []
+    - stage_id: base_order_effective
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: base_item_effective
+        alias: bie
+      joins: []
+      filters: []
+      group_by:
+      - bie.customer_id
+      - bie.order_id
+      - bie.paid_date
+      having:
+      - SUM(bie.item_effective_amount) > 0
+      outputs:
+      - field: customer_id
+        expression: bie.customer_id
+      - field: order_id
+        expression: bie.order_id
+      - field: paid_date
+        expression: bie.paid_date
+      - field: order_effective_amount
+        expression: SUM(bie.item_effective_amount)
+      hidden_control_fields: []
+    - stage_id: base_customer
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: base_order_effective
+        alias: boe
+      joins: []
+      filters: []
+      group_by:
+      - boe.customer_id
+      having: []
+      outputs:
+      - field: customer_id
+        expression: boe.customer_id
+      - field: base_effective_amount
+        expression: SUM(boe.order_effective_amount)
+      hidden_control_fields: []
+    - stage_id: report_item_effective
+      stage_type: aggregate
+      source:
+        table: fact_order_items
+        stage_id: null
+        alias: rfoi
+      joins:
+      - table: fact_orders
+        alias: rfo
+        join_type: inner
+        conditions:
+        - left: rfoi.order_id
+          right: rfo.order_id
+      - table: fact_refunds
+        alias: rfr
+        join_type: left
+        conditions:
+        - left: rfoi.order_item_id
+          right: rfr.order_item_id
+        - left: rfoi.order_id
+          right: rfr.order_id
+      filters:
+      - rfo.paid_at IS NOT NULL
+      - CAST(rfo.paid_at AS DATE) BETWEEN :analysis_start_date AND :analysis_end_date
+      group_by:
+      - rfoi.order_item_id
+      - rfoi.order_id
+      - rfoi.item_paid_amount
+      - rfo.customer_id
+      - rfo.paid_at
+      having: []
+      outputs:
+      - field: order_item_id
+        expression: rfoi.order_item_id
+      - field: order_id
+        expression: rfoi.order_id
+      - field: customer_id
+        expression: rfo.customer_id
+      - field: paid_date
+        expression: CAST(rfo.paid_at AS DATE)
+      - field: item_effective_amount
+        expression: rfoi.item_paid_amount - COALESCE(SUM(rfr.refund_amount) FILTER (WHERE rfr.refund_status = 'completed'), 0)
+      hidden_control_fields: []
+    - stage_id: report_order_effective
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: report_item_effective
+        alias: rie
+      joins: []
+      filters: []
+      group_by:
+      - rie.customer_id
+      - rie.order_id
+      - rie.paid_date
+      having:
+      - SUM(rie.item_effective_amount) > 0
+      outputs:
+      - field: customer_id
+        expression: rie.customer_id
+      - field: order_id
+        expression: rie.order_id
+      - field: paid_date
+        expression: rie.paid_date
+      - field: order_effective_amount
+        expression: SUM(rie.item_effective_amount)
+      hidden_control_fields: []
+    - stage_id: report_customer
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: report_order_effective
+        alias: roe
+      joins: []
+      filters: []
+      group_by:
+      - roe.customer_id
+      having: []
+      outputs:
+      - field: customer_id
+        expression: roe.customer_id
+      - field: report_effective_amount
+        expression: SUM(roe.order_effective_amount)
+      hidden_control_fields: []
+    - stage_id: final
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: base_customer
+        alias: bc
+      joins:
+      - stage_id: report_customer
+        alias: rc
+        join_type: left
+        conditions:
+        - left: bc.customer_id
+          right: rc.customer_id
+      filters: []
+      group_by: []
+      having: []
+      outputs:
+      - field: r12_repurchase_amount
+        expression: SUM(COALESCE(rc.report_effective_amount, 0))
+      hidden_control_fields:
+      - field: __group_size
+        expression: COUNT(DISTINCT rc.customer_id)
+        semantics: r12_repurchase_customer_count
+    final_stage: final
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    - fact_refunds
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_order_items.order_item_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+    - fact_refunds.order_id
+    - fact_refunds.order_item_id
+    - fact_refunds.refund_amount
+    - fact_refunds.refund_status
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: r12_base_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: bfoi
+      - table_name: fact_orders
+        alias: bfo
+    - target_id: r12_report_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: rfoi
+      - table_name: fact_orders
+        alias: rfo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: r12_repurchase_amount
+      source_columns:
+      - fact_order_items.item_paid_amount
+      - fact_orders.customer_id
+      - fact_orders.paid_at
+      - fact_refunds.refund_amount
+      - fact_refunds.refund_status
+      category: aggregated_business_confidential
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: r12_repurchase_amount
+    direction: desc
+- name: r12_repurchase_spending_overall_v2
+  metric: r12_repurchase_spending
+  chinese_name: 整体R12回购客单客户消费
+  query_type: r12_cohort_staged_metric
+  result_grain: overall
+  description: R12回购有效消费金额 / R12回购客户数。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(COALESCE(rc.report_effective_amount, 0)) / NULLIF(COUNT(DISTINCT rc.customer_id), 0)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    - effective_purchase = order paid item amount - completed refund amount > 0
+    - R12 Base uses the 12 calendar months immediately before analysis_start_date
+    time_window_columns:
+    - fact_orders.paid_at
+  query_logic:
+    stages:
+    - stage_id: base_item_effective
+      stage_type: aggregate
+      source:
+        table: fact_order_items
+        stage_id: null
+        alias: bfoi
+      joins:
+      - table: fact_orders
+        alias: bfo
+        join_type: inner
+        conditions:
+        - left: bfoi.order_id
+          right: bfo.order_id
+      - table: fact_refunds
+        alias: bfr
+        join_type: left
+        conditions:
+        - left: bfoi.order_item_id
+          right: bfr.order_item_id
+        - left: bfoi.order_id
+          right: bfr.order_id
+      filters:
+      - bfo.paid_at IS NOT NULL
+      - CAST(bfo.paid_at AS DATE) >= (CAST(:analysis_start_date AS DATE) - INTERVAL '12 months')
+      - CAST(bfo.paid_at AS DATE) < CAST(:analysis_start_date AS DATE)
+      group_by:
+      - bfoi.order_item_id
+      - bfoi.order_id
+      - bfoi.item_paid_amount
+      - bfo.customer_id
+      - bfo.paid_at
+      having: []
+      outputs:
+      - field: order_item_id
+        expression: bfoi.order_item_id
+      - field: order_id
+        expression: bfoi.order_id
+      - field: customer_id
+        expression: bfo.customer_id
+      - field: paid_date
+        expression: CAST(bfo.paid_at AS DATE)
+      - field: item_effective_amount
+        expression: bfoi.item_paid_amount - COALESCE(SUM(bfr.refund_amount) FILTER (WHERE bfr.refund_status = 'completed'), 0)
+      hidden_control_fields: []
+    - stage_id: base_order_effective
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: base_item_effective
+        alias: bie
+      joins: []
+      filters: []
+      group_by:
+      - bie.customer_id
+      - bie.order_id
+      - bie.paid_date
+      having:
+      - SUM(bie.item_effective_amount) > 0
+      outputs:
+      - field: customer_id
+        expression: bie.customer_id
+      - field: order_id
+        expression: bie.order_id
+      - field: paid_date
+        expression: bie.paid_date
+      - field: order_effective_amount
+        expression: SUM(bie.item_effective_amount)
+      hidden_control_fields: []
+    - stage_id: base_customer
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: base_order_effective
+        alias: boe
+      joins: []
+      filters: []
+      group_by:
+      - boe.customer_id
+      having: []
+      outputs:
+      - field: customer_id
+        expression: boe.customer_id
+      - field: base_effective_amount
+        expression: SUM(boe.order_effective_amount)
+      hidden_control_fields: []
+    - stage_id: report_item_effective
+      stage_type: aggregate
+      source:
+        table: fact_order_items
+        stage_id: null
+        alias: rfoi
+      joins:
+      - table: fact_orders
+        alias: rfo
+        join_type: inner
+        conditions:
+        - left: rfoi.order_id
+          right: rfo.order_id
+      - table: fact_refunds
+        alias: rfr
+        join_type: left
+        conditions:
+        - left: rfoi.order_item_id
+          right: rfr.order_item_id
+        - left: rfoi.order_id
+          right: rfr.order_id
+      filters:
+      - rfo.paid_at IS NOT NULL
+      - CAST(rfo.paid_at AS DATE) BETWEEN :analysis_start_date AND :analysis_end_date
+      group_by:
+      - rfoi.order_item_id
+      - rfoi.order_id
+      - rfoi.item_paid_amount
+      - rfo.customer_id
+      - rfo.paid_at
+      having: []
+      outputs:
+      - field: order_item_id
+        expression: rfoi.order_item_id
+      - field: order_id
+        expression: rfoi.order_id
+      - field: customer_id
+        expression: rfo.customer_id
+      - field: paid_date
+        expression: CAST(rfo.paid_at AS DATE)
+      - field: item_effective_amount
+        expression: rfoi.item_paid_amount - COALESCE(SUM(rfr.refund_amount) FILTER (WHERE rfr.refund_status = 'completed'), 0)
+      hidden_control_fields: []
+    - stage_id: report_order_effective
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: report_item_effective
+        alias: rie
+      joins: []
+      filters: []
+      group_by:
+      - rie.customer_id
+      - rie.order_id
+      - rie.paid_date
+      having:
+      - SUM(rie.item_effective_amount) > 0
+      outputs:
+      - field: customer_id
+        expression: rie.customer_id
+      - field: order_id
+        expression: rie.order_id
+      - field: paid_date
+        expression: rie.paid_date
+      - field: order_effective_amount
+        expression: SUM(rie.item_effective_amount)
+      hidden_control_fields: []
+    - stage_id: report_customer
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: report_order_effective
+        alias: roe
+      joins: []
+      filters: []
+      group_by:
+      - roe.customer_id
+      having: []
+      outputs:
+      - field: customer_id
+        expression: roe.customer_id
+      - field: report_effective_amount
+        expression: SUM(roe.order_effective_amount)
+      hidden_control_fields: []
+    - stage_id: final
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: base_customer
+        alias: bc
+      joins:
+      - stage_id: report_customer
+        alias: rc
+        join_type: left
+        conditions:
+        - left: bc.customer_id
+          right: rc.customer_id
+      filters: []
+      group_by: []
+      having: []
+      outputs:
+      - field: r12_repurchase_spending
+        expression: SUM(COALESCE(rc.report_effective_amount, 0)) / NULLIF(COUNT(DISTINCT rc.customer_id), 0)
+      hidden_control_fields:
+      - field: __group_size
+        expression: COUNT(DISTINCT rc.customer_id)
+        semantics: r12_repurchase_customer_count
+    final_stage: final
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    - fact_refunds
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_order_items.order_item_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+    - fact_refunds.order_id
+    - fact_refunds.order_item_id
+    - fact_refunds.refund_amount
+    - fact_refunds.refund_status
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: r12_base_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: bfoi
+      - table_name: fact_orders
+        alias: bfo
+    - target_id: r12_report_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: rfoi
+      - table_name: fact_orders
+        alias: rfo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: r12_repurchase_spending
+      source_columns:
+      - fact_order_items.item_paid_amount
+      - fact_orders.customer_id
+      - fact_orders.paid_at
+      - fact_refunds.refund_amount
+      - fact_refunds.refund_status
+      category: aggregated_business_confidential
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: r12_repurchase_spending
     direction: desc
 - name: member_gmv_share_overall_v2
   metric: member_gmv_share
@@ -3865,12 +5622,256 @@ query_plans:
   default_sort:
     field: member_gmv_share
     direction: desc
+- name: gmv_membership_level_v2
+  metric: gmv
+  chinese_name: 支付时会员等级GMV
+  query_type: aggregate_metric
+  result_grain: membership_level
+  description: 按订单支付时会员等级拆分 GMV。member_level_at_order 为空时归入 NON_MEMBER；历史交易不会按客户后续会员状态重新分类。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: SUM(foi.item_paid_amount)
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    time_window_columns: []
+  query_logic:
+    base_source:
+      table: fact_order_items
+      alias: foi
+    joins:
+    - table: fact_orders
+      alias: fo
+      join_type: inner
+      conditions:
+      - left: foi.order_id
+        right: fo.order_id
+    group_by:
+    - fo.member_level_at_order
+    outputs:
+    - field: membership_segment
+      expression: COALESCE(fo.member_level_at_order, 'NON_MEMBER')
+    - field: gmv
+      expression: SUM(foi.item_paid_amount)
+    hidden_control_fields:
+    - field: __group_size
+      expression: COUNT(DISTINCT fo.customer_id)
+      semantics: distinct_buyers_per_payment_time_membership_segment
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_order_items
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_order_items.item_paid_amount
+    - fact_order_items.order_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.member_level_at_order
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_order_items
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: gmv_membership_level_v2_source
+      source_table: fact_order_items
+      table_aliases:
+      - table_name: fact_order_items
+        alias: foi
+      - table_name: fact_orders
+        alias: fo
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: membership_segment
+      source_columns:
+      - fact_orders.member_level_at_order
+      category: ordinary
+      token_namespace: null
+    - output_field: gmv
+      source_columns:
+      - fact_order_items.item_paid_amount
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: gmv
+    direction: desc
+- name: order_count_customer_lifecycle_membership_v2
+  metric: order_count
+  chinese_name: 客户生命周期与支付时会员订单构成
+  query_type: scope_local_customer_lifecycle_membership_composition
+  result_grain: customer_lifecycle_membership
+  description: 把当前窗口成功支付订单划分为新客订单，以及老客在支付时铂金/黄金/白银/青铜/非会员五个互斥层级。新老客判断只使用当前 Effective Scope 内、analysis_start_date 之前的可观察成功支付历史。
+  semantic_contract:
+    date_attribution: fact_orders.paid_at
+    metric_expression: COUNT(DISTINCT report order_id) grouped by scope-local customer lifecycle and payment-time membership
+    base_filters:
+    - fact_orders.paid_at IS NOT NULL
+    - old customer = same-scope customer with successful payment before analysis_start_date
+    - new customer = no same-scope successful payment before analysis_start_date and has successful payment in window
+    - old-customer membership uses fact_orders.member_level_at_order
+    time_window_columns:
+    - fact_orders.paid_at
+  query_logic:
+    stages:
+    - stage_id: old_customer_history
+      stage_type: aggregate
+      source:
+        table: fact_orders
+        stage_id: null
+        alias: hist
+      joins: []
+      filters:
+      - hist.paid_at IS NOT NULL
+      - CAST(hist.paid_at AS DATE) < :analysis_start_date
+      group_by:
+      - hist.customer_id
+      having: []
+      outputs:
+      - field: customer_id
+        expression: hist.customer_id
+      hidden_control_fields: []
+    - stage_id: report_orders
+      stage_type: project
+      source:
+        table: fact_orders
+        stage_id: null
+        alias: ro
+      joins: []
+      filters:
+      - ro.paid_at IS NOT NULL
+      - CAST(ro.paid_at AS DATE) BETWEEN :analysis_start_date AND :analysis_end_date
+      group_by: []
+      having: []
+      outputs:
+      - field: order_id
+        expression: ro.order_id
+      - field: customer_id
+        expression: ro.customer_id
+      - field: member_level_at_order
+        expression: ro.member_level_at_order
+      hidden_control_fields: []
+    - stage_id: classified_orders
+      stage_type: project
+      source:
+        table: null
+        stage_id: report_orders
+        alias: r
+      joins:
+      - stage_id: old_customer_history
+        alias: h
+        join_type: left
+        conditions:
+        - left: r.customer_id
+          right: h.customer_id
+      filters: []
+      group_by: []
+      having: []
+      outputs:
+      - field: order_id
+        expression: r.order_id
+      - field: customer_id
+        expression: r.customer_id
+      - field: customer_segment
+        expression: CASE WHEN h.customer_id IS NULL THEN 'NEW_CUSTOMER' WHEN r.member_level_at_order = 'platinum' THEN 'OLD_PLATINUM' WHEN r.member_level_at_order = 'gold' THEN 'OLD_GOLD' WHEN r.member_level_at_order = 'silver' THEN 'OLD_SILVER' WHEN r.member_level_at_order = 'bronze' THEN 'OLD_BRONZE' WHEN r.member_level_at_order IS NULL THEN 'OLD_NON_MEMBER' ELSE 'OLD_UNKNOWN' END
+      hidden_control_fields: []
+    - stage_id: final
+      stage_type: aggregate
+      source:
+        table: null
+        stage_id: classified_orders
+        alias: co
+      joins: []
+      filters: []
+      group_by:
+      - co.customer_segment
+      having: []
+      outputs:
+      - field: customer_segment
+        expression: co.customer_segment
+      - field: order_count
+        expression: COUNT(DISTINCT co.order_id)
+      hidden_control_fields:
+      - field: __group_size
+        expression: COUNT(DISTINCT co.customer_id)
+        semantics: distinct_customers_per_customer_segment
+    final_stage: final
+  resource_contract:
+    required_tables:
+    - dim_channel
+    - dim_region
+    - fact_orders
+    required_columns:
+    - dim_channel.channel_code
+    - dim_channel.channel_id
+    - dim_region.region_code
+    - dim_region.region_id
+    - fact_orders.channel_id
+    - fact_orders.customer_id
+    - fact_orders.member_level_at_order
+    - fact_orders.order_id
+    - fact_orders.paid_at
+    - fact_orders.shipping_region_id
+  scope_contract:
+    scope_mode: predicate_safe
+    source_tables:
+    - fact_orders
+    required_dimensions:
+    - channel
+    - region
+    targets:
+    - target_id: order_customer_history_source
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: hist
+    - target_id: order_customer_report_source
+      source_table: fact_orders
+      table_aliases:
+      - table_name: fact_orders
+        alias: ro
+    history_contract: null
+  result_contract:
+    field_bindings:
+    - output_field: customer_segment
+      source_columns:
+      - fact_orders.customer_id
+      - fact_orders.member_level_at_order
+      - fact_orders.paid_at
+      category: ordinary
+      token_namespace: null
+    - output_field: order_count
+      source_columns:
+      - fact_orders.order_id
+      category: ordinary
+      token_namespace: null
+    result_shape: aggregate
+    minimum_group_size_required: true
+    group_size_field: __group_size
+    policy_version: result_protection_v1
+  default_sort:
+    field: order_count
+    direction: desc
 - name: refund_rate_overall_v2
   metric: refund_rate
   chinese_name: 整体退款率
   query_type: staged_aggregate_metric
   result_grain: overall
-  description: 指定销售分析范围内，原订单支付 cohort 最终已完成退款金额 占对应原始支付 GMV 的比例。多次部分退款先按 order_item 汇总，避免重复销售分母。
+  description: 按整体计算指定销售分析范围内，原订单支付 cohort 最终已完成退款金额占对应原始支付 GMV 的比例。多次部分退款先按 order_item 汇总，避免重复销售分母。
   semantic_contract:
     date_attribution: fact_orders.paid_at
     metric_expression: SUM(item_refund_summary.completed_refund_amount) / NULLIF(SUM(item_refund_summary.item_paid_amount), 0)
@@ -3983,7 +5984,7 @@ query_plans:
       - fact_order_items.item_paid_amount
       - fact_refunds.refund_amount
       - fact_refunds.refund_status
-      category: business_confidential
+      category: aggregated_business_confidential
       token_namespace: null
     result_shape: aggregate
     minimum_group_size_required: true

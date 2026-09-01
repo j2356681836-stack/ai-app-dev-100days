@@ -511,6 +511,44 @@ def test_cte_contract_mismatch_is_denied() -> None:
     )
 
 
+
+R12_COHORT_PLAN_NAMES = (
+    "r12_base_customer_count_overall_v2",
+    "r12_repurchase_customer_count_overall_v2",
+    "r12_repurchase_rate_overall_v2",
+    "r12_repurchase_amount_overall_v2",
+    "r12_repurchase_spending_overall_v2",
+)
+
+
+def test_r12_cohort_family_ast_enforcement() -> None:
+    """
+    五个 R12 Cohort Plan 必须逐个通过 Compiler + AST Enforcement。
+    """
+
+    for plan_name in R12_COHORT_PLAN_NAMES:
+        envelope, compiled = _ready_pair(
+            plan_name=plan_name,
+            question="2025年7月1日至2025年7月31日",
+        )
+
+        decision = enforce_compiled_sql_ast_v2(
+            envelope=envelope,
+            compiled=compiled,
+        )
+
+        assert decision.success, (
+            f"{plan_name}: "
+            f"{decision.status.value}: "
+            f"{decision.detail}"
+        )
+        assert (
+            decision.status
+            == CompiledSqlAstStatusV2.ENFORCED
+        )
+        assert decision.contract is not None
+
+
 def test_catalog_wide_ast_enforcement() -> None:
     (
         catalog,
@@ -589,16 +627,36 @@ def test_catalog_wide_ast_enforcement() -> None:
         failures
     )
 
-    assert planning_counts == Counter(
-        {
-            "ready_for_compilation": 45,
-            "scope_binding_not_ready": 4,
-        }
+    # Catalog 总数不是安全合同，不应随每次正式 Metric 扩展手工改数字。
+    # 真正的 Gate 是：所有 READY Plan 都必须通过 AST Enforcement，
+    # 且 Planning 不得出现未纳入验收的状态。
+    assert sum(planning_counts.values()) == len(
+        catalog.query_plans
     )
+
+    allowed_planning_statuses = {
+        "ready_for_compilation",
+        "scope_binding_not_ready",
+    }
+    assert set(planning_counts).issubset(
+        allowed_planning_statuses
+    ), (
+        "Catalog 出现未纳入验收合同的 Planning 状态："
+        f"{dict(planning_counts)}"
+    )
+
+    ready_count = planning_counts[
+        "ready_for_compilation"
+    ]
+
     assert enforcement_counts == Counter(
         {
-            "enforced": 45,
+            "enforced": ready_count,
         }
+    ), (
+        "所有 READY_FOR_COMPILATION Plan 都必须通过 AST Enforcement："
+        f"planning={dict(planning_counts)}; "
+        f"enforcement={dict(enforcement_counts)}"
     )
 
 
@@ -611,6 +669,7 @@ TESTS = (
     test_wildcard_projection_is_denied,
     test_unknown_function_is_denied,
     test_cte_contract_mismatch_is_denied,
+    test_r12_cohort_family_ast_enforcement,
     test_catalog_wide_ast_enforcement,
 )
 

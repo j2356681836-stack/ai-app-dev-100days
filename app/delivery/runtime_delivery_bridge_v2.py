@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from enum import Enum
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +40,9 @@ from app.delivery.executive_decision_brief_v2 import (
     ExecutiveDecisionBriefPreviewV2,
     build_executive_decision_brief_preview_v2,
 )
+from app.delivery.ranking_answer_delivery_v1 import (
+    build_ranking_conclusion_v1,
+)
 from app.governance.access_context import AccessContext
 from app.governance.execution_budget import (
     ExecutionBudgetPolicy,
@@ -62,6 +66,9 @@ from app.semantic_layer.query_plan_v2_loader import (
     get_query_plan_v2_by_name,
 )
 from app.semantic_layer.question_semantic_parser_v2 import LLMCall
+from app.semantic_layer.requested_scope_resolution_v2 import (
+    RequestedScopeResolutionV2,
+)
 from app.semantic_layer.time_comparison_contract_v2 import (
     TimeWindowReferenceV2,
 )
@@ -143,6 +150,15 @@ class RuntimeDeliveryBridgeResultV2(BaseModel):
 
     safe_runtime_result: dict[str, Any]
 
+    # server-trusted Requested Scope contract。
+    # 不从 UI 文本或 scope_summary 反向解析。
+    requested_scope: RequestedScopeResolutionV2 | None = None
+
+    # 用户原问题希望达到的分析深度。
+    # 它与本次单 Query 实际形成的 FACT Evidence Delivery 分离，
+    # 防止 UI 把所有成功查询静默升级成 Investigation。
+    requested_analysis_mode: AnalysisModeV2 = AnalysisModeV2.FACT
+
     delivery: EvidencePackDeliveryV2 | None = None
     console_view: DecisionConsoleViewV2 | None = None
     executive_brief: ExecutiveDecisionBriefPreviewV2 | None = None
@@ -178,9 +194,15 @@ def _project_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _load_metric_definition_v2(
-    metric_name: str,
-):
+@lru_cache(maxsize=1)
+def _load_business_metrics_catalog_v2() -> dict[str, Any]:
+    """
+    进程内缓存 Dataset V2 Business Metrics Metadata。
+
+    business_metrics.yaml 是部署期 server-owned semantic contract，
+    不包含用户查询结果或动态业务数据。
+    """
+
     path = (
         _project_root()
         / "metadata"
@@ -192,10 +214,40 @@ def _load_metric_definition_v2(
         path.read_text(encoding="utf-8")
     )
 
+    if not isinstance(payload, dict):
+        raise ValueError(
+            "business_metrics.yaml 顶层必须是 mapping。"
+        )
+
+    return payload
+
+
+@lru_cache(maxsize=None)
+def _load_metric_definition_v2(
+    metric_name: str,
+):
+    """
+    缓存单个 Metric Definition Snapshot。
+
+    相同 metric 在 current/reference 或多个 Delivery 中复用
+    同一份不可变语义快照，避免重复 YAML parse / snapshot build。
+    """
+
     return build_metric_definition_snapshot_v2(
-        metadata_catalog=payload,
+        metadata_catalog=_load_business_metrics_catalog_v2(),
         metric_name=metric_name,
     )
+
+
+def clear_runtime_metric_metadata_cache_v2() -> None:
+    """
+    开发 / 测试时显式清理 Metric Metadata 缓存。
+
+    生产请求不应自动失效；metadata 变更应通过新部署生效。
+    """
+
+    _load_metric_definition_v2.cache_clear()
+    _load_business_metrics_catalog_v2.cache_clear()
 
 
 def _compiled_window_v2(
@@ -243,6 +295,34 @@ def _safe_public_result(
     }
 
 
+def _requested_analysis_mode_v2(
+    state: GovernedAnalystStateV2,
+) -> AnalysisModeV2:
+    """
+    从 Graph 已完成的 Analytics Planning 中读取 Requested Analysis Mode。
+
+    Structured Plan 路径没有自然语言 Analytics Planning，
+    因此安全回退为 FACT。这里不重新解析 question。
+    """
+
+    analytics = state.get("analytics")
+    resolution = getattr(
+        analytics,
+        "analysis_mode_resolution",
+        None,
+    )
+    analysis_mode = getattr(
+        resolution,
+        "analysis_mode",
+        None,
+    )
+
+    if isinstance(analysis_mode, AnalysisModeV2):
+        return analysis_mode
+
+    return AnalysisModeV2.FACT
+
+
 def _failed(
     *,
     status: RuntimeDeliveryBridgeStatusV2,
@@ -253,6 +333,9 @@ def _failed(
         status=status,
         message=message,
         safe_runtime_result=_safe_public_result(state),
+        requested_analysis_mode=(
+            _requested_analysis_mode_v2(state)
+        ),
     )
 
 
@@ -439,9 +522,17 @@ def build_runtime_delivery_from_governed_state_v2(
         else None
     )
 
+    ranking_conclusion = build_ranking_conclusion_v1(
+        delivery=delivery,
+        question=state["question"],
+        metadata_catalog=_load_business_metrics_catalog_v2(),
+        breakdown_evidence_id=breakdown_id,
+    )
+
     console_view = build_decision_console_view_v2(
         delivery=delivery,
         breakdown_evidence_id=breakdown_id,
+        ranking_conclusion=ranking_conclusion,
     )
 
     brief = build_executive_decision_brief_preview_v2(
@@ -454,6 +545,14 @@ def build_runtime_delivery_from_governed_state_v2(
         status=RuntimeDeliveryBridgeStatusV2.READY,
         message=final_answer.answer,
         safe_runtime_result=public,
+        requested_scope=getattr(
+            envelope,
+            "requested_scope",
+            None,
+        ),
+        requested_analysis_mode=(
+            _requested_analysis_mode_v2(state)
+        ),
         delivery=delivery,
         console_view=console_view,
         executive_brief=brief,
@@ -504,6 +603,7 @@ def invoke_governed_plan_delivery_v2(
     question: str,
     runtime_config: GovernanceRuntimeConfig,
     approved_tool_binding: ApprovedGovernedQueryToolBindingV2,
+    requested_scope: RequestedScopeResolutionV2 | None = None,
     execution_policy: GovernedExecutionPolicy | None = None,
     engine_override: Engine | None = None,
     event_id: str | None = None,
@@ -578,6 +678,7 @@ def invoke_governed_plan_delivery_v2(
         context=context,
         plan=plan,
         time_resolution=time_resolution,
+        requested_scope=requested_scope,
     )
 
     if (

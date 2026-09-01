@@ -239,6 +239,7 @@ def test_prompt_injection_cannot_mutate_server_access_context() -> None:
         context,
         plan,
         time_resolution,
+        requested_scope=None,
     ):
         seen["governance_context"] = context
         seen["region_scope"] = (
@@ -247,6 +248,7 @@ def test_prompt_injection_cannot_mutate_server_access_context() -> None:
         seen["channel_scope"] = (
             context.allowed_channel_codes
         )
+        seen["requested_scope"] = requested_scope
         return _governed_ready()
 
     def fake_execute_governed_query_v2(
@@ -328,6 +330,34 @@ def test_prompt_injection_cannot_mutate_server_access_context() -> None:
         seen.get("channel_scope"),
         context.allowed_channel_codes,
         "Prompt text must not expand Channel scope.",
+    )
+    requested_scope = seen.get(
+        "requested_scope"
+    )
+
+    assert_equal(
+        getattr(
+            requested_scope,
+            "region_codes",
+            frozenset(),
+        ),
+        frozenset(),
+        (
+            "This isolated security fixture must not convert prompt "
+            "instructions into trusted Requested Region codes."
+        ),
+    )
+    assert_equal(
+        getattr(
+            requested_scope,
+            "channel_codes",
+            frozenset(),
+        ),
+        frozenset(),
+        (
+            "This isolated security fixture must not convert prompt "
+            "instructions into trusted Requested Channel codes."
+        ),
     )
     assert_equal(
         context.model_dump(

@@ -122,7 +122,7 @@ SIMPLE_METRIC_SPECS: tuple[SimpleMetricSpec, ...] = (
     ),
     SimpleMetricSpec(
         metric="order_count",
-        chinese_name="交易量",
+        chinese_name="订单数",
         source_kind="orders",
         metric_expression=(
             "COUNT(DISTINCT fo.order_id)"
@@ -162,7 +162,7 @@ SIMPLE_METRIC_SPECS: tuple[SimpleMetricSpec, ...] = (
         chinese_name="IPT",
         source_kind="items",
         metric_expression=(
-            "SUM(foi.quantity) "
+            "CAST(SUM(foi.quantity) AS NUMERIC) "
             "/ NULLIF("
             "COUNT(DISTINCT fo.order_id), 0"
             ")"
@@ -197,7 +197,7 @@ SIMPLE_METRIC_SPECS: tuple[SimpleMetricSpec, ...] = (
         chinese_name="FREQ",
         source_kind="orders",
         metric_expression=(
-            "COUNT(DISTINCT fo.order_id) "
+            "CAST(COUNT(DISTINCT fo.order_id) AS NUMERIC) "
             "/ NULLIF("
             "COUNT(DISTINCT fo.customer_id), 0"
             ")"
@@ -487,7 +487,7 @@ def _metric_expression(
 
     if spec.metric == "purchase_frequency":
         return (
-            "COUNT(DISTINCT fo.order_id) "
+            "CAST(COUNT(DISTINCT fo.order_id) AS NUMERIC) "
             "/ NULLIF("
             "COUNT(DISTINCT fo.customer_id), 0"
             ")"
@@ -503,7 +503,7 @@ def _metric_expression(
 
     if spec.metric == "ipt":
         return (
-            "SUM(foi.quantity) "
+            "CAST(SUM(foi.quantity) AS NUMERIC) "
             "/ NULLIF("
             "COUNT(DISTINCT fo.order_id), 0"
             ")"

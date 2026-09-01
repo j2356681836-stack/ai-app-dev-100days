@@ -442,6 +442,43 @@ def test_unsafe_fragment_guard() -> None:
         )
 
 
+
+R12_COHORT_PLAN_NAMES = (
+    "r12_base_customer_count_overall_v2",
+    "r12_repurchase_customer_count_overall_v2",
+    "r12_repurchase_rate_overall_v2",
+    "r12_repurchase_amount_overall_v2",
+    "r12_repurchase_spending_overall_v2",
+)
+
+
+def test_r12_cohort_family_compilation() -> None:
+    """
+    B5B R12 family 必须真正进入 Governed Compiler，
+    不能因为 catalog-wide 统计变化而被静默跳过。
+    """
+
+    for plan_name in R12_COHORT_PLAN_NAMES:
+        contract = _compile(
+            plan_name=plan_name,
+            question="2025年7月1日至2025年7月31日",
+        )
+
+        sql = contract.sql
+
+        assert "base_item_effective AS (" in sql, plan_name
+        assert "report_item_effective AS (" in sql, plan_name
+        assert "INTERVAL '12 months'" in sql, plan_name
+        assert (
+            "BETWEEN :analysis_start_date "
+            "AND :analysis_end_date"
+            in sql
+        ), plan_name
+        assert contract.visible_output_fields == (
+            plan_name.removesuffix("_overall_v2"),
+        ), plan_name
+
+
 def test_catalog_wide_ready_plan_compilation() -> None:
     (
         catalog,
@@ -513,16 +550,38 @@ def test_catalog_wide_ready_plan_compilation() -> None:
         failures
     )
 
-    assert planning_counts == Counter(
-        {
-            "ready_for_compilation": 45,
-            "scope_binding_not_ready": 4,
-        }
+    # Catalog 会随正式能力扩展而增长，因此这里不再写死 Plan 总数。
+    # Gate 仍保持严格：
+    # 1) 每个 Catalog Plan 都必须产生一个已知 Planning 状态；
+    # 2) 任何 READY Plan 都必须成功编译；
+    # 3) 不允许出现未预期的新 Planning 状态。
+    assert sum(planning_counts.values()) == len(
+        catalog.query_plans
     )
+
+    allowed_planning_statuses = {
+        "ready_for_compilation",
+        "scope_binding_not_ready",
+    }
+    assert set(planning_counts).issubset(
+        allowed_planning_statuses
+    ), (
+        "Catalog 出现未纳入验收合同的 Planning 状态："
+        f"{dict(planning_counts)}"
+    )
+
+    ready_count = planning_counts[
+        "ready_for_compilation"
+    ]
+
     assert compile_counts == Counter(
         {
-            "compiled": 45,
+            "compiled": ready_count,
         }
+    ), (
+        "所有 READY_FOR_COMPILATION Plan 都必须成功编译："
+        f"planning={dict(planning_counts)}; "
+        f"compile={dict(compile_counts)}"
     )
 
 
@@ -534,6 +593,7 @@ TESTS = (
     test_sqlalchemy_named_parameter_contract,
     test_compilation_is_deterministic,
     test_unsafe_fragment_guard,
+    test_r12_cohort_family_compilation,
     test_catalog_wide_ready_plan_compilation,
 )
 

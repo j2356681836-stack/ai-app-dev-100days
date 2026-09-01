@@ -20,6 +20,11 @@ class SensitiveDataPolicy(BaseModel):
     allow_direct_identifiers: bool = False
     allow_free_text: bool = False
     allow_cost_data: bool = False
+
+    # 聚合业务敏感指标与原始成本/退款/营销敏感数据分离。
+    # 默认 False，只有 server-owned composition root 可以显式开启。
+    allow_aggregated_business_metrics: bool = False
+
     minimum_group_size: int = Field(default=5, ge=1)
 
 

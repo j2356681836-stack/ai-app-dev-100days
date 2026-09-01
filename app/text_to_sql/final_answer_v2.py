@@ -24,7 +24,7 @@ class FinalAnswerStatusV2(str, Enum):
 
 
 class ScopeDisclosureV2(BaseModel):
-    """本次 SQL 实际绑定的授权数据范围。"""
+    """本次 SQL 实际绑定的有效数据范围。"""
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
@@ -189,7 +189,7 @@ def _scope_prefix(
         return ""
 
     return (
-        "基于本次实际执行的授权数据范围（"
+        "基于本次实际执行的有效数据范围（"
         f"{disclosure.summary}），"
     )
 

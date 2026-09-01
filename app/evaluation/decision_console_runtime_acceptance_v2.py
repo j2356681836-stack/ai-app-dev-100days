@@ -14,6 +14,10 @@ from app.governance.access_context import (
 from app.semantic_layer.query_plan_v2_loader import (
     load_query_plan_v2_catalog,
 )
+from app.semantic_layer.channel_applicability_v2 import (
+    ChannelBusinessRoleV2,
+    channel_codes_for_role_v2,
+)
 
 
 EXPECTED_VERSION = "decision_console_runtime_v2_0"
@@ -72,7 +76,22 @@ def test_ui_scope_is_server_owned() -> None:
         request_id="day89-runtime-test",
     )
 
-    assert context.allowed_channel_codes == DAY89_LOCAL_CHANNEL_CODES
+    expected_sales_channels = (
+        DAY89_LOCAL_CHANNEL_CODES
+        & channel_codes_for_role_v2(
+            ChannelBusinessRoleV2.SALES
+        )
+    )
+
+    # Governance boundary remains server-owned, but the server-owned
+    # authorization scope is now further narrowed by business applicability:
+    #
+    # Authorized Scope ∩ Metric Applicable Scope.
+    #
+    # Therefore GMV / sales-oriented Decision Console scope must not include
+    # marketing-only channels such as Xiaohongshu.
+    assert context.allowed_channel_codes == expected_sales_channels
+    assert "XIAOHONGSHU" not in context.allowed_channel_codes
     assert context.allowed_region_codes == DAY89_LOCAL_REGION_CODES
     assert context.denied_columns == frozenset()
 

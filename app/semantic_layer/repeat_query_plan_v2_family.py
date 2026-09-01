@@ -207,9 +207,11 @@ def build_repeat_customer_rate_overall_plan() -> QueryPlanV2:
             "成功支付购买客户数的比例。"
         ),
         final_expression=(
+            "CAST("
             "COUNT(*) FILTER "
             "(WHERE cps.purchase_day_count >= 2) "
-            "/ NULLIF(COUNT(*), 0)"
+            "AS NUMERIC"
+            ") / NULLIF(COUNT(*), 0)"
         ),
     )
 

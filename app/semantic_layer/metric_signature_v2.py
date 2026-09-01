@@ -38,6 +38,20 @@ class SemanticOperand(str, Enum):
     )
     MULTI_PAID_ORDER_CUSTOMER = "multi_paid_order_customer"
 
+    # Day93 B5B R12 Cohort structural operands.
+    #
+    # 这些 operand 描述的是 Cohort Eligibility / Repurchase 业务身份，
+    # 不能复用 PAID_BUYER 或 REPEAT_DISTINCT_PAID_DATE_CUSTOMER：
+    # - PAID_BUYER 是当前分析窗口的购买客户；
+    # - REPEAT_DISTINCT_PAID_DATE_CUSTOMER 是窗口内跨日复购客户；
+    # - R12 Base / Repurchase 使用“报表期前 R12 eligibility + 本期回购”
+    #   的独立 Cohort 语义。
+    R12_BASE_CUSTOMER = "r12_base_customer"
+    R12_REPURCHASE_CUSTOMER = "r12_repurchase_customer"
+    R12_REPURCHASE_EFFECTIVE_AMOUNT = (
+        "r12_repurchase_effective_amount"
+    )
+
     PAYMENT_TIME_MEMBER_PAID_AMOUNT = (
         "payment_time_member_paid_amount"
     )

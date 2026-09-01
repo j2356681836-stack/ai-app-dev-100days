@@ -29,6 +29,17 @@ from app.semantic_layer.analytics_planning_service_v2 import (
     AnalyticsPlanningStatusV2,
     resolve_analytics_planning_v2,
 )
+from app.semantic_layer.business_request_preflight_v2 import (
+    BusinessRequestPreflightDecisionV2,
+    BusinessRequestPreflightOutcomeV2,
+    evaluate_business_request_preflight_v2,
+)
+from app.semantic_layer.dataset_availability_contract_v2 import (
+    DatasetAvailabilityDecisionV2,
+    DatasetAvailabilityOutcomeV2,
+    evaluate_dataset_availability_v2,
+    evaluate_explicit_dataset_availability_preflight_v2,
+)
 from app.semantic_layer.query_plan_compiler_v2 import (
     QueryPlanCompileStatusV2,
     compile_governed_query_plan_v2,
@@ -70,9 +81,11 @@ class GovernedAnalystStateV2(TypedDict, total=False):
     occurred_at_utc: datetime | None
     written_at_utc: datetime | None
 
+    business_preflight: BusinessRequestPreflightDecisionV2
     analytics: Any
     plan: Any
     time_resolution: Any
+    dataset_availability: DatasetAvailabilityDecisionV2
     governed_decision: Any
     envelope: Any
     compilation_decision: Any
@@ -117,6 +130,79 @@ def _budget_denied(
         decision is not None
         and not decision.allowed
     )
+
+
+def business_request_preflight_node(
+    state: GovernedAnalystStateV2,
+) -> GovernedAnalystStateV2:
+    """
+    SQL / Semantic Planning 之前的确定性业务能力边界。
+
+    不消耗 Governed Tool / SQL Budget；它只读取用户问题和
+    server-owned semantic metadata。
+    """
+    decision = evaluate_business_request_preflight_v2(
+        state["question"]
+    )
+
+    return {
+        "business_preflight": decision,
+        "graph_error": None,
+    }
+
+
+def route_business_request_preflight(
+    state: GovernedAnalystStateV2,
+) -> Literal[
+    "dataset_availability_fast_preflight",
+    "business_preflight_stop",
+]:
+    decision = state["business_preflight"]
+
+    if (
+        decision.outcome
+        == BusinessRequestPreflightOutcomeV2.CONTINUE
+    ):
+        return "dataset_availability_fast_preflight"
+
+    return "business_preflight_stop"
+
+
+def dataset_availability_fast_preflight_node(
+    state: GovernedAnalystStateV2,
+) -> GovernedAnalystStateV2:
+    """
+    Semantic / LLM Planning 之前的显式时间 Dataset Availability 快检。
+
+    该节点不消耗 Governed Tool / SQL Budget，也不调用 LLM。
+    只有“单一、显式、确定性时间窗”才会在这里做提前判断；
+    其余情况继续交给原 Analytics Planning 与正式 Time Resolution。
+    """
+    decision = evaluate_explicit_dataset_availability_preflight_v2(
+        question=state["question"],
+        reference_date=state["reference_date"],
+    )
+
+    return {
+        "dataset_availability": decision,
+    }
+
+
+def route_dataset_availability_fast_preflight(
+    state: GovernedAnalystStateV2,
+) -> Literal[
+    "analytics_planning",
+    "dataset_availability_stop",
+]:
+    decision = state["dataset_availability"]
+
+    if decision.outcome in {
+        DatasetAvailabilityOutcomeV2.OUTSIDE_BUSINESS_WINDOW,
+        DatasetAvailabilityOutcomeV2.PARTIAL_OVERLAP,
+    }:
+        return "dataset_availability_stop"
+
+    return "analytics_planning"
 
 
 def analytics_planning_node(
@@ -266,7 +352,7 @@ def resolve_time_node(
 def route_time_resolution(
     state: GovernedAnalystStateV2,
 ) -> Literal[
-    "governed_planning",
+    "dataset_availability",
     "budget_stop",
 ]:
     if _budget_denied(
@@ -274,7 +360,42 @@ def route_time_resolution(
     ):
         return "budget_stop"
 
-    return "governed_planning"
+    return "dataset_availability"
+
+
+def dataset_availability_node(
+    state: GovernedAnalystStateV2,
+) -> GovernedAnalystStateV2:
+    """
+    Time Resolver 之后、Governance / SQL 之前的数据覆盖检查。
+
+    这里不把超出范围的日期静默截断到 Dataset Window。
+    完全越界或部分越界都明确停止，让用户知道可查询范围。
+    """
+    decision = evaluate_dataset_availability_v2(
+        time_resolution=state["time_resolution"]
+    )
+
+    return {
+        "dataset_availability": decision,
+    }
+
+
+def route_dataset_availability(
+    state: GovernedAnalystStateV2,
+) -> Literal[
+    "governed_planning",
+    "dataset_availability_stop",
+]:
+    decision = state["dataset_availability"]
+
+    if decision.outcome in {
+        DatasetAvailabilityOutcomeV2.AVAILABLE,
+        DatasetAvailabilityOutcomeV2.NOT_APPLICABLE,
+    }:
+        return "governed_planning"
+
+    return "dataset_availability_stop"
 
 
 def governed_planning_node(
@@ -290,10 +411,15 @@ def governed_planning_node(
             budget
         )
 
+    analytics = state["analytics"]
+
     decision = build_governed_planning_envelope_v2(
         context=state["context"],
         plan=state["plan"],
         time_resolution=state["time_resolution"],
+        requested_scope=(
+            analytics.requested_scope_resolution
+        ),
     )
 
     update: GovernedAnalystStateV2 = {
@@ -520,7 +646,9 @@ def final_answer_node(
 def _safe_common_evidence(
     state: GovernedAnalystStateV2,
 ) -> dict[str, Any]:
+    business_preflight = state.get("business_preflight")
     analytics = state.get("analytics")
+    dataset_availability = state.get("dataset_availability")
     envelope = state.get("envelope")
     compiled = state.get("compiled")
     ast_decision = state.get("ast_decision")
@@ -531,6 +659,26 @@ def _safe_common_evidence(
 
     return {
         "question": state["question"],
+        "business_preflight_outcome": (
+            business_preflight.outcome.value
+            if business_preflight is not None
+            else None
+        ),
+        "business_preflight_reason_code": (
+            business_preflight.reason_code
+            if business_preflight is not None
+            else None
+        ),
+        "dataset_availability_outcome": (
+            dataset_availability.outcome.value
+            if dataset_availability is not None
+            else None
+        ),
+        "dataset_availability_reason_code": (
+            dataset_availability.reason_code
+            if dataset_availability is not None
+            else None
+        ),
         "budget_steps_used": (
             budget_state.steps_used
             if budget_state is not None
@@ -545,6 +693,35 @@ def _safe_common_evidence(
             analytics.status.value
             if analytics is not None
             else None
+        ),
+        "requested_region_codes": (
+            sorted(
+                analytics.requested_scope_resolution.region_codes
+            )
+            if analytics is not None
+            else []
+        ),
+        "requested_channel_codes": (
+            sorted(
+                analytics.requested_scope_resolution.channel_codes
+            )
+            if analytics is not None
+            else []
+        ),
+        "requested_scope_status": (
+            analytics.requested_scope_resolution.status.value
+            if analytics is not None
+            else None
+        ),
+        "unresolved_scope_dimensions": (
+            sorted(
+                dimension.value
+                for dimension
+                in analytics.requested_scope_resolution
+                .unresolved_dimensions
+            )
+            if analytics is not None
+            else []
         ),
         "metric_name": (
             envelope.metric_name
@@ -590,6 +767,55 @@ def _safe_common_evidence(
     }
 
 
+def business_preflight_stop_node(
+    state: GovernedAnalystStateV2,
+) -> GovernedAnalystStateV2:
+    decision = state["business_preflight"]
+
+    result = {
+        "success": False,
+        "outcome": "stopped",
+        "stop_stage": "business_request_preflight",
+        "message": (
+            decision.user_message
+            or "这个问题暂时不能安全查询。"
+        ),
+        "reason_code": decision.reason_code,
+        **_safe_common_evidence(state),
+    }
+
+    return {
+        "result": result,
+    }
+
+
+def dataset_availability_stop_node(
+    state: GovernedAnalystStateV2,
+) -> GovernedAnalystStateV2:
+    decision = state["dataset_availability"]
+
+    result = {
+        "success": False,
+        "outcome": "no_data",
+        "stop_stage": "dataset_availability",
+        "message": (
+            decision.user_message
+            or "当前请求的时间范围没有可查询的业务数据。"
+        ),
+        "reason_code": decision.reason_code,
+        "dataset_business_start_date": (
+            decision.business_window.start_date.isoformat()
+        ),
+        "dataset_business_end_date": (
+            decision.business_window.end_date.isoformat()
+        ),
+        **_safe_common_evidence(state),
+    }
+
+    return {
+        "result": result,
+    }
+
 def budget_stop_node(
     state: GovernedAnalystStateV2,
 ) -> GovernedAnalystStateV2:
@@ -616,17 +842,107 @@ def budget_stop_node(
     }
 
 
+def _analytics_stop_business_message_v2(
+    analytics,
+) -> str:
+    status = analytics.status
+
+    if (
+        status
+        == AnalyticsPlanningStatusV2.NEEDS_SCOPE_CLARIFICATION
+    ):
+        return (
+            "我识别到了你指定的地区或渠道，"
+            "但暂时无法可靠映射到当前数据范围。"
+            "请换用系统中已有的地区或渠道名称后再试。"
+        )
+
+    if (
+        status
+        == AnalyticsPlanningStatusV2.NEEDS_METRIC_CLARIFICATION
+    ):
+        return (
+            "这个问题还需要确认指标口径后才能查询。"
+            "请补充你具体想看的业务指标。"
+        )
+
+    if status == AnalyticsPlanningStatusV2.UNSUPPORTED_METRIC:
+        return (
+            "这个问题暂不支持查询。"
+            "当前系统还没有找到可安全执行的指标口径。"
+        )
+
+    if status == AnalyticsPlanningStatusV2.MULTIPLE_INTENTS:
+        return (
+            "这个问题包含多个分析目标，"
+            "当前还不能一次安全完成。"
+            "你可以先拆成一个问题查询；"
+            "系统不会为了给出结果而混合不同分析口径。"
+        )
+
+    if status in {
+        AnalyticsPlanningStatusV2.MISSING_GRAIN,
+        AnalyticsPlanningStatusV2.AMBIGUOUS_GRAIN,
+    }:
+        return (
+            "这个问题还需要确认你希望按什么维度查看，"
+            "例如整体、渠道、地区或品类。"
+        )
+
+    if status == AnalyticsPlanningStatusV2.UNSUPPORTED_GRAIN:
+        return (
+            "这个问题的分析维度暂不支持直接查询。"
+            "请改用当前已支持的整体、渠道、地区或品类维度。"
+        )
+
+    if status == AnalyticsPlanningStatusV2.EVIDENCE_CONFLICT:
+        return (
+            "系统对这个问题的指标理解存在冲突，"
+            "为了避免返回错误数据，本次没有继续查询。"
+            "请把指标或分析范围说得更明确一些。"
+        )
+
+    if status == AnalyticsPlanningStatusV2.PARSE_FAILED:
+        return (
+            "暂时没能可靠理解这个问题。"
+            "请换一种更明确的业务表达后再试。"
+        )
+
+    if status == AnalyticsPlanningStatusV2.CATALOG_CONFLICT:
+        return (
+            "当前查询配置存在冲突，暂时无法安全执行。"
+            "这不是数据本身的问题。"
+        )
+
+    if status == AnalyticsPlanningStatusV2.METRIC_NOT_FOUND:
+        return (
+            "这个问题暂时没有可用的查询指标。"
+            "请换一个已定义的业务指标后再试。"
+        )
+
+    if status == AnalyticsPlanningStatusV2.PLANNED_MULTIPLE:
+        return (
+            "这个问题需要多个分析步骤，"
+            "当前版本还不能一次完成。"
+            "你可以先拆成单个问题查询。"
+        )
+
+    return (
+        "这个问题目前还不能安全形成查询。"
+        "请补充更明确的指标、时间或分析维度后再试。"
+    )
+
+
 def analytics_stop_node(
     state: GovernedAnalystStateV2,
 ) -> GovernedAnalystStateV2:
+    analytics = state["analytics"]
+
     result = {
         "success": False,
         "outcome": "stopped",
         "stop_stage": "analytics_planning",
-        "message": (
-            "当前请求未形成单一可执行 Query Plan，"
-            "因此未进入治理执行链。"
-        ),
+        "message": _analytics_stop_business_message_v2(analytics),
         **_safe_common_evidence(state),
     }
 

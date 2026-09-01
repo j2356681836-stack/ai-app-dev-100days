@@ -31,6 +31,10 @@ from app.semantic_layer.analytics_planning_service_v2 import (
 from app.semantic_layer.query_plan_compiler_v2 import (
     QueryPlanCompileStatusV2,
 )
+from app.semantic_layer.requested_scope_resolution_v2 import (
+    RequestedScopeResolutionStatusV2,
+    RequestedScopeResolutionV2,
+)
 from app.text_to_sql.final_answer_v2 import (
     FinalAnswerStatusV2,
 )
@@ -132,6 +136,15 @@ def _runtime_config() -> GovernanceRuntimeConfig:
     )
 
 
+def _no_explicit_requested_scope():
+    return RequestedScopeResolutionV2(
+        status=(
+            RequestedScopeResolutionStatusV2
+            .NO_EXPLICIT_SCOPE
+        ),
+    )
+
+
 def _analytics_single():
     return SimpleNamespace(
         status=(
@@ -140,6 +153,9 @@ def _analytics_single():
         ),
         semantic_decision=SimpleNamespace(
             candidates=("gmv",),
+        ),
+        requested_scope_resolution=(
+            _no_explicit_requested_scope()
         ),
         metric_name="gmv",
         plan_names=("gmv_overall_v2",),
@@ -155,6 +171,9 @@ def _analytics_multiple():
         ),
         semantic_decision=SimpleNamespace(
             candidates=("gmv",),
+        ),
+        requested_scope_resolution=(
+            _no_explicit_requested_scope()
         ),
         metric_name="gmv",
         plan_names=(

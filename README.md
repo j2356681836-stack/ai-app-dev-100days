@@ -895,6 +895,89 @@ Day92 formal repair commit observed PASS
 - Dataset V2 继续是 Candidate，Latest Stable 仍是 Day60 V1。
 
 
+### Day93 Blind / Fresh Generalization / Investigation Hardening
+
+Day93 对 Phase4 的业务调查能力进行了 Blind / Fresh Generalization 与真实 Decision Console 验收，并针对未见 Case 暴露出的通用缺口完成收束。
+
+当前冻结能力：
+
+```text
+Business Question
+↓
+Comparison Seed
+↓
+Comparison-aware Investigation
+├─ Channel Change
+├─ Category Change
+├─ Geography：AREA → PROVINCE → CITY
+└─ Campaign / Promotion Change
+↓
+Reconciliation
+↓
+Evidence / Verification / History
+↓
+Business Decision Boundary
+```
+
+关键增强：
+- Comparison Seed 明确交付 reference / current 完整时间窗口、两期 KPI、变化额与变化率；
+- 后续“XX变化”调查必须继承同一 Comparison，不再退化成单期 Snapshot；
+- Channel / Category / Geography / Campaign 的两期变化分解支持 reconciliation；
+- Geography 严格遵循 `AREA → PROVINCE → CITY`，并区分系统 Investigation 与用户 Exploration；
+- Analytical Path 使用完整 Semantic Signature 判断 `SAME / REFINE / SLICE / SWITCH / CROSS`，不再因为大类相同就误判重复查询；
+- 用户自定义调查支持业务语义识别，未注册 capability 明确 fail-closed；
+- Authorized Scope 与 Metric Applicable Scope 分离：GMV 只适用于 5 个销售渠道，小红书保持 marketing-only；
+- Activity / Promotion 支持 Campaign 数值分解，但明确 `campaign contribution ≠ causal uplift`；
+- Analysis History 可恢复原始问题与深入调查状态；
+- Periodic Report 修复 historical anchor 第一次提交可能回到默认完成周期的问题。
+
+Fresh / Regression discipline：
+
+```text
+FG01
+→ 首次执行暴露问题并参与修复
+→ Post-Failure Regression PASS
+→ 不再声称 Fresh
+
+FG02
+→ 修复冻结后首次执行
+→ Fresh Generalization PASS
+```
+
+代表性 FG02：
+
+```text
+2025-03 GMV：977,438.66
+2025-04 GMV：808,481.78
+Delta：-168,956.88
+Delta Rate：-17.29%
+
+Channel Change：reconciled
+Category Change：reconciled
+Duplicate Semantic Request：no new query / no fake evidence
+```
+
+Day93 Final Gate：
+
+```text
+F02 Human Calibration                 PASS
+Comparison-aware Investigation        PASS
+FG01 Post-Failure Regression          PASS
+FG02 Fresh Generalization             PASS
+R01 Monthly Final Rerun               PASS
+Periodic Anchor First-submit Fix      PASS
+Day93 Final Regression Suite          PASS
+Unified Regression V2                 PASS
+```
+
+当前边界：
+- Contribution / Campaign attribution 不等于因果解释；
+- Evidence-aware Investigation Routing 尚未实现；
+- `Campaign × Channel` / `Campaign × Category` 等 Cross-Analysis 尚未正式注册；
+- Production Active Anomaly Policy 仍为 0；
+- Dataset V2 继续保持 Candidate，Latest Stable 仍为 Day60 V1；
+- Day94 执行 Phase4 Full Regression / Public Delivery Hard Gate / Portfolio Evidence Freeze。
+
 # Demo
 
 用户输入：哪个品类退款率最高？
@@ -2016,7 +2099,7 @@ Phase3 最终定位：一个运行在 Beauty BI Dataset V2 上、具备可解释
 
 Evidence-based Business Insight Engine + Public Delivery
 
-状态：🚧 进行中（Day92 Cloud Deployment / Public Demo 已完成）
+状态：🚧 进行中（Day93 Blind / Fresh Generalization / Final Regression 已完成，Day94 READY）
 
 当前 Day82-Day94 目标：
 - ✅ Day82：Insight Contract / Tool Contract / Time Comparison / Business Decision Evaluation Contract；
@@ -2030,7 +2113,7 @@ Evidence-based Business Insight Engine + Public Delivery
 - ✅ Day90：Docker Compose / One-command Startup / Fresh-volume Reproducibility；
 - ✅ Day91：Observability / Unified Regression / CI / Delivery Performance；
 - ✅ Day92：Cloud Deployment / Public Demo / Public Business Smoke；
-- Day93：Blind Test / Human Expert Proxy Review；
+- ✅ Day93：Blind / Fresh Generalization / Human Calibration / Investigation Hardening / Final Regression；
 - Day94：Phase4 Full Regression / Public Delivery Hard Gate。
 
 Phase4 不以继续扩建 Text-to-SQL 为主，而是把已受治理的数据查询能力升级为“证据化经营异动诊断”。
@@ -2140,9 +2223,9 @@ Decision Console / Answer / Audit Trace
 # 当前版本
 
 Version: v0.60
-完成度：Day92 / 100
+完成度：Day93 / 100
 Phase3：CLOSED
-Phase4：IN_PROGRESS（Day92 completed）
+Phase4：IN_PROGRESS（Day93 completed / Day94 READY）
 
 Latest Stable Baseline：
 
@@ -2341,10 +2424,33 @@ Final Git State：main == origin/main / working tree clean
 Final Day92 Commit：50f15f2
 ```
 
+Day93 Blind / Fresh Generalization / Investigation Hardening：
+
+```text
+F02 Human Calibration：PASS
+FG01 Post-Failure Regression：PASS
+FG02 Fresh Generalization：PASS
+Comparison Seed / Comparison-aware Investigation：PASS
+Geography AREA → PROVINCE → CITY：PASS
+Campaign Change / Reconciliation：PASS
+History / Evidence Clarity：PASS
+R01 Monthly Final Rerun：PASS
+Periodic Anchor First-submit Fix：PASS
+Final Regression Suite：PASS
+Unified Regression V2：PASS
+```
+
+Day93 继续保持：
+- Dataset V2 = Candidate；
+- Latest Stable = Day60 / `beauty_bi_v1` / `6701323`；
+- Production Active Anomaly Policy = 0；
+- Contribution / Campaign attribution 不升级为 causal proof；
+- Evidence-aware Routing 与 Cross-Analysis 留到 Phase4 之后评估，不进入 Day94 新功能范围。
+
 当前已知限制：
 - `SEM-REL-GAP-001`：live Structured Semantic Parser repeatability；
 - `TIME-REL-GAP-001`：显式年份表达存在 whitespace / silent fallback 风险；Day88 只修 observed probe fixture，生产 Time Resolver 尚待 Public Delivery 前关闭；
-- Periodic Report Date Widget：Day92 公网手工测试观察到年份切换后的首次日期选择可能回到当前年份，必须在 Day94 Hard Gate 前收束；
+- Periodic Report Date Widget：Day93 已关闭 first-submit anchor commit 问题，historical anchor 第一次提交即可稳定进入 Runtime；
 - Semantic Metric Clarification UX：模糊指标问题可以 fail-closed，但尚未把 metric-level `NEEDS_CLARIFICATION` 投影成 server-owned selectable choices；
 - Cloud Observability / public edge rate-limit：Day92 不把它们冒充已完成 production hardening，Day94 只根据真实证据做最终声明；
 - `SCOPE-GAP-001`：Requested Region / Channel Value Filter 尚未正式结构化；
@@ -2355,4 +2461,4 @@ Final Day92 Commit：50f15f2
 - V2 automatic SQL Repair Runtime disabled；
 - real LLM token usage 已由 Day91 Langfuse Generation Capture 完成；可信 cost mapping 尚未验证，Token Usage 尚未接入在线 Execution Budget；Observability ↔ Audit 的进一步 correlation 仍可增强。
 
-下一步：Day93 进入 Blind Test / Human Expert Proxy Review，使用真正 unseen business cases 通过公网 Decision Console 验证 Business Decision Quality、Judge ↔ Human calibration 与 success / partial / failure / unsupported 的诚实交付。
+下一步：Day94 进入 Phase4 Product Hardening / Full Regression / Public Delivery Hard Gate，冻结 5-minute demo、Trust & Verification、Export Acceptance 与 Phase4 Closing Evidence；不新增 Evidence-aware Routing、Cross-Analysis 或因果推断能力。

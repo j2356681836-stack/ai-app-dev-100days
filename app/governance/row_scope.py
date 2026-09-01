@@ -7,6 +7,10 @@ from typing import AbstractSet
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.governance.access_context import AccessContext
+from app.semantic_layer.requested_scope_resolution_v2 import (
+    RequestedScopeResolutionStatusV2,
+    RequestedScopeResolutionV2,
+)
 
 
 class ScopeDimension(str, Enum):
@@ -20,6 +24,15 @@ class RowScopeReason(str, Enum):
     INVALID_SOURCE_TABLE = "invalid_source_table"
     INVALID_SCOPE_DECLARATION = "invalid_scope_declaration"
     UNSUPPORTED_SCOPE_PATH = "unsupported_scope_path"
+    REQUESTED_SCOPE_UNAUTHORIZED = (
+        "requested_scope_unauthorized"
+    )
+    REQUESTED_SCOPE_DIMENSION_UNSUPPORTED = (
+        "requested_scope_dimension_unsupported"
+    )
+    REQUESTED_SCOPE_UNRESOLVED = (
+        "requested_scope_unresolved"
+    )
 
 
 class ScopeJoin(BaseModel):
@@ -319,6 +332,45 @@ def _allowed_codes_for_dimension(
     return context.allowed_channel_codes
 
 
+def _requested_codes_for_dimension(
+    requested_scope: RequestedScopeResolutionV2 | None,
+    dimension: ScopeDimension,
+) -> frozenset[str]:
+    if (
+        requested_scope is None
+        or requested_scope.status
+        == RequestedScopeResolutionStatusV2.NO_EXPLICIT_SCOPE
+    ):
+        return frozenset()
+
+    if dimension == ScopeDimension.REGION:
+        return requested_scope.region_codes
+
+    return requested_scope.channel_codes
+
+
+def _effective_codes_for_dimension(
+    *,
+    context: AccessContext,
+    requested_scope: RequestedScopeResolutionV2 | None,
+    dimension: ScopeDimension,
+) -> frozenset[str]:
+    authorized = _allowed_codes_for_dimension(
+        context,
+        dimension,
+    )
+
+    requested = _requested_codes_for_dimension(
+        requested_scope,
+        dimension,
+    )
+
+    if not requested:
+        return authorized
+
+    return requested
+
+
 def _path_for(
     dimension: ScopeDimension,
     source_table: str,
@@ -377,6 +429,7 @@ def _build_requirement(
     dimension: ScopeDimension,
     source_table: str,
     spec: _ScopePathSpec,
+    requested_scope: RequestedScopeResolutionV2 | None,
 ) -> RowScopeRequirement:
     joins = tuple(
         ScopeJoin(
@@ -401,9 +454,10 @@ def _build_requirement(
         lookup_table=spec.lookup_table,
         lookup_id_column=spec.lookup_id_column,
         lookup_code_column=spec.lookup_code_column,
-        allowed_codes=_allowed_codes_for_dimension(
-            context,
-            dimension,
+        allowed_codes=_effective_codes_for_dimension(
+            context=context,
+            requested_scope=requested_scope,
+            dimension=dimension,
         ),
         parameter_name=spec.parameter_name,
         join_path=joins,
@@ -478,6 +532,7 @@ def plan_row_scope(
             ScopeDimension.CHANNEL,
         }
     ),
+    requested_scope: RequestedScopeResolutionV2 | None = None,
 ) -> RowScopeDecision:
     """
     为明确声明的分析事实来源表生成不可变 Row Scope Plan。
@@ -536,6 +591,78 @@ def plan_row_scope(
             ),
         )
 
+    if (
+        requested_scope is not None
+        and requested_scope.status
+        == RequestedScopeResolutionStatusV2
+        .UNRESOLVED_EXPLICIT_SCOPE
+    ):
+        return _denied(
+            context,
+            reason_code=(
+                RowScopeReason
+                .REQUESTED_SCOPE_UNRESOLVED
+            ),
+            message=(
+                "Explicit Requested Scope contains one or more "
+                "unresolved dimension values."
+            ),
+        )
+
+    requested_dimensions = frozenset(
+        dimension
+        for dimension in ScopeDimension
+        if _requested_codes_for_dimension(
+            requested_scope,
+            dimension,
+        )
+    )
+
+    unsupported_requested_dimensions = (
+        requested_dimensions
+        - dimensions
+    )
+
+    if unsupported_requested_dimensions:
+        return _denied(
+            context,
+            reason_code=(
+                RowScopeReason
+                .REQUESTED_SCOPE_DIMENSION_UNSUPPORTED
+            ),
+            message=(
+                "The Query Plan cannot safely apply one or more "
+                "explicitly requested Scope dimensions."
+            ),
+        )
+
+    unauthorized_requested_dimensions = frozenset(
+        dimension
+        for dimension in requested_dimensions
+        if not _requested_codes_for_dimension(
+            requested_scope,
+            dimension,
+        ).issubset(
+            _allowed_codes_for_dimension(
+                context,
+                dimension,
+            )
+        )
+    )
+
+    if unauthorized_requested_dimensions:
+        return _denied(
+            context,
+            reason_code=(
+                RowScopeReason
+                .REQUESTED_SCOPE_UNAUTHORIZED
+            ),
+            message=(
+                "One or more explicitly requested Scope values "
+                "are outside the authorized data scope."
+            ),
+        )
+
     empty_dimensions = frozenset(
         dimension
         for dimension in dimensions
@@ -584,6 +711,7 @@ def plan_row_scope(
             dimension=dimension,
             source_table=source_table,
             spec=_path_for(dimension, source_table),
+            requested_scope=requested_scope,
         )
         for source_table in sorted(normalized_tables)
         for dimension in sorted(

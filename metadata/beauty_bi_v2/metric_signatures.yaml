@@ -123,3 +123,33 @@ signatures:
   right_operand: null
   intrinsic_partition: none
   qualifiers: []
+- metric_name: r12_base_customer_count
+  operator: qualified_count
+  left_operand: r12_base_customer
+  right_operand: null
+  intrinsic_partition: none
+  qualifiers: []
+- metric_name: r12_repurchase_customer_count
+  operator: qualified_count
+  left_operand: r12_repurchase_customer
+  right_operand: null
+  intrinsic_partition: none
+  qualifiers: []
+- metric_name: r12_repurchase_rate
+  operator: divide
+  left_operand: r12_repurchase_customer
+  right_operand: r12_base_customer
+  intrinsic_partition: none
+  qualifiers: []
+- metric_name: r12_repurchase_amount
+  operator: sum
+  left_operand: r12_repurchase_effective_amount
+  right_operand: null
+  intrinsic_partition: none
+  qualifiers: []
+- metric_name: r12_repurchase_spending
+  operator: divide
+  left_operand: r12_repurchase_effective_amount
+  right_operand: r12_repurchase_customer
+  intrinsic_partition: none
+  qualifiers: []

@@ -13,6 +13,7 @@ from app.semantic_layer.question_semantic_parser_v2 import (
     detect_multiple_intents_v2,
     extract_deterministic_question_evidence_v2,
     parse_question_semantics_v2,
+    validate_operand_description_registry_v2,
 )
 from app.semantic_layer.question_signature_v2 import (
     QuestionOperator,
@@ -44,6 +45,47 @@ def fake_llm_payload(**kwargs) -> str:
     return json.dumps(
         payload,
         ensure_ascii=False,
+    )
+
+
+def test_operand_description_registry_matches_enum_exactly() -> None:
+    validate_operand_description_registry_v2()
+
+
+def test_normal_order_question_can_build_prompt_after_r12_extension() -> None:
+    prompt = build_question_semantic_parser_prompt_v2(
+        "2025年一共有多少笔成功支付订单？"
+    )
+
+    assert_true(
+        "paid_order" in prompt,
+        "普通订单问题必须能正常构建 Semantic Parser Prompt。",
+    )
+
+    assert_true(
+        "r12_base_customer" in prompt,
+        "Prompt Registry 必须完整包含新增 R12 Operand。",
+    )
+
+
+def test_r12_operand_descriptions_preserve_cohort_boundaries() -> None:
+    prompt = build_question_semantic_parser_prompt_v2(
+        "R12回购率是多少？"
+    )
+
+    assert_true(
+        "完整连续 12 个日历月" in prompt,
+        "R12 Base 描述必须明确完整 12 个日历月。",
+    )
+
+    assert_true(
+        "不是窗口内跨不同日期重复购买客户" in prompt,
+        "R12 Repurchase 必须与窗口内跨日复购保持边界。",
+    )
+
+    assert_true(
+        "completed refund" in prompt,
+        "R12 Effective Amount 描述必须保留 completed refund 语义。",
     )
 
 
@@ -1151,6 +1193,9 @@ def test_same_window_evidence_fills_missing_llm_qualifier() -> None:
 
 def run_tests() -> None:
     tests = [
+        test_operand_description_registry_matches_enum_exactly,
+        test_normal_order_question_can_build_prompt_after_r12_extension,
+        test_r12_operand_descriptions_preserve_cohort_boundaries,
         test_prompt_contains_no_metric_selection_contract,
         test_amount_per_buyer_parses_to_structure,
         test_unknown_structure_preserves_nulls,

@@ -1,8 +1,16 @@
 from __future__ import annotations
 
 from app.delivery.decision_console_runtime_v2 import (
+    build_day89_business_question_tool_binding_registry_v2,
+    build_day89_channel_buyer_count_tool_binding_v2,
+    build_day89_channel_order_count_tool_binding_v2,
     build_day89_channel_tool_binding_v2,
     build_day89_overall_gmv_tool_binding_v2,
+    build_day89_overall_order_count_tool_binding_v2,
+    build_day93_category_refund_rate_tool_binding_v2,
+    build_day93_channel_refund_rate_tool_binding_v2,
+    build_day93_overall_refund_rate_tool_binding_v2,
+    build_day93_region_refund_rate_tool_binding_v2,
 )
 from app.delivery.runtime_delivery_bridge_v2 import (
     _select_approved_tool_binding_for_plan_v2,
@@ -36,11 +44,14 @@ def test_primary_channel_binding_still_matches() -> None:
 def test_overall_binding_is_selected_from_static_registry() -> None:
     channel = build_day89_channel_tool_binding_v2()
     overall = build_day89_overall_gmv_tool_binding_v2()
+    registry = (
+        build_day89_business_question_tool_binding_registry_v2()
+    )
 
     selected = _select_approved_tool_binding_for_plan_v2(
         actual_plan_name="gmv_overall_v2",
         primary_binding=channel,
-        approved_tool_binding_registry=(overall,),
+        approved_tool_binding_registry=registry,
     )
 
     _assert_equal(
@@ -50,14 +61,150 @@ def test_overall_binding_is_selected_from_static_registry() -> None:
     )
 
 
+def test_order_count_binding_is_selected_from_static_registry() -> None:
+    channel = build_day89_channel_tool_binding_v2()
+    registry = (
+        build_day89_business_question_tool_binding_registry_v2()
+    )
+
+    selected = _select_approved_tool_binding_for_plan_v2(
+        actual_plan_name="order_count_overall_v2",
+        primary_binding=channel,
+        approved_tool_binding_registry=registry,
+    )
+
+    expected = build_day89_overall_order_count_tool_binding_v2()
+
+    _assert_equal(
+        selected,
+        expected,
+        "order_count_overall_v2 必须选择显式注册的订单数 binding。",
+    )
+
+
+def test_order_count_channel_binding_is_selected_from_static_registry() -> None:
+    channel = build_day89_channel_tool_binding_v2()
+    registry = (
+        build_day89_business_question_tool_binding_registry_v2()
+    )
+
+    selected = _select_approved_tool_binding_for_plan_v2(
+        actual_plan_name="order_count_channel_v2",
+        primary_binding=channel,
+        approved_tool_binding_registry=registry,
+    )
+
+    expected = build_day89_channel_order_count_tool_binding_v2()
+
+    _assert_equal(
+        selected,
+        expected,
+        "order_count_channel_v2 必须选择显式注册的渠道订单数 binding。",
+    )
+
+
+def test_buyer_count_channel_binding_is_selected_from_static_registry() -> None:
+    channel = build_day89_channel_tool_binding_v2()
+    registry = (
+        build_day89_business_question_tool_binding_registry_v2()
+    )
+
+    selected = _select_approved_tool_binding_for_plan_v2(
+        actual_plan_name="buyer_count_channel_v2",
+        primary_binding=channel,
+        approved_tool_binding_registry=registry,
+    )
+
+    expected = build_day89_channel_buyer_count_tool_binding_v2()
+
+    _assert_equal(
+        selected,
+        expected,
+        "buyer_count_channel_v2 必须选择显式注册的渠道购买人数 binding。",
+    )
+
+
+def test_refund_rate_bindings_are_selected_from_static_registry() -> None:
+    channel = build_day89_channel_tool_binding_v2()
+    registry = (
+        build_day89_business_question_tool_binding_registry_v2()
+    )
+
+    expectations = (
+        (
+            "refund_rate_overall_v2",
+            build_day93_overall_refund_rate_tool_binding_v2(),
+        ),
+        (
+            "refund_rate_channel_v2",
+            build_day93_channel_refund_rate_tool_binding_v2(),
+        ),
+        (
+            "refund_rate_region_v2",
+            build_day93_region_refund_rate_tool_binding_v2(),
+        ),
+        (
+            "refund_rate_category_v2",
+            build_day93_category_refund_rate_tool_binding_v2(),
+        ),
+    )
+
+    for plan_name, expected in expectations:
+        selected = _select_approved_tool_binding_for_plan_v2(
+            actual_plan_name=plan_name,
+            primary_binding=channel,
+            approved_tool_binding_registry=registry,
+        )
+
+        _assert_equal(
+            selected,
+            expected,
+            f"{plan_name} 必须选择显式注册的退款率 binding。",
+        )
+
+
+def test_business_question_registry_is_static_and_unique() -> None:
+    registry = (
+        build_day89_business_question_tool_binding_registry_v2()
+    )
+
+    plan_names = tuple(
+        binding.plan_name
+        for binding in registry
+    )
+
+    _assert_equal(
+        plan_names,
+        (
+            "gmv_overall_v2",
+            "order_count_overall_v2",
+            "order_count_channel_v2",
+            "buyer_count_channel_v2",
+            "refund_rate_overall_v2",
+            "refund_rate_channel_v2",
+            "refund_rate_region_v2",
+            "refund_rate_category_v2",
+        ),
+        "Business Question Registry 必须保持当前显式批准集合。",
+    )
+
+    _assert_equal(
+        len(plan_names),
+        len(set(plan_names)),
+        "Approved Registry plan_name 不得重复。",
+    )
+
+
 def test_unregistered_plan_remains_fail_closed() -> None:
     channel = build_day89_channel_tool_binding_v2()
-    overall = build_day89_overall_gmv_tool_binding_v2()
+    registry = (
+        build_day89_business_question_tool_binding_registry_v2()
+    )
 
     selected = _select_approved_tool_binding_for_plan_v2(
         actual_plan_name="gmv_region_v2",
         primary_binding=channel,
-        approved_tool_binding_registry=(overall,),
+        approved_tool_binding_registry=registry,
     )
 
     _assert_equal(
@@ -87,6 +234,11 @@ def test_duplicate_registration_is_rejected() -> None:
 _TESTS = (
     test_primary_channel_binding_still_matches,
     test_overall_binding_is_selected_from_static_registry,
+    test_order_count_binding_is_selected_from_static_registry,
+    test_order_count_channel_binding_is_selected_from_static_registry,
+    test_buyer_count_channel_binding_is_selected_from_static_registry,
+    test_refund_rate_bindings_are_selected_from_static_registry,
+    test_business_question_registry_is_static_and_unique,
     test_unregistered_plan_remains_fail_closed,
     test_duplicate_registration_is_rejected,
 )

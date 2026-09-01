@@ -4,6 +4,9 @@ import sys
 
 import app.semantic_layer.metric_semantic_search_v2 as search
 import app.semantic_layer.vector_store_v2 as vector_store
+from app.semantic_layer.metric_text_builder_v2 import (
+    build_all_metric_texts_v2,
+)
 
 
 def assert_equal(
@@ -73,22 +76,42 @@ def test_metric_vector_builder_supports_one_batch_call() -> None:
         )
     )
 
+    canonical_metric_texts = tuple(
+        build_all_metric_texts_v2()
+    )
+    expected_metric_count = len(
+        canonical_metric_texts
+    )
+
+    assert_true(
+        expected_metric_count > 0,
+        "Canonical Metric Semantic Corpus 不能为空。",
+    )
     assert_equal(
         len(vectors),
-        19,
-        "Batch Vector Builder 仍必须生成 19 个 Metric vectors。",
+        expected_metric_count,
+        (
+            "Batch Vector Builder 必须覆盖当前完整 "
+            "Metric Semantic Corpus。"
+        ),
     )
     assert_equal(
         calls["count"],
         1,
-        "19 个 Metric texts 应支持一次 batch embedding。",
+        (
+            "完整 Metric Semantic Corpus 应支持 "
+            "一次 batch embedding。"
+        ),
     )
     assert_equal(
         calls["sizes"],
         [
-            19,
+            expected_metric_count,
         ],
-        "Batch input 应包含完整 19 个 Metric texts。",
+        (
+            "Batch input 必须覆盖当前完整 "
+            "Metric Semantic Corpus。"
+        ),
     )
 
 

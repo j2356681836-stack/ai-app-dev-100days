@@ -33,6 +33,7 @@ metrics:
   - 哪个渠道毛利率最高
   - 退款金额是多少
   - 扣除退款后的销售额是多少
+  ranking_preference: higher_is_better
 - name: gross_margin
   chinese_name: 毛利额
   aliases:
@@ -61,6 +62,7 @@ metrics:
   - 2025年净利润是多少
   - 哪个渠道利润率最高
   - 退款金额是多少
+  ranking_preference: higher_is_better
 - name: gross_margin_rate
   chinese_name: 毛利率
   aliases:
@@ -71,8 +73,7 @@ metrics:
   definition: '在指定分析范围内，成功支付订单产生的商品毛利额 占对应 GMV 的比例。 该指标衡量每单位支付销售额中有多少比例形成商品毛利， 不等同于净利润率或其他经营利润率。
 
     '
-  formula: "SUM(\n  fact_order_items.item_paid_amount\n  - fact_order_items.item_cost_amount\n) / NULLIF(\n  SUM(fact_order_items.item_paid_amount),\n\
-    \  0\n)\n"
+  formula: "SUM(\n  fact_order_items.item_paid_amount\n  - fact_order_items.item_cost_amount\n) / NULLIF(\n  SUM(fact_order_items.item_paid_amount),\n  0\n)\n"
   tables:
   - fact_orders
   - fact_order_items
@@ -89,6 +90,7 @@ metrics:
   - 2025年净利润率是多少
   - 哪个渠道利润最高
   - 退款率是多少
+  ranking_preference: higher_is_better
 - name: refund_rate
   chinese_name: 退款率
   aliases:
@@ -97,8 +99,7 @@ metrics:
   - 成交退款率
   - 退款金额占比
   grain: paid_order_items
-  definition: '在指定销售分析范围内，成功支付订单最终已完成退款的金额 占对应原始支付销售金额的比例。 仅 refund_status 为 completed 的退款进入退款金额； rejected、cancelled 和尚未完成的
-    requested 退款不计入分子。 退款归属原订单的 paid_at，用于衡量对应销售 cohort 的退款程度， 不表示按 refund_completed_at 统计的售后退款发生趋势。
+  definition: '在指定销售分析范围内，成功支付订单最终已完成退款的金额 占对应原始支付销售金额的比例。 仅 refund_status 为 completed 的退款进入退款金额； rejected、cancelled 和尚未完成的 requested 退款不计入分子。 退款归属原订单的 paid_at，用于衡量对应销售 cohort 的退款程度， 不表示按 refund_completed_at 统计的售后退款发生趋势。
 
     '
   formula: "SUM(completed_refund_amount) / NULLIF(\n  SUM(fact_order_items.item_paid_amount),\n  0\n)\n"
@@ -121,6 +122,7 @@ metrics:
   - 退款申请数量是多少
   - 哪个品类退款订单数最多
   - 2025年GMV是多少
+  ranking_preference: lower_is_better
 - name: roi
   chinese_name: 营销投资回报率
   aliases:
@@ -131,8 +133,7 @@ metrics:
   - 投产比
   - 投放产出比
   grain: channel
-  definition: '在指定分析时间范围内，直接响应渠道产生的成功支付 GMV 与该渠道同期营销投入金额的比值。 本项目 ROI 定义为 GMV / Marketing Spend，结果表示倍率而非百分比， 不扣除商品成本、退款及其他经营费用。
-    没有直接销售归因能力的 marketing-only 渠道不纳入直接响应 ROI 比较。
+  definition: '在指定分析时间范围内，直接响应渠道产生的成功支付 GMV 与该渠道同期营销投入金额的比值。 本项目 ROI 定义为 GMV / Marketing Spend，结果表示倍率而非百分比， 不扣除商品成本、退款及其他经营费用。 没有直接销售归因能力的 marketing-only 渠道不纳入直接响应 ROI 比较。
 
     '
   formula: "SUM(channel_gmv) / NULLIF(\n  SUM(fact_marketing_spend.spend_amount),\n  0\n)\n"
@@ -157,6 +158,7 @@ metrics:
   - 各渠道营销费用是多少
   - 哪个地区ROI最高
   - 每投入一元营销费产生多少毛利
+  ranking_preference: higher_is_better
 - name: cac
   chinese_name: 获客成本
   aliases:
@@ -166,8 +168,7 @@ metrics:
   - 渠道获客成本
   - 拉新成本
   grain: channel
-  definition: '在指定分析时间范围内，直接响应渠道的营销投入金额 除以该渠道同期产生的渠道支付新客数。 渠道支付新客指 customer 在该 channel 的第一次成功支付， 首次支付必须基于完整历史订单确定，再判断该首次支付事件
-    是否落入当前分析时间范围。 后续退款不改变已经发生的首次成功支付事件。 本指标不等同于渠道贡献品牌新客的获客成本。
+  definition: '在指定分析时间范围内，直接响应渠道的营销投入金额 除以该渠道同期产生的渠道支付新客数。 渠道支付新客指 customer 在该 channel 的第一次成功支付， 首次支付必须基于完整历史订单确定，再判断该首次支付事件 是否落入当前分析时间范围。 后续退款不改变已经发生的首次成功支付事件。 本指标不等同于渠道贡献品牌新客的获客成本。
 
     '
   formula: "SUM(fact_marketing_spend.spend_amount) / NULLIF(\n  channel_paid_new_customer_count,\n  0\n)\n"
@@ -194,6 +195,7 @@ metrics:
   - 哪个渠道贡献的品牌新客最多
   - 哪个地区获客成本最低
   - 每获得一个品牌新客需要多少钱
+  ranking_preference: lower_is_better
 - name: brand_paid_new_customer_count
   chinese_name: 品牌支付新客数
   aliases:
@@ -203,12 +205,10 @@ metrics:
   - 品牌首次购买客户数
   - 首购客户数
   grain: customer_first_paid_event
-  definition: '在指定分析时间范围内，首次完成品牌成功支付的 customer 数量。 每个 customer 在整个品牌生命周期中最多只会成为一次品牌支付新客。 首次支付必须基于完整历史成功支付订单确定， 再判断该首次支付事件是否落入当前分析时间范围。
-    客户后续发生退款、再次购买或进入其他渠道， 都不会改变已经发生的品牌首次支付事件。
+  definition: '在指定分析时间范围内，首次完成品牌成功支付的 customer 数量。 每个 customer 在整个品牌生命周期中最多只会成为一次品牌支付新客。 首次支付必须基于完整历史成功支付订单确定， 再判断该首次支付事件是否落入当前分析时间范围。 客户后续发生退款、再次购买或进入其他渠道， 都不会改变已经发生的品牌首次支付事件。
 
     '
-  formula: "COUNT(\n  customer where global_brand_paid_sequence = 1\n  and first_brand_paid_at is within analysis date range\n\
-    )\n"
+  formula: "COUNT(\n  customer where global_brand_paid_sequence = 1\n  and first_brand_paid_at is within analysis date range\n)\n"
   tables:
   - fact_orders
   filters:
@@ -235,12 +235,10 @@ metrics:
   - 首次进入渠道客户数
   - 渠道拉新人数
   grain: customer_channel_first_paid_event
-  definition: '在指定分析时间范围内，customer 在某个 channel 首次完成成功支付所形成的渠道支付新客数量。 同一个 customer 可以分别成为多个渠道的渠道支付新客， 但在同一个 channel 中最多只会成为一次渠道支付新客。
-    渠道首次支付必须基于该 customer 在该 channel 的完整历史成功支付订单确定， 再判断首次支付事件是否落入当前分析时间范围。 后续退款不改变已经发生的渠道首次支付事件。
+  definition: '在指定分析时间范围内，customer 在某个 channel 首次完成成功支付所形成的渠道支付新客数量。 同一个 customer 可以分别成为多个渠道的渠道支付新客， 但在同一个 channel 中最多只会成为一次渠道支付新客。 渠道首次支付必须基于该 customer 在该 channel 的完整历史成功支付订单确定， 再判断首次支付事件是否落入当前分析时间范围。 后续退款不改变已经发生的渠道首次支付事件。
 
     '
-  formula: "COUNT(\n  customer-channel where channel_paid_sequence = 1\n  and first_channel_paid_at is within analysis date\
-    \ range\n)\n"
+  formula: "COUNT(\n  customer-channel where channel_paid_sequence = 1\n  and first_channel_paid_at is within analysis date range\n)\n"
   tables:
   - fact_orders
   - dim_channel
@@ -259,6 +257,7 @@ metrics:
   - 哪个渠道贡献的品牌新客最多
   - 2025年复购客户有多少
   - 2025年注册用户有多少
+  ranking_preference: higher_is_better
 - name: repeat_customer_rate
   chinese_name: 跨日复购率
   aliases:
@@ -266,8 +265,7 @@ metrics:
   - 跨购买日复购率
   - 同日多单计一次复购率
   grain: customer_purchase_period
-  definition: '在指定分析时间范围内，至少在两个不同支付日期发生成功购买的 customer 数，占同期所有成功支付购买客户数的比例。 同一个 customer 在同一天产生多张支付订单时，该日期只视为一个购买日。 本指标用于衡量报告周期内客户再次发生购买行为的比例，
-    不等同于两单及以上客户占比，也不等同于首购后30日、90日等 Cohort 新客复购率。
+  definition: '在指定分析时间范围内，至少在两个不同支付日期发生成功购买的 customer 数，占同期所有成功支付购买客户数的比例。 同一个 customer 在同一天产生多张支付订单时，该日期只视为一个购买日。 本指标用于衡量报告周期内客户再次发生购买行为的比例， 不等同于两单及以上客户占比，也不等同于首购后30日、90日等 Cohort 新客复购率。
 
     '
   formula: "repeat_customer_count / NULLIF(\n  buyer_count,\n  0\n)\n"
@@ -296,8 +294,7 @@ metrics:
   - 会员消费贡献率
   - 会员销售金额占比
   grain: paid_order_items
-  definition: '在指定分析时间范围内，支付时点具有会员身份的订单所产生的 GMV， 占同期全部成功支付 GMV 的比例。 会员身份使用 fact_orders.member_level_at_order 的支付时点快照判断， 不使用客户当前会员状态回溯历史交易。
-    本指标衡量会员销售对整体 GMV 的贡献程度， 不代表会员人数占比、会员增量贡献或利润贡献。
+  definition: '在指定分析时间范围内，支付时点具有会员身份的订单所产生的 GMV， 占同期全部成功支付 GMV 的比例。 会员身份使用 fact_orders.member_level_at_order 的支付时点快照判断， 不使用客户当前会员状态回溯历史交易。 本指标衡量会员销售对整体 GMV 的贡献程度， 不代表会员人数占比、会员增量贡献或利润贡献。
 
     '
   formula: "SUM(\n  member_order_item_paid_amount\n) / NULLIF(\n  SUM(fact_order_items.item_paid_amount),\n  0\n)\n"
@@ -346,8 +343,9 @@ metrics:
   - 2025年品牌新客有多少
   - 2025年复购人数是多少
   - 会员人数有多少
+  ranking_preference: higher_is_better
 - name: order_count
-  chinese_name: 交易量
+  chinese_name: 订单数
   aliases:
   - 订单量
   - 支付订单量
@@ -355,6 +353,7 @@ metrics:
   - 成交订单数
   - 交易笔数
   - 支付单量
+  - 交易量
   grain: paid_order
   definition: '在指定分析时间范围内，成功支付订单的数量。 仅统计 paid_at 非空的订单，不包含待支付或取消且未支付的订单。
 
@@ -376,6 +375,7 @@ metrics:
   - 2025年交易件数是多少
   - 创建订单数是多少
   - 取消订单数是多少
+  ranking_preference: higher_is_better
 - name: units_sold
   chinese_name: 交易件数
   aliases:
@@ -406,6 +406,7 @@ metrics:
   - 2025年购买人数是多少
   - 平均每单买几件
   - 平均销售单价是多少
+  ranking_preference: higher_is_better
 - name: spending_per_buyer
   chinese_name: 人均消费金额
   aliases:
@@ -564,3 +565,129 @@ metrics:
   - 2025年复购率是多少
   - 购买人数是多少
   - FREQ是多少
+- name: r12_base_customer_count
+  chinese_name: R12 Base客户数
+  aliases:
+  - R12客户池
+  - R12基础客户数
+  - 过去12个月有效购买客户数
+  - R12 Base人数
+  grain: customer_cohort
+  definition: 以当前报表开始日为边界，在其之前连续12个日历月内，至少发生一次有效购买的去重 customer 数。有效购买按成功支付金额扣除 completed refund 后的订单净有效消费大于0判断。该指标是 Periodic Customer Health 的 eligibility base，不是当前窗口购买人数，也不是会员人数。
+  formula: COUNT(DISTINCT customer in R12 effective-purchase base)
+  tables:
+  - fact_orders
+  - fact_order_items
+  - fact_refunds
+  filters:
+  - base window = 12 calendar months immediately before report_start
+  - fact_orders.paid_at IS NOT NULL
+  - only completed refunds reduce effective purchase amount
+  - refunds are attributed to original paid cohort
+  - order effective amount must be > 0
+  - full R12 history is required
+  examples:
+  - 2025年7月R12 Base客户数是多少
+  - 7月报表的过去12个月客户池有多少人
+  negative_examples:
+  - 2025年7月购买人数是多少
+  - 2025年7月跨日复购人数是多少
+  - 会员人数是多少
+- name: r12_repurchase_customer_count
+  chinese_name: R12回购客户数
+  aliases:
+  - R12复购客户数
+  - R12回购人数
+  - Base回购人数
+  - 老客回购人数
+  grain: customer_cohort
+  definition: R12 Base客户中，在当前报表窗口再次发生至少一次有效购买的去重 customer 数。同一个客户无论本期产生多少张有效订单，都只计一次。
+  formula: COUNT(DISTINCT R12 Base customer with report-window effective purchase)
+  tables:
+  - fact_orders
+  - fact_order_items
+  - fact_refunds
+  filters:
+  - customer must belong to the report-specific R12 Base
+  - report-window purchase must have order effective amount > 0
+  - only completed refunds reduce effective purchase amount
+  examples:
+  - 2025年7月R12回购客户有多少
+  - 7月Base客户中有多少人回来购买
+  negative_examples:
+  - 2025年7月跨日复购人数是多少
+  - 2025年7月购买人数是多少
+  - 新客数是多少
+- name: r12_repurchase_rate
+  chinese_name: R12回购率
+  aliases:
+  - R12复购率
+  - Base回购率
+  - R12客户回购率
+  - 老客回购率
+  grain: customer_cohort
+  definition: R12回购客户数占对应报表期 R12 Base客户数的比例。Current 与 Reference 周期必须分别使用各自的 R12 Base，不能共用同一个 Base。该指标不等同于窗口内跨日复购率 repeat_customer_rate。
+  formula: r12_repurchase_customer_count / NULLIF(r12_base_customer_count, 0)
+  tables:
+  - fact_orders
+  - fact_order_items
+  - fact_refunds
+  filters:
+  - full R12 history is required
+  - effective purchase uses completed-refund-adjusted order amount > 0
+  examples:
+  - 2025年7月R12回购率是多少
+  - 7月Base客户回购率相比6月如何
+  negative_examples:
+  - 2025年7月跨日复购率是多少
+  - 首购后30天复购率是多少
+  - 两单及以上客户占比是多少
+- name: r12_repurchase_amount
+  chinese_name: R12回购有效消费金额
+  aliases:
+  - R12回购金额
+  - R12复购金额
+  - Base客户本期有效消费
+  - 老客回购金额
+  grain: customer_cohort
+  definition: 属于 R12 Base 且在当前报表窗口再次发生有效购买的客户，在该报表窗口形成的净有效消费金额。completed refund 按原始 paid cohort 回溯扣减。该指标不是 GMV，不能用支付发生即确认的 GMV 口径替代。
+  formula: SUM(report-window effective amount of R12 repurchase customers)
+  tables:
+  - fact_orders
+  - fact_order_items
+  - fact_refunds
+  filters:
+  - customer must belong to the report-specific R12 Base
+  - completed refunds reduce effective amount
+  - order effective amount must be > 0
+  examples:
+  - 2025年7月R12回购有效消费金额是多少
+  - 7月老客回购金额有多少
+  negative_examples:
+  - 2025年7月GMV是多少
+  - 2025年7月会员GMV是多少
+  - 退款金额是多少
+- name: r12_repurchase_spending
+  chinese_name: R12回购客人均有效消费
+  aliases:
+  - R12回购Spending
+  - R12回购客人均消费
+  - Base回购客人均消费
+  - 老客回购人均消费
+  grain: customer_cohort
+  definition: R12回购有效消费金额除以 R12回购客户数，衡量本期发生回购的 Base 客户平均贡献的净有效消费。该指标不等同于全部 Buyer 的 Spending。
+  formula: r12_repurchase_amount / NULLIF(r12_repurchase_customer_count, 0)
+  tables:
+  - fact_orders
+  - fact_order_items
+  - fact_refunds
+  filters:
+  - customer must belong to the report-specific R12 Base
+  - only customers with report-window effective purchase enter denominator
+  examples:
+  - 2025年7月R12回购客人均有效消费是多少
+  - 7月老客回购Spending是多少
+  negative_examples:
+  - 2025年7月Spending是多少
+  - AUS是多少
+  - 会员人均消费是多少

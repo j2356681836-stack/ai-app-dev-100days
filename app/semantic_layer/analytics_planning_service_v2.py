@@ -3,8 +3,12 @@ from __future__ import annotations
 from enum import Enum
 from typing import AbstractSet, Callable
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.semantic_layer.analysis_mode_resolution_v2 import (
+    AnalysisModeResolutionV2,
+    resolve_analysis_mode_v2,
+)
 from app.semantic_layer.candidate_decision_ranking_v2 import (
     EmbeddingRankerV2,
 )
@@ -18,7 +22,13 @@ from app.semantic_layer.question_semantic_parser_v2 import (
 )
 from app.semantic_layer.result_grain_resolver_v2 import (
     ResultGrainResolutionV2,
+    apply_seed_overall_fallback_v2,
     resolve_result_grain_v2,
+)
+from app.semantic_layer.requested_scope_resolution_v2 import (
+    RequestedScopeResolutionStatusV2,
+    RequestedScopeResolutionV2,
+    resolve_requested_scope_v2,
 )
 from app.semantic_layer.semantic_decision_service_v2 import (
     SemanticDecisionResultV2,
@@ -33,6 +43,9 @@ class AnalyticsPlanningStatusV2(str, Enum):
 
     NEEDS_METRIC_CLARIFICATION = (
         "needs_metric_clarification"
+    )
+    NEEDS_SCOPE_CLARIFICATION = (
+        "needs_scope_clarification"
     )
     UNSUPPORTED_METRIC = "unsupported_metric"
     MULTIPLE_INTENTS = "multiple_intents"
@@ -57,6 +70,13 @@ class AnalyticsPlanningResultV2(BaseModel):
     question: str
 
     semantic_decision: SemanticDecisionResultV2
+    requested_scope_resolution: RequestedScopeResolutionV2
+    analysis_mode_resolution: AnalysisModeResolutionV2 = Field(
+        default_factory=lambda: AnalysisModeResolutionV2(
+            analysis_mode="fact",
+        ),
+        exclude=True,
+    )
     grain_resolution: ResultGrainResolutionV2 | None = None
     plan_selection: QueryPlanSelectionResultV2 | None = None
 
@@ -72,6 +92,53 @@ class AnalyticsPlanningResultV2(BaseModel):
             self.semantic_decision.status
             == SemanticDecisionStatusV2.MATCHED
         )
+
+        if (
+            self.status
+            == AnalyticsPlanningStatusV2
+            .NEEDS_SCOPE_CLARIFICATION
+        ):
+            if (
+                self.requested_scope_resolution.status
+                != RequestedScopeResolutionStatusV2
+                .UNRESOLVED_EXPLICIT_SCOPE
+            ):
+                raise ValueError(
+                    "NEEDS_SCOPE_CLARIFICATION requires an "
+                    "unresolved explicit Requested Scope."
+                )
+
+            if self.grain_resolution is not None:
+                raise ValueError(
+                    "Scope clarification stop must not resolve grain."
+                )
+
+            if self.plan_selection is not None:
+                raise ValueError(
+                    "Scope clarification stop must not select a plan."
+                )
+
+            if self.plan_names:
+                raise ValueError(
+                    "Scope clarification stop must not expose plans."
+                )
+
+            if semantic_matched:
+                if (
+                    self.metric_name
+                    != self.semantic_decision.metric_name
+                ):
+                    raise ValueError(
+                        "Scope clarification must preserve matched "
+                        "metric_name."
+                    )
+            elif self.metric_name is not None:
+                raise ValueError(
+                    "Unmatched semantic scope stop must not expose "
+                    "metric_name."
+                )
+
+            return self
 
         if not semantic_matched:
             if self.grain_resolution is not None:
@@ -156,6 +223,14 @@ class AnalyticsPlanningResultV2(BaseModel):
 
 
 SemanticResolverV2 = Callable[..., SemanticDecisionResultV2]
+RequestedScopeResolverV2 = Callable[
+    [str],
+    RequestedScopeResolutionV2,
+]
+AnalysisModeResolverV2 = Callable[
+    [str],
+    AnalysisModeResolutionV2,
+]
 GrainResolverV2 = Callable[[str], ResultGrainResolutionV2]
 PlanSelectorV2 = Callable[..., QueryPlanSelectionResultV2]
 
@@ -206,6 +281,12 @@ def resolve_analytics_planning_v2(
     semantic_resolver: SemanticResolverV2 = (
         resolve_semantic_decision_v2
     ),
+    requested_scope_resolver: RequestedScopeResolverV2 = (
+        resolve_requested_scope_v2
+    ),
+    analysis_mode_resolver: AnalysisModeResolverV2 = (
+        resolve_analysis_mode_v2
+    ),
     grain_resolver: GrainResolverV2 = (
         resolve_result_grain_v2
     ),
@@ -219,13 +300,28 @@ def resolve_analytics_planning_v2(
     Order:
     Question
     -> Semantic Decision
+    -> Requested Scope Resolution
+    -> Analysis Mode Resolution
     -> stop unless Metric is MATCHED
     -> Result Grain Resolution
     -> Query Plan Selection
 
     Important:
     - Semantic Decision is invoked exactly once.
+    - Requested Scope Resolution is invoked exactly once.
+    - Analysis Mode Resolution is invoked exactly once.
+    - Requested Analysis Mode does not authorize data access and does
+      not imply that a comparison/diagnostic delivery already exists.
+    - Requested Scope is descriptive only at this layer;
+      it does not authorize or apply Row Scope.
     - Result Grain does not change Row Scope.
+    - At this layer Grain describes the trusted Seed Query output shape,
+      not the later Investigation Target Grain.
+    - FACT / COMPARISON / DIAGNOSTIC / INVESTIGATION may promote only an
+      UNSPECIFIED, evidence-free Seed Grain to Overall.
+    - Explicit / ambiguous / multi-plan Grain semantics are never
+      overwritten.
+    - COMPOSITION intentionally does not receive this fallback.
     - Query Plan selection does not generate or execute SQL.
     """
     semantic = semantic_resolver(
@@ -234,6 +330,54 @@ def resolve_analytics_planning_v2(
         llm_call=llm_call,
         ranker=ranker,
     )
+
+    requested_scope = requested_scope_resolver(
+        question
+    )
+
+    analysis_mode = analysis_mode_resolver(
+        question
+    )
+
+    if (
+        requested_scope.status
+        == RequestedScopeResolutionStatusV2
+        .UNRESOLVED_EXPLICIT_SCOPE
+    ):
+        unresolved = ", ".join(
+            sorted(
+                dimension.value
+                for dimension
+                in requested_scope.unresolved_dimensions
+            )
+        )
+
+        return AnalyticsPlanningResultV2(
+            status=(
+                AnalyticsPlanningStatusV2
+                .NEEDS_SCOPE_CLARIFICATION
+            ),
+            question=question,
+            semantic_decision=semantic,
+            requested_scope_resolution=requested_scope,
+            analysis_mode_resolution=analysis_mode,
+            grain_resolution=None,
+            plan_selection=None,
+            metric_name=(
+                semantic.metric_name
+                if (
+                    semantic.status
+                    == SemanticDecisionStatusV2.MATCHED
+                )
+                else None
+            ),
+            plan_names=(),
+            detail=(
+                "存在无法解析的显式数据范围"
+                f"（{unresolved}）。"
+                "请使用当前数据集中可识别的地区或渠道名称。"
+            ),
+        )
 
     if semantic.status != SemanticDecisionStatusV2.MATCHED:
         planning_status = _SEMANTIC_STOP_STATUS_MAP.get(
@@ -250,6 +394,8 @@ def resolve_analytics_planning_v2(
             status=planning_status,
             question=question,
             semantic_decision=semantic,
+            requested_scope_resolution=requested_scope,
+            analysis_mode_resolution=analysis_mode,
             grain_resolution=None,
             plan_selection=None,
             metric_name=None,
@@ -277,6 +423,11 @@ def resolve_analytics_planning_v2(
         question
     )
 
+    grain = apply_seed_overall_fallback_v2(
+        resolution=grain,
+        analysis_mode=analysis_mode.analysis_mode.value,
+    )
+
     selection = plan_selector(
         metric_name=metric_name,
         grain_resolution=grain,
@@ -296,6 +447,8 @@ def resolve_analytics_planning_v2(
         status=planning_status,
         question=question,
         semantic_decision=semantic,
+        requested_scope_resolution=requested_scope,
+        analysis_mode_resolution=analysis_mode,
         grain_resolution=grain,
         plan_selection=selection,
         metric_name=metric_name,

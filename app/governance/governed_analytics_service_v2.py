@@ -264,6 +264,9 @@ def execute_governed_analytics_v2(
         context=context,
         plan=plan,
         time_resolution=time_resolution,
+        requested_scope=(
+            analytics.requested_scope_resolution
+        ),
     )
 
     if (

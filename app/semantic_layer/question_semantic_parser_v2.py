@@ -103,6 +103,18 @@ _OPERAND_DESCRIPTIONS = {
         "至少在两个不同成交/付款日期发生过成功交易的客户。",
     SemanticOperand.MULTI_PAID_ORDER_CUSTOMER:
         "成功成交/付款订单数至少为两笔的客户；同日两单也满足。",
+    SemanticOperand.R12_BASE_CUSTOMER:
+        "报表开始日前完整连续 12 个日历月内，至少发生一次 "
+        "Effective Purchase 的客户。它是 R12 Cohort Base，"
+        "不是当前报表窗口内的普通成交客户。",
+    SemanticOperand.R12_REPURCHASE_CUSTOMER:
+        "属于 R12 Base、并在当前报表窗口再次发生 Effective Purchase "
+        "的客户。它描述 R12 Cohort Repurchase，"
+        "不是窗口内跨不同日期重复购买客户。",
+    SemanticOperand.R12_REPURCHASE_EFFECTIVE_AMOUNT:
+        "R12 回购客户在当前报表窗口内的净有效消费金额；"
+        "completed refund 会从对应消费中扣减。"
+        "它不是 GMV，也不是原始退款金额。",
     SemanticOperand.PAYMENT_TIME_MEMBER_PAID_AMOUNT:
         "按交易发生/付款当时的会员身份判断得到的会员成交金额。",
 }
@@ -127,9 +139,46 @@ def _enum_values_text(enum_type) -> str:
     )
 
 
+def validate_operand_description_registry_v2() -> None:
+    """
+    SemanticOperand 与 Prompt Description Registry 必须严格同步。
+
+    这是结构性合同：
+    - 新增 SemanticOperand 时必须同时补充受控描述；
+    - 删除 Operand 后也不能遗留无效描述。
+
+    这样缺口会在测试 / Prompt build 阶段 fail loud，
+    而不是在真实业务请求运行时以 KeyError 暴露。
+    """
+
+    expected = set(SemanticOperand)
+    actual = set(_OPERAND_DESCRIPTIONS)
+
+    missing = sorted(
+        (
+            item.value
+            for item in expected - actual
+        )
+    )
+    extra = sorted(
+        (
+            item.value
+            for item in actual - expected
+        )
+    )
+
+    if missing or extra:
+        raise ValueError(
+            "SemanticOperand description registry mismatch. "
+            f"Missing={missing}; Extra={extra}"
+        )
+
+
 def build_question_semantic_parser_prompt_v2(
     question: str,
 ) -> str:
+    validate_operand_description_registry_v2()
+
     operand_lines = "\n".join(
         (
             f"- {operand.value}: "

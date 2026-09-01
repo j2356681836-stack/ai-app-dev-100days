@@ -12,6 +12,9 @@ from app.governance.row_scope import (
     ScopeDimension,
     plan_row_scope,
 )
+from app.semantic_layer.requested_scope_resolution_v2 import (
+    RequestedScopeResolutionV2,
+)
 from app.governance.row_scope_binding import (
     ScopeBindingDecision,
     ScopedQueryContract,
@@ -472,6 +475,7 @@ def bind_query_plan_scope_v2(
     *,
     context: AccessContext,
     plan: QueryPlanV2,
+    requested_scope: RequestedScopeResolutionV2 | None = None,
 ) -> QueryPlanScopeBindingDecisionV2:
     """
     Connect a trusted Query Plan V2 to existing Row Scope controls.
@@ -551,6 +555,7 @@ def bind_query_plan_scope_v2(
         required_dimensions=(
             scope.required_dimensions
         ),
+        requested_scope=requested_scope,
     )
 
     if not row_scope_decision.allowed:

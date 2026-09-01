@@ -40,14 +40,23 @@ EXPECTED_METRICS = {
     "purchase_frequency",
     "repeat_customer_count",
     "multi_order_customer_count",
+    "r12_base_customer_count",
+    "r12_repurchase_customer_count",
+    "r12_repurchase_rate",
+    "r12_repurchase_amount",
+    "r12_repurchase_spending",
 }
 
 NEW_PLAN_NAMES = {
     "refund_rate_overall_v2",
+    "refund_rate_channel_v2",
+    "refund_rate_region_v2",
+    "refund_rate_category_v2",
     "roi_channel_v2",
     "cac_channel_v2",
     "brand_paid_new_customer_count_overall_v2",
     "channel_paid_new_customer_count_channel_v2",
+    "order_count_customer_lifecycle_membership_v2",
 }
 
 
@@ -75,15 +84,15 @@ def by_name(name: str):
     )
 
 
-def test_catalog_has_48_plans() -> None:
+def test_catalog_has_59_plans() -> None:
     assert_equal(
         len(catalog().query_plans),
-        48,
-        "完整 V2 Catalog 应包含 48 个 Query Plan。",
+        59,
+        "完整 V2 Catalog 应包含 59 个 Query Plan。",
     )
 
 
-def test_catalog_has_exact_19_metrics() -> None:
+def test_catalog_has_exact_24_metrics() -> None:
     metrics = {
         plan.metric
         for plan in catalog().query_plans
@@ -92,7 +101,7 @@ def test_catalog_has_exact_19_metrics() -> None:
     assert_equal(
         metrics,
         EXPECTED_METRICS,
-        "完整 Catalog 必须精确覆盖 Metadata V2 的 19 个 metric。",
+        "完整 Catalog 必须精确覆盖 Metadata V2 的 24 个 metric。",
     )
 
 
@@ -130,21 +139,21 @@ def test_logic_type_counts_are_correct() -> None:
 
     assert_equal(
         query_logic_count,
-        40,
-        "39 Simple + 1 Member 应形成 40 个 QueryLogic Plan。",
+        42,
+        "39 Simple + 1 Member 应形成 42 个 QueryLogic Plan。",
     )
 
     assert_equal(
         staged_count,
-        8,
+        17,
         (
-            "3 Repeat + Refund + ROI + CAC + Brand New + "
-            "Channel New 应形成 8 个 StagedQueryLogic Plan。"
+            "3 Repeat + 5 R12 + 4 Refund + ROI + CAC + Brand New + "
+            "Channel New + Order Customer Composition 应形成 17 个 StagedQueryLogic Plan。"
         ),
     )
 
 
-def test_all_five_new_candidates_are_present() -> None:
+def test_declared_candidate_plan_set_is_present() -> None:
     names = {
         plan.name
         for plan in catalog().query_plans
@@ -152,7 +161,7 @@ def test_all_five_new_candidates_are_present() -> None:
 
     assert_true(
         NEW_PLAN_NAMES.issubset(names),
-        "5 个 Day73 新候选必须全部进入 Canonical Catalog。",
+        "声明的候选 Plan 必须全部进入 Canonical Catalog。",
     )
 
 
@@ -197,46 +206,90 @@ def test_cross_fact_stage_joins_are_preserved() -> None:
         )
 
 
-def test_refund_preaggregation_semantics_are_preserved() -> None:
-    plan = by_name(
-        "refund_rate_overall_v2"
-    )
+def test_refund_grain_family_preserves_preaggregation_semantics() -> None:
+    expected = {
+        "refund_rate_overall_v2": (
+            "overall",
+            None,
+        ),
+        "refund_rate_channel_v2": (
+            "channel",
+            "channel_name",
+        ),
+        "refund_rate_region_v2": (
+            "region",
+            "region_name",
+        ),
+        "refund_rate_category_v2": (
+            "category",
+            "category",
+        ),
+    }
 
-    first_stage = (
-        plan.query_logic.stages[0]
-    )
+    for plan_name, (
+        expected_grain,
+        dimension_field,
+    ) in expected.items():
+        plan = by_name(plan_name)
 
-    refund_join = next(
-        join
-        for join in first_stage.joins
-        if getattr(join, "table", None)
-        == "fact_refunds"
-    )
+        assert_equal(
+            plan.result_grain,
+            expected_grain,
+            f"{plan_name} Grain 不正确。",
+        )
 
-    assert_equal(
-        refund_join.join_type,
-        "left",
-        "Refund Rate 必须 LEFT JOIN refund events。",
-    )
+        first_stage = (
+            plan.query_logic.stages[0]
+        )
 
-    expression = next(
-        output.expression
-        for output in first_stage.outputs
-        if output.field
-        == "completed_refund_amount"
-    )
+        refund_join = next(
+            join
+            for join in first_stage.joins
+            if getattr(join, "table", None)
+            == "fact_refunds"
+        )
 
-    assert_true(
-        "SUM(fr.refund_amount) FILTER"
-        in expression,
-        "Refund Rate 必须先按 Item 聚合 completed refund。",
-    )
+        assert_equal(
+            refund_join.join_type,
+            "left",
+            f"{plan_name} 必须 LEFT JOIN refund events。",
+        )
 
-    assert_true(
-        "fr.refund_status = 'completed'"
-        in expression,
-        "Refund Rate 必须保持 completed-only 分子。",
-    )
+        expression = next(
+            output.expression
+            for output in first_stage.outputs
+            if output.field
+            == "completed_refund_amount"
+        )
+
+        assert_true(
+            "SUM(fr.refund_amount) FILTER"
+            in expression,
+            f"{plan_name} 必须先按 Item 聚合 completed refund。",
+        )
+
+        assert_true(
+            "fr.refund_status = 'completed'"
+            in expression,
+            f"{plan_name} 必须保持 completed-only 分子。",
+        )
+
+        final_stage = plan.query_logic.stages[-1]
+        final_fields = {
+            output.field
+            for output in final_stage.outputs
+        }
+
+        assert_true(
+            "refund_rate" in final_fields,
+            f"{plan_name} 必须输出 refund_rate。",
+        )
+
+        if dimension_field is not None:
+            assert_true(
+                dimension_field in final_fields,
+                f"{plan_name} 必须输出 {dimension_field}。",
+            )
 
 
 def test_global_history_identities_are_preserved() -> None:
@@ -354,9 +407,34 @@ def test_cross_fact_time_windows_are_preserved() -> None:
         )
 
 
-def test_new_confidential_metric_bindings_are_preserved() -> None:
+def test_sensitive_metric_bindings_are_preserved() -> None:
+    for plan_name in (
+        "refund_rate_overall_v2",
+        "refund_rate_channel_v2",
+        "refund_rate_region_v2",
+        "refund_rate_category_v2",
+    ):
+        plan = by_name(plan_name)
+
+        binding = next(
+            item
+            for item in plan.result_contract.field_bindings
+            if item.output_field == "refund_rate"
+        )
+
+        assert_equal(
+            binding.category,
+            (
+                SensitiveDataCategory
+                .AGGREGATED_BUSINESS_CONFIDENTIAL
+            ),
+            (
+                f"{plan_name} 必须使用独立的 "
+                "Aggregated Business Confidential 类别。"
+            ),
+        )
+
     for plan_name, field in (
-        ("refund_rate_overall_v2", "refund_rate"),
         ("roi_channel_v2", "roi"),
         ("cac_channel_v2", "cac"),
     ):
@@ -364,16 +442,14 @@ def test_new_confidential_metric_bindings_are_preserved() -> None:
 
         binding = next(
             item
-            for item in (
-                plan.result_contract.field_bindings
-            )
+            for item in plan.result_contract.field_bindings
             if item.output_field == field
         )
 
         assert_equal(
             binding.category,
             SensitiveDataCategory.BUSINESS_CONFIDENTIAL,
-            f"{plan_name} 必须保持 Business Confidential。",
+            f"{plan_name} 必须继续保持 raw/cost Business Confidential。",
         )
 
 
@@ -404,7 +480,7 @@ def test_writer_is_byte_deterministic() -> None:
         )
 
 
-def test_written_yaml_round_trips_with_48_plans() -> None:
+def test_written_yaml_round_trips_with_59_plans() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         path = Path(temp_dir) / "query_plans.yaml"
 
@@ -423,8 +499,8 @@ def test_written_yaml_round_trips_with_48_plans() -> None:
 
         assert_equal(
             len(loaded.query_plans),
-            48,
-            "完整 YAML Round-trip 后仍应有 48 plans。",
+            59,
+            "完整 YAML Round-trip 后仍应有 59 plans。",
         )
 
         assert_equal(
@@ -433,11 +509,11 @@ def test_written_yaml_round_trips_with_48_plans() -> None:
                 for plan in loaded.query_plans
             },
             EXPECTED_METRICS,
-            "Round-trip 后仍必须覆盖 19 Metrics。",
+            "Round-trip 后仍必须覆盖 24 Metrics。",
         )
 
 
-def test_all_eight_staged_plans_survive_serialization() -> None:
+def test_all_seventeen_staged_plans_survive_serialization() -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         path = Path(temp_dir) / "query_plans.yaml"
 
@@ -462,8 +538,8 @@ def test_all_eight_staged_plans_survive_serialization() -> None:
                 )
                 for plan in loaded.query_plans
             ),
-            8,
-            "YAML Round-trip 后 8 个 Staged Plan 必须保持类型。",
+            17,
+            "YAML Round-trip 后 17 个 Staged Plan 必须保持类型。",
         )
 
 
@@ -497,22 +573,22 @@ def test_complete_catalog_identity_is_frozen() -> None:
 
 def run_tests() -> None:
     tests = [
-        test_catalog_has_48_plans,
-        test_catalog_has_exact_19_metrics,
+        test_catalog_has_59_plans,
+        test_catalog_has_exact_24_metrics,
         test_plan_names_are_unique,
         test_logic_type_counts_are_correct,
-        test_all_five_new_candidates_are_present,
+        test_declared_candidate_plan_set_is_present,
         test_global_history_plan_set_is_exact,
         test_cross_fact_stage_joins_are_preserved,
-        test_refund_preaggregation_semantics_are_preserved,
+        test_refund_grain_family_preserves_preaggregation_semantics,
         test_global_history_identities_are_preserved,
         test_global_history_scope_placement_is_preserved,
         test_cross_fact_time_windows_are_preserved,
-        test_new_confidential_metric_bindings_are_preserved,
+        test_sensitive_metric_bindings_are_preserved,
         test_aus_category_remains_absent,
         test_writer_is_byte_deterministic,
-        test_written_yaml_round_trips_with_48_plans,
-        test_all_eight_staged_plans_survive_serialization,
+        test_written_yaml_round_trips_with_59_plans,
+        test_all_seventeen_staged_plans_survive_serialization,
         test_complete_catalog_identity_is_frozen,
     ]
 

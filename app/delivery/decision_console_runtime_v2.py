@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import calendar
+import re
 from datetime import date, timedelta
 from uuid import uuid4
 
@@ -12,10 +13,28 @@ from app.agents.investigation_contracts_v2 import (
 from app.delivery.decision_console_entry_v2 import (
     PeriodicReportCadenceV2,
 )
+from app.delivery.business_clarification_continuation_v1 import (
+    BusinessClarificationResolutionV1,
+)
 from app.delivery.breakdown_trusted_summary_v2 import (
     TrustedBreakdownSummaryResultV2,
     TrustedBreakdownSummaryStatusV2,
     build_trusted_breakdown_summary_v2,
+)
+from app.delivery.decision_console_view_v2 import (
+    build_decision_console_view_v2,
+)
+from app.delivery.contribution_investigation_recommendation_v1 import (
+    build_contribution_investigation_recommendation_v1,
+)
+from app.delivery.contribution_investigation_route_v2 import (
+    build_contribution_investigation_route_v2,
+)
+from app.agents.investigation_route_v2 import (
+    InvestigationScopeStrategyV2,
+)
+from app.delivery.ranking_answer_delivery_v1 import (
+    build_priority_assessment_v1,
 )
 from app.delivery.runtime_comparison_delivery_v2 import (
     RuntimeComparisonDeliveryResultV2,
@@ -25,6 +44,7 @@ from app.delivery.runtime_delivery_bridge_v2 import (
     ApprovedGovernedQueryToolBindingV2,
     RuntimeDeliveryBridgeResultV2,
     RuntimeDeliveryBridgeStatusV2,
+    _select_approved_tool_binding_for_plan_v2,
     invoke_governed_graph_delivery_v2,
     invoke_governed_plan_delivery_v2,
 )
@@ -39,8 +59,34 @@ from app.governance.governance_runtime import (
     GovernanceRuntimeConfig,
     load_governance_runtime_config,
 )
+from app.semantic_layer.analysis_mode_contract_v2 import (
+    AnalysisModeV2,
+)
+from app.semantic_layer.analysis_mode_resolution_v2 import (
+    resolve_analysis_mode_v2,
+)
+from app.semantic_layer.dataset_availability_contract_v2 import (
+    DatasetAvailabilityOutcomeV2,
+    evaluate_dataset_availability_v2,
+)
+from app.semantic_layer.query_plan_selector_v2 import (
+    QueryPlanSelectionStatusV2,
+    select_query_plan_v2,
+)
 from app.semantic_layer.query_plan_v2_loader import (
     load_query_plan_v2_catalog,
+)
+from app.semantic_layer.channel_applicability_v2 import (
+    ChannelBusinessRoleV2,
+    channel_codes_for_role_v2,
+)
+from app.semantic_layer.requested_scope_resolution_v2 import (
+    RequestedScopeResolutionStatusV2,
+    resolve_requested_scope_v2,
+)
+from app.semantic_layer.result_grain_resolver_v2 import (
+    ResultGrainResolutionStatusV2,
+    resolve_result_grain_v2,
 )
 from app.semantic_layer.time_comparison_contract_v2 import (
     AlignmentModeV2,
@@ -48,6 +94,10 @@ from app.semantic_layer.time_comparison_contract_v2 import (
     PeriodModeV2,
     TimeComparisonContractV2,
     TimeWindowReferenceV2,
+)
+from app.semantic_layer.time_window_resolver_v2 import (
+    TimeWindowResolutionStatusV2,
+    resolve_time_window_v2,
 )
 
 
@@ -116,6 +166,8 @@ def _catalog_resources_v2() -> tuple[
 def build_day89_local_access_context_v2(
     *,
     request_id: str,
+    allow_aggregated_business_metrics: bool = False,
+    channel_role: ChannelBusinessRoleV2 = ChannelBusinessRoleV2.SALES,
 ) -> AccessContext:
     """
     Day89 local single-user Decision Console context.
@@ -125,6 +177,16 @@ def build_day89_local_access_context_v2(
     """
 
     metrics, tables, columns = _catalog_resources_v2()
+
+    business_applicable_channels = (
+        DAY89_LOCAL_CHANNEL_CODES
+        & channel_codes_for_role_v2(channel_role)
+    )
+
+    if not business_applicable_channels:
+        raise ValueError(
+            "当前 AccessContext 与业务渠道适用范围没有交集。"
+        )
 
     return AccessContext(
         request_id=request_id,
@@ -138,10 +200,17 @@ def build_day89_local_access_context_v2(
         allowed_columns=columns,
         denied_columns=frozenset(),
         allowed_region_codes=DAY89_LOCAL_REGION_CODES,
-        allowed_channel_codes=DAY89_LOCAL_CHANNEL_CODES,
-        sensitive_data_policy=SensitiveDataPolicy(),
-        policy_version="day89_local_console_policy_v1",
-        scope_source="day89_local_single_user_mvp",
+        allowed_channel_codes=business_applicable_channels,
+        sensitive_data_policy=SensitiveDataPolicy(
+            allow_aggregated_business_metrics=(
+                allow_aggregated_business_metrics
+            ),
+        ),
+        policy_version="day89_local_console_policy_v2",
+        scope_source=(
+            "day89_local_single_user_mvp:"
+            f"{channel_role.value}_channel_scope"
+        ),
     )
 
 
@@ -205,6 +274,1017 @@ def build_day89_overall_gmv_tool_binding_v2(
     )
 
 
+def build_day89_overall_order_count_tool_binding_v2(
+) -> ApprovedGovernedQueryToolBindingV2:
+    """
+    Day93 Blind Regression 首次正式注册非 GMV 的 Business Question Tool。
+
+    这是显式 server-owned approval：
+    - plan_name 固定为 order_count_overall_v2；
+    - Tool identity 固定；
+    - permissions / executor 继续使用既有 Governed Query contract；
+    - 不从用户问题或 Catalog 动态创建 Tool。
+    """
+
+    return ApprovedGovernedQueryToolBindingV2(
+        plan_name="order_count_overall_v2",
+        tool_contract=_governed_query_tool_contract_v2(
+            name="governed_order_count_overall_query",
+            purpose="查询授权范围内的成功支付订单数。",
+        ),
+    )
+
+
+def build_day89_channel_order_count_tool_binding_v2(
+) -> ApprovedGovernedQueryToolBindingV2:
+    """
+    F04 Clarification Continuation 的显式渠道订单数批准项。
+    """
+    return ApprovedGovernedQueryToolBindingV2(
+        plan_name="order_count_channel_v2",
+        tool_contract=_governed_query_tool_contract_v2(
+            name="governed_order_count_channel_query",
+            purpose="查询授权范围内的渠道订单数。",
+        ),
+    )
+
+
+def build_day89_channel_buyer_count_tool_binding_v2(
+) -> ApprovedGovernedQueryToolBindingV2:
+    """
+    F04 Clarification Continuation 的显式渠道购买人数批准项。
+    """
+    return ApprovedGovernedQueryToolBindingV2(
+        plan_name="buyer_count_channel_v2",
+        tool_contract=_governed_query_tool_contract_v2(
+            name="governed_buyer_count_channel_query",
+            purpose="查询授权范围内的渠道购买人数。",
+        ),
+    )
+
+
+def _build_day93_refund_rate_tool_binding_v2(
+    *,
+    grain: str,
+) -> ApprovedGovernedQueryToolBindingV2:
+    supported = {
+        "overall": "整体",
+        "channel": "渠道",
+        "region": "地区",
+        "category": "品类",
+    }
+
+    if grain not in supported:
+        raise ValueError(
+            f"Unsupported refund-rate binding grain: {grain}"
+        )
+
+    return ApprovedGovernedQueryToolBindingV2(
+        plan_name=f"refund_rate_{grain}_v2",
+        tool_contract=_governed_query_tool_contract_v2(
+            name=f"governed_refund_rate_{grain}_query",
+            purpose=(
+                f"查询授权范围内的{supported[grain]}退款率。"
+            ),
+        ),
+    )
+
+
+def build_day93_overall_refund_rate_tool_binding_v2(
+) -> ApprovedGovernedQueryToolBindingV2:
+    return _build_day93_refund_rate_tool_binding_v2(
+        grain="overall"
+    )
+
+
+def build_day93_channel_refund_rate_tool_binding_v2(
+) -> ApprovedGovernedQueryToolBindingV2:
+    return _build_day93_refund_rate_tool_binding_v2(
+        grain="channel"
+    )
+
+
+def build_day93_region_refund_rate_tool_binding_v2(
+) -> ApprovedGovernedQueryToolBindingV2:
+    return _build_day93_refund_rate_tool_binding_v2(
+        grain="region"
+    )
+
+
+def build_day93_category_refund_rate_tool_binding_v2(
+) -> ApprovedGovernedQueryToolBindingV2:
+    return _build_day93_refund_rate_tool_binding_v2(
+        grain="category"
+    )
+
+
+def build_day89_business_question_tool_binding_registry_v2(
+) -> tuple[ApprovedGovernedQueryToolBindingV2, ...]:
+    """
+    Business Question Runtime 的 server-owned 静态 Approved Registry。
+
+    这里列出的每一项都代表一次显式产品/治理批准。
+    新 Query Plan 不会因为加入 Catalog 就自动获得 Tool Binding。
+
+    primary gmv_channel_v2 为向后兼容继续单独传入；
+    本 Registry 只保存 additional approved bindings。
+    """
+
+    registry = (
+        build_day89_overall_gmv_tool_binding_v2(),
+        build_day89_overall_order_count_tool_binding_v2(),
+        build_day89_channel_order_count_tool_binding_v2(),
+        build_day89_channel_buyer_count_tool_binding_v2(),
+        build_day93_overall_refund_rate_tool_binding_v2(),
+        build_day93_channel_refund_rate_tool_binding_v2(),
+        build_day93_region_refund_rate_tool_binding_v2(),
+        build_day93_category_refund_rate_tool_binding_v2(),
+    )
+
+    plan_names = tuple(
+        binding.plan_name
+        for binding in registry
+    )
+
+    if len(plan_names) != len(set(plan_names)):
+        raise ValueError(
+            "Day89 Business Question Approved Binding Registry "
+            f"contains duplicate plan_name values: {plan_names}"
+        )
+
+    return registry
+
+
+
+def _is_day93_f02_compound_gmv_channel_question_v1(
+    question: str,
+) -> bool:
+    """
+    F02 的窄 server-owned compound question contract。
+
+    当前 V1 只识别：
+    - GMV；
+    - 明确的“相比 / 比”时间比较；
+    - 渠道；
+    - 明确的继续调查 / 优先查看意图。
+
+    它不是通用 multi-intent parser。
+    未命中时继续交给既有 Governed Graph。
+    """
+    text = re.sub(
+        r"\s+",
+        "",
+        question,
+    ).casefold()
+
+    has_gmv = "gmv" in text
+    has_comparison = bool(
+        re.search(r"(?:相比|比较|比)", text)
+    )
+    has_channel = "渠道" in text
+    has_investigation = bool(
+        re.search(
+            (
+                r"(?:继续|进一步)?(?:调查|分析|排查)"
+                r".{0,12}(?:先|优先|最值得)"
+                r".{0,8}(?:看|调查|关注)"
+                r".{0,6}(?:哪个|哪一个)?渠道"
+                r"|"
+                r"(?:最值得|优先|首先)"
+                r".{0,8}(?:看|调查|关注)"
+                r".{0,6}(?:哪个|哪一个)?渠道"
+                r"|"
+                r"(?:先|优先)(?:看|调查|关注)"
+                r"(?:哪个|哪一个)渠道"
+            ),
+            text,
+        )
+    )
+
+    return (
+        has_gmv
+        and has_comparison
+        and has_channel
+        and has_investigation
+    )
+
+
+def _extract_day93_f02_adjacent_months_v1(
+    question: str,
+) -> tuple[date, date] | None:
+    """
+    从 F02 V1 中提取 Current Month / Reference Month。
+
+    仅接受“显式当前年月 + 相邻前月”的月环比。
+    例如：
+      2025年10月 ... 相比9月 ...
+      2026年1月 ... 相比2025年12月 ...
+
+    返回：
+      (current_anchor_date, reference_anchor_date)
+
+    非相邻月份 / 非明确年月 -> None，禁止静默改写比较合同。
+    """
+    text = re.sub(
+        r"\s+",
+        "",
+        question,
+    )
+
+    match = re.search(
+        (
+            r"(?P<current_year>20\d{2})年"
+            r"(?P<current_month>\d{1,2})月"
+            r".{0,40}?"
+            r"(?:相比|比较|比)"
+            r".{0,12}?"
+            r"(?:(?P<reference_year>20\d{2})年)?"
+            r"(?P<reference_month>\d{1,2})月"
+        ),
+        text,
+        flags=re.IGNORECASE,
+    )
+
+    if match is None:
+        return None
+
+    current_year = int(match.group("current_year"))
+    current_month = int(match.group("current_month"))
+    reference_month = int(match.group("reference_month"))
+
+    if not (
+        1 <= current_month <= 12
+        and 1 <= reference_month <= 12
+    ):
+        return None
+
+    if current_month == 1:
+        expected_reference_year = current_year - 1
+        expected_reference_month = 12
+    else:
+        expected_reference_year = current_year
+        expected_reference_month = current_month - 1
+
+    raw_reference_year = match.group("reference_year")
+
+    reference_year = (
+        int(raw_reference_year)
+        if raw_reference_year is not None
+        else expected_reference_year
+    )
+
+    if (
+        reference_year != expected_reference_year
+        or reference_month != expected_reference_month
+    ):
+        return None
+
+    current_end_day = calendar.monthrange(
+        current_year,
+        current_month,
+    )[1]
+    reference_end_day = calendar.monthrange(
+        reference_year,
+        reference_month,
+    )[1]
+
+    return (
+        date(
+            current_year,
+            current_month,
+            current_end_day,
+        ),
+        date(
+            reference_year,
+            reference_month,
+            reference_end_day,
+        ),
+    )
+
+
+
+def _resolve_day93_gmv_comparison_seed_investigation_v2(
+    question: str,
+) -> tuple[date, date, object] | None:
+    """
+    Resolve a comparison-bearing Investigation with a clear GMV Seed
+    but no explicit Seed Result Grain.
+
+    Example:
+        “2025年8月GMV相比7月表现怎么样？
+         如果继续调查，最值得优先看哪个方向？”
+
+    Contract:
+    - requested analysis mode = INVESTIGATION;
+    - Day93 registration currently supports explicit GMV only;
+    - raw Result Grain remains UNSPECIFIED with no dimension evidence;
+    - time comparison is an explicit adjacent natural-month MoM;
+    - unresolved explicit Requested Scope fails closed.
+
+    This resolves only the trusted Seed Comparison.
+    It does NOT choose the later Investigation Target Grain.
+    """
+
+    text = str(question).strip()
+
+    if "gmv" not in text.casefold():
+        return None
+
+    analysis_mode = resolve_analysis_mode_v2(
+        text
+    )
+
+    if (
+        analysis_mode.analysis_mode
+        != AnalysisModeV2.INVESTIGATION
+    ):
+        return None
+
+    raw_grain = resolve_result_grain_v2(
+        text
+    )
+
+    if (
+        raw_grain.status
+        != ResultGrainResolutionStatusV2.UNSPECIFIED
+        or raw_grain.dimensions
+        or raw_grain.evidence
+    ):
+        return None
+
+    months = _extract_day93_f02_adjacent_months_v1(
+        text
+    )
+
+    if months is None:
+        return None
+
+    requested_scope = resolve_requested_scope_v2(
+        text
+    )
+
+    if (
+        requested_scope.status
+        == RequestedScopeResolutionStatusV2
+        .UNRESOLVED_EXPLICIT_SCOPE
+    ):
+        return None
+
+    current_anchor, reference_anchor = months
+
+    return (
+        current_anchor,
+        reference_anchor,
+        requested_scope,
+    )
+
+
+def _run_day93_gmv_comparison_seed_investigation_v2(
+    *,
+    question: str,
+    runtime_config: GovernanceRuntimeConfig,
+    execution_policy: GovernedExecutionPolicy | None,
+) -> RuntimeDeliveryBridgeResultV2 | None:
+    """
+    Generic Comparison Seed -> bounded Investigation.
+
+    F02 remains the richer special orchestration:
+        Overall Comparison -> Channel Contribution -> Route.
+
+    This generic path does:
+        Overall Comparison Seed
+        -> release trusted current/reference/delta first
+        -> preserve requested_analysis_mode=INVESTIGATION
+        -> later Agentic Investigation chooses a registered direction.
+
+    The Seed Evidence remains COMPARISON evidence.
+    The user's deeper requested mode remains INVESTIGATION.
+    """
+
+    resolved = (
+        _resolve_day93_gmv_comparison_seed_investigation_v2(
+            question
+        )
+    )
+
+    if resolved is None:
+        return None
+
+    (
+        current_anchor,
+        reference_anchor,
+        requested_scope,
+    ) = resolved
+
+    comparison = build_monthly_mom_comparison_v2(
+        anchor_date=current_anchor
+    )
+
+    # Defense in depth: parser and deterministic comparison builder
+    # must agree on the exact reference month.
+    if (
+        comparison.reference_window.end_date
+        != reference_anchor
+    ):
+        return RuntimeDeliveryBridgeResultV2(
+            status=RuntimeDeliveryBridgeStatusV2.GRAPH_STOPPED,
+            message=(
+                "比较时间合同无法稳定对齐，"
+                "本次不执行替代查询。"
+            ),
+            safe_runtime_result={
+                "success": False,
+                "outcome": "stopped",
+                "stop_stage": (
+                    "comparison_seed_time_contract"
+                ),
+                "reason_code": (
+                    "reference_window_mismatch"
+                ),
+                "question": question,
+            },
+            requested_scope=requested_scope,
+            requested_analysis_mode=(
+                AnalysisModeV2.INVESTIGATION
+            ),
+        )
+
+    binding = (
+        build_day89_overall_gmv_tool_binding_v2()
+    )
+
+    base_request_id = (
+        "day93-comparison-seed-"
+        f"{current_anchor.isoformat()}-"
+        f"{uuid4().hex}"
+    )
+
+    current_request_id = (
+        f"{base_request_id}-current"
+    )
+    current_result = invoke_governed_plan_delivery_v2(
+        context=build_day89_local_access_context_v2(
+            request_id=current_request_id,
+        ),
+        plan_name=binding.plan_name,
+        analysis_window=comparison.current_window,
+        question=_monthly_overall_gmv_question_v2(
+            comparison.current_window
+        ),
+        runtime_config=runtime_config,
+        approved_tool_binding=binding,
+        requested_scope=requested_scope,
+        execution_policy=execution_policy,
+        event_id=current_request_id,
+    )
+
+    reference_request_id = (
+        f"{base_request_id}-reference"
+    )
+    reference_result = invoke_governed_plan_delivery_v2(
+        context=build_day89_local_access_context_v2(
+            request_id=reference_request_id,
+        ),
+        plan_name=binding.plan_name,
+        analysis_window=(
+            comparison.reference_window
+        ),
+        question=_monthly_overall_gmv_question_v2(
+            comparison.reference_window
+        ),
+        runtime_config=runtime_config,
+        approved_tool_binding=binding,
+        requested_scope=requested_scope,
+        execution_policy=execution_policy,
+        event_id=reference_request_id,
+    )
+
+    comparison_delivery = (
+        build_runtime_comparison_delivery_v2(
+            current_result=current_result,
+            reference_result=reference_result,
+            comparison=comparison,
+            request_subject=question,
+        )
+    )
+
+    if (
+        comparison_delivery.status.value
+        != "ready"
+        or comparison_delivery.delivery is None
+        or comparison_delivery.console_view is None
+        or comparison_delivery.executive_brief is None
+        or comparison_delivery.metric_comparison_result
+        is None
+    ):
+        return RuntimeDeliveryBridgeResultV2(
+            status=RuntimeDeliveryBridgeStatusV2.GRAPH_STOPPED,
+            message=(
+                "整体比较 Seed 没有形成完整的可释放证据，"
+                "因此暂不进入后续调查。"
+            ),
+            safe_runtime_result={
+                "success": False,
+                "outcome": "stopped",
+                "stop_stage": (
+                    "comparison_seed_delivery"
+                ),
+                "reason_code": (
+                    "comparison_delivery_not_ready"
+                ),
+                "comparison_status": (
+                    comparison_delivery.status.value
+                ),
+                "question": question,
+                "current_window": {
+                    "start_date": (
+                        comparison.current_window
+                        .start_date.isoformat()
+                    ),
+                    "end_date": (
+                        comparison.current_window
+                        .end_date.isoformat()
+                    ),
+                },
+                "reference_window": {
+                    "start_date": (
+                        comparison.reference_window
+                        .start_date.isoformat()
+                    ),
+                    "end_date": (
+                        comparison.reference_window
+                        .end_date.isoformat()
+                    ),
+                },
+            },
+            requested_scope=requested_scope,
+            requested_analysis_mode=(
+                AnalysisModeV2.INVESTIGATION
+            ),
+        )
+
+    return RuntimeDeliveryBridgeResultV2(
+        status=RuntimeDeliveryBridgeStatusV2.READY,
+        message=(
+            "整体时间比较 Seed 已形成受治理交付；"
+            "后续调查方向尚未由 Seed Grain 预先指定。"
+        ),
+        safe_runtime_result={
+            "success": True,
+            "outcome": "ready",
+            "orchestration": (
+                "comparison_seed_then_investigation_v2"
+            ),
+            "question": question,
+            "seed_metric": "gmv",
+            "seed_grain": "overall",
+            "investigation_target_grain": None,
+            "current_window": {
+                "start_date": (
+                    comparison.current_window
+                    .start_date.isoformat()
+                ),
+                "end_date": (
+                    comparison.current_window
+                    .end_date.isoformat()
+                ),
+            },
+            "reference_window": {
+                "start_date": (
+                    comparison.reference_window
+                    .start_date.isoformat()
+                ),
+                "end_date": (
+                    comparison.reference_window
+                    .end_date.isoformat()
+                ),
+            },
+        },
+        requested_scope=requested_scope,
+        requested_analysis_mode=(
+            AnalysisModeV2.INVESTIGATION
+        ),
+        delivery=comparison_delivery.delivery,
+        console_view=(
+            comparison_delivery.console_view
+        ),
+        executive_brief=(
+            comparison_delivery.executive_brief
+        ),
+    )
+
+
+def _run_day93_f02_compound_comparison_v1(
+    *,
+    question: str,
+    runtime_config: GovernanceRuntimeConfig,
+    execution_policy: GovernedExecutionPolicy | None,
+) -> RuntimeDeliveryBridgeResultV2 | None:
+    """
+    F02：Overall Comparison -> Channel Contribution
+    -> Investigation Recommendation。
+
+    这里只编排既有可信能力，不重新实现：
+    - GMV Query Plan；
+    - Monthly Comparison；
+    - Channel Breakdown；
+    - Contribution Core；
+    - Result Protection / Evidence / Audit。
+
+    当前 V1 只支持无显式 Row Scope 的相邻自然月 GMV 比较。
+    有显式 Region / Channel Scope 时交回原 Graph，避免专用 Runtime
+    忽略 Requested Scope。
+    """
+    if not _is_day93_f02_compound_gmv_channel_question_v1(
+        question
+    ):
+        return None
+
+    months = _extract_day93_f02_adjacent_months_v1(
+        question
+    )
+
+    if months is None:
+        return None
+
+    current_anchor, reference_anchor = months
+
+    requested_scope = resolve_requested_scope_v2(
+        question
+    )
+
+    if (
+        requested_scope.status
+        != RequestedScopeResolutionStatusV2.NO_EXPLICIT_SCOPE
+    ):
+        return None
+
+    # Local import 避免 decision_console_runtime_v2 与
+    # monthly_contribution_delivery_v2 的模块级循环依赖。
+    from app.delivery.monthly_contribution_delivery_v2 import (
+        MonthlyContributionDeliveryStatusV2,
+        run_day89_monthly_gmv_channel_contribution_v2,
+    )
+
+    compound = run_day89_monthly_gmv_channel_contribution_v2(
+        anchor_date=current_anchor,
+        runtime_config=runtime_config,
+        execution_policy=execution_policy,
+    )
+
+    if (
+        compound.status
+        != MonthlyContributionDeliveryStatusV2.READY
+        or compound.delivery is None
+        or compound.console_view is None
+        or compound.metric_comparison_result is None
+        or compound.contribution_result is None
+        or compound.executive_brief is None
+        or compound.console_view.contribution is None
+    ):
+        return RuntimeDeliveryBridgeResultV2(
+            status=RuntimeDeliveryBridgeStatusV2.GRAPH_STOPPED,
+            message=(
+                "整体月度比较或渠道变化贡献没有形成完整的"
+                "可释放证据，因此暂不生成优先调查建议。"
+            ),
+            safe_runtime_result={
+                "success": False,
+                "outcome": "stopped",
+                "stop_stage": "f02_compound_orchestration",
+                "reason_code": (
+                    "comparison_or_contribution_not_ready"
+                ),
+                "compound_status": compound.status.value,
+                "question": question,
+                "current_anchor_date": (
+                    current_anchor.isoformat()
+                ),
+                "reference_anchor_date": (
+                    reference_anchor.isoformat()
+                ),
+            },
+            requested_scope=requested_scope,
+            requested_analysis_mode=AnalysisModeV2.DIAGNOSTIC,
+        )
+
+    contribution_evidence_id = (
+        compound.console_view.contribution.evidence_id
+    )
+
+    route_recommendation = (
+        build_contribution_investigation_route_v2(
+            contribution=compound.contribution_result,
+            contribution_evidence_id=(
+                contribution_evidence_id
+            ),
+        )
+    )
+
+    # 旧的单一 Channel Recommendation 仅在新 Routing Policy
+    # 明确允许 Member Focus 时保留，用于兼容现有 Channel Focus
+    # code/value binding。Near-Tie / Distributed 不再生成 Top1 Focus。
+    recommendation = None
+
+    if (
+        route_recommendation is not None
+        and route_recommendation.route.scope_strategy
+        == InvestigationScopeStrategyV2.FOCUS_MEMBER
+    ):
+        recommendation = (
+            build_contribution_investigation_recommendation_v1(
+                contribution=compound.contribution_result,
+                contribution_evidence_id=(
+                    contribution_evidence_id
+                ),
+            )
+        )
+
+    breakdown_evidence_id = (
+        compound.console_view.breakdown.evidence_id
+        if compound.console_view.breakdown is not None
+        else None
+    )
+
+    rebuilt_view = build_decision_console_view_v2(
+        delivery=compound.delivery,
+        metric_comparison_result=(
+            compound.metric_comparison_result
+        ),
+        contribution_result=compound.contribution_result,
+        contribution_evidence_id=(
+            contribution_evidence_id
+        ),
+        breakdown_evidence_id=breakdown_evidence_id,
+        contribution_investigation_recommendation=(
+            recommendation
+        ),
+        contribution_investigation_route_recommendation=(
+            route_recommendation
+        ),
+    )
+
+    comparison = compound.metric_comparison_result
+
+    return RuntimeDeliveryBridgeResultV2(
+        status=RuntimeDeliveryBridgeStatusV2.READY,
+        message=(
+            "GMV 月环比、渠道变化贡献与下一步调查建议"
+            "已形成受治理业务交付。"
+        ),
+        safe_runtime_result={
+            "success": True,
+            "outcome": "ready",
+            "orchestration": (
+                "f02_monthly_comparison_channel_contribution_v1"
+            ),
+            "question": question,
+            "current_window": {
+                "start_date": (
+                    comparison.comparison.current_window
+                    .start_date.isoformat()
+                ),
+                "end_date": (
+                    comparison.comparison.current_window
+                    .end_date.isoformat()
+                ),
+            },
+            "reference_window": {
+                "start_date": (
+                    comparison.comparison.reference_window
+                    .start_date.isoformat()
+                ),
+                "end_date": (
+                    comparison.comparison.reference_window
+                    .end_date.isoformat()
+                ),
+            },
+            "recommendation_available": (
+                route_recommendation is not None
+            ),
+            "legacy_member_focus_available": (
+                recommendation is not None
+            ),
+            "route_pattern": (
+                route_recommendation.pattern_assessment.pattern.value
+                if route_recommendation is not None
+                else None
+            ),
+            "route_scope_strategy": (
+                route_recommendation.route.scope_strategy.value
+                if route_recommendation is not None
+                else None
+            ),
+            "route_next_dimension": (
+                route_recommendation.route.next_dimension.value
+                if route_recommendation is not None
+                else None
+            ),
+            "contribution_reconciliation_status": (
+                compound.contribution_result
+                .reconciliation_status.value
+            ),
+        },
+        requested_scope=requested_scope,
+        requested_analysis_mode=AnalysisModeV2.DIAGNOSTIC,
+        delivery=compound.delivery,
+        console_view=rebuilt_view,
+        executive_brief=compound.executive_brief,
+    )
+
+
+def _is_day93_refund_category_priority_question_v1(
+    question: str,
+) -> bool:
+    """
+    F03 的窄 server-owned compound question contract。
+
+    必须同时出现：
+    - 品类粒度；
+    - 退款率；
+    - 明确的优先关注 / 调查 / 排查 / 处理意图。
+
+    “哪个品类退款率最高”仍走普通 Fact Ranking，
+    不会被升级成 Priority Assessment。
+    """
+    text = re.sub(
+        r"\s+",
+        "",
+        question,
+    ).casefold()
+
+    has_category = bool(
+        re.search(
+            r"(?:各|哪个|哪一个)?(?:品类|类别)",
+            text,
+        )
+    )
+    has_refund_rate = "退款率" in text
+    has_priority = bool(
+        re.search(
+            (
+                r"(?:最值得|应该|应当)?"
+                r"(?:优先|首先)"
+                r"(?:关注|调查|排查|处理)"
+                r"|"
+                r"最值得(?:关注|调查|排查|处理)"
+            ),
+            text,
+        )
+    )
+
+    return (
+        has_category
+        and has_refund_rate
+        and has_priority
+    )
+
+
+def _attach_day93_priority_assessment_v1(
+    *,
+    result: RuntimeDeliveryBridgeResultV2,
+    question: str,
+) -> RuntimeDeliveryBridgeResultV2:
+    if (
+        result.status
+        != RuntimeDeliveryBridgeStatusV2.READY
+        or result.delivery is None
+        or result.console_view is None
+        or result.console_view.breakdown is None
+    ):
+        return result
+
+    breakdown_id = (
+        result.console_view.breakdown.evidence_id
+    )
+
+    priority = build_priority_assessment_v1(
+        delivery=result.delivery,
+        question=question,
+        breakdown_evidence_id=breakdown_id,
+    )
+
+    if priority is None:
+        return result
+
+    rebuilt_view = build_decision_console_view_v2(
+        delivery=result.delivery,
+        breakdown_evidence_id=breakdown_id,
+        ranking_conclusion=(
+            result.console_view.ranking_conclusion
+        ),
+        priority_assessment=priority,
+    )
+
+    return result.model_copy(
+        update={
+            "console_view": rebuilt_view,
+        }
+    )
+
+
+def _run_day93_refund_category_priority_v1(
+    *,
+    question: str,
+    reference_date: date,
+    runtime_config: GovernanceRuntimeConfig,
+    execution_policy: GovernedExecutionPolicy | None,
+) -> RuntimeDeliveryBridgeResultV2 | None:
+    """
+    F03 的结构化单证据执行入口。
+
+    它只绕过容易把 compound question 判成 MULTIPLE_INTENTS 的
+    Natural-language Metric / Grain Planning。
+
+    不绕过：
+    - Requested Scope Resolution；
+    - Dataset Availability；
+    - AccessContext；
+    - Governed Planning；
+    - SQL Compilation；
+    - AST / Execution Policy；
+    - Result Protection；
+    - Audit / Evidence Delivery。
+
+    当前 V1 只批准 refund_rate_category_v2。
+    """
+    if not _is_day93_refund_category_priority_question_v1(
+        question
+    ):
+        return None
+
+    requested_scope = resolve_requested_scope_v2(
+        question
+    )
+
+    if (
+        requested_scope.status
+        == RequestedScopeResolutionStatusV2
+        .UNRESOLVED_EXPLICIT_SCOPE
+    ):
+        # 交还普通 Graph，让既有 Scope Clarification fail closed。
+        return None
+
+    time_resolution = resolve_time_window_v2(
+        question,
+        reference_date=reference_date,
+    )
+
+    if (
+        time_resolution.status
+        != TimeWindowResolutionStatusV2.RESOLVED
+        or time_resolution.effective_start_date is None
+        or time_resolution.effective_end_date is None
+    ):
+        # 时间不明确时不发明 window，继续使用原 Graph 的安全停止逻辑。
+        return None
+
+    availability = evaluate_dataset_availability_v2(
+        time_resolution=time_resolution
+    )
+
+    if (
+        availability.outcome
+        != DatasetAvailabilityOutcomeV2.AVAILABLE
+    ):
+        # 交回原 Graph，保持统一 Dataset Boundary 文案。
+        return None
+
+    request_id = (
+        "day93-f03-priority-"
+        f"{uuid4().hex}"
+    )
+
+    binding = (
+        build_day93_category_refund_rate_tool_binding_v2()
+    )
+
+    analysis_window = TimeWindowReferenceV2(
+        start_date=time_resolution.effective_start_date,
+        end_date=time_resolution.effective_end_date,
+    )
+
+    result = invoke_governed_plan_delivery_v2(
+        context=build_day89_local_access_context_v2(
+            request_id=request_id,
+            allow_aggregated_business_metrics=True,
+        ),
+        plan_name=binding.plan_name,
+        analysis_window=analysis_window,
+        question=question,
+        runtime_config=runtime_config,
+        approved_tool_binding=binding,
+        requested_scope=requested_scope,
+        execution_policy=execution_policy,
+        event_id=request_id,
+    )
+
+    return _attach_day93_priority_assessment_v1(
+        result=result,
+        question=question,
+    )
+
+
 def run_day89_local_investigation_v2(
     *,
     question: str,
@@ -218,14 +1298,49 @@ def run_day89_local_investigation_v2(
         else load_governance_runtime_config()
     )
 
+    f02_result = _run_day93_f02_compound_comparison_v1(
+        question=question,
+        runtime_config=active_config,
+        execution_policy=execution_policy,
+    )
+
+    if f02_result is not None:
+        return f02_result
+
+    comparison_seed_result = (
+        _run_day93_gmv_comparison_seed_investigation_v2(
+            question=question,
+            runtime_config=active_config,
+            execution_policy=execution_policy,
+        )
+    )
+
+    if comparison_seed_result is not None:
+        return comparison_seed_result
+
+    priority_result = (
+        _run_day93_refund_category_priority_v1(
+            question=question,
+            reference_date=reference_date,
+            runtime_config=active_config,
+            execution_policy=execution_policy,
+        )
+    )
+
+    if priority_result is not None:
+        return priority_result
+
     request_id = f"day89-console-{uuid4().hex}"
 
     context = build_day89_local_access_context_v2(
         request_id=request_id,
+        allow_aggregated_business_metrics=True,
     )
 
     channel_binding = build_day89_channel_tool_binding_v2()
-    overall_binding = build_day89_overall_gmv_tool_binding_v2()
+    approved_registry = (
+        build_day89_business_question_tool_binding_registry_v2()
+    )
 
     return invoke_governed_graph_delivery_v2(
         context=context,
@@ -233,8 +1348,194 @@ def run_day89_local_investigation_v2(
         reference_date=reference_date,
         runtime_config=active_config,
         approved_tool_binding=channel_binding,
-        approved_tool_binding_registry=(
-            overall_binding,
+        approved_tool_binding_registry=approved_registry,
+        execution_policy=execution_policy,
+        event_id=request_id,
+    )
+
+
+def _clarification_runtime_stop_v1(
+    *,
+    resolution: BusinessClarificationResolutionV1,
+    stop_stage: str,
+    message: str,
+    reason_code: str,
+) -> RuntimeDeliveryBridgeResultV2:
+    """
+    Structured Clarification continuation 的安全停止结果。
+    """
+    grain = resolution.preserved_grain_resolution
+    time_resolution = resolution.preserved_time_resolution
+
+    return RuntimeDeliveryBridgeResultV2(
+        status=RuntimeDeliveryBridgeStatusV2.GRAPH_STOPPED,
+        message=message,
+        safe_runtime_result={
+            "success": False,
+            "outcome": "stopped",
+            "stop_stage": stop_stage,
+            "message": message,
+            "reason_code": reason_code,
+            "planning_source": (
+                "business_clarification_structured_context"
+            ),
+            "selected_metric_name": (
+                resolution.selected_metric_name
+            ),
+            "preserved_grain_key": grain.grain_key,
+            "preserved_start_date": (
+                time_resolution.requested_start_date.isoformat()
+                if time_resolution.requested_start_date is not None
+                else None
+            ),
+            "preserved_end_date": (
+                time_resolution.requested_end_date.isoformat()
+                if time_resolution.requested_end_date is not None
+                else None
+            ),
+        },
+    )
+
+
+def run_day93_business_clarification_continuation_v1(
+    *,
+    resolution: BusinessClarificationResolutionV1,
+    runtime_config: GovernanceRuntimeConfig | None = None,
+    execution_policy: GovernedExecutionPolicy | None = None,
+) -> RuntimeDeliveryBridgeResultV2:
+    """
+    普通业务澄清后的结构化恢复 Runtime。
+
+    只补用户选择的 Metric，复用第一次 Clarification Stop 时冻结的：
+    - Time Resolution；
+    - Requested Scope；
+    - Result Grain。
+
+    不再从 resolved_question 重跑 Semantic / Grain / Time NLP。
+
+    仍完整经过：
+    Query Plan Selection
+    -> Approved Tool Binding
+    -> Governed Planning
+    -> Compilation
+    -> AST recheck
+    -> SQL Execution
+    -> Result Protection
+    -> Audit / Evidence / Delivery
+    """
+    time_resolution = resolution.preserved_time_resolution
+
+    if (
+        time_resolution.status
+        != TimeWindowResolutionStatusV2.RESOLVED
+        or time_resolution.effective_start_date is None
+        or time_resolution.effective_end_date is None
+    ):
+        return _clarification_runtime_stop_v1(
+            resolution=resolution,
+            stop_stage="time_resolution",
+            reason_code="clarification_time_not_resolved",
+            message=(
+                "评价指标已经确认，但原问题的时间范围仍不够明确。"
+                "请补充具体时间后再继续。"
+            ),
+        )
+
+    availability = evaluate_dataset_availability_v2(
+        time_resolution=time_resolution
+    )
+
+    if (
+        availability.outcome
+        != DatasetAvailabilityOutcomeV2.AVAILABLE
+    ):
+        return _clarification_runtime_stop_v1(
+            resolution=resolution,
+            stop_stage="dataset_availability",
+            reason_code=(
+                availability.reason_code
+                or "clarification_dataset_unavailable"
+            ),
+            message=(
+                availability.user_message
+                or "原问题的时间范围当前没有可查询数据。"
+            ),
+        )
+
+    selection = select_query_plan_v2(
+        metric_name=resolution.selected_metric_name,
+        grain_resolution=(
+            resolution.preserved_grain_resolution
+        ),
+    )
+
+    if (
+        selection.status
+        != QueryPlanSelectionStatusV2.MATCHED
+        or len(selection.plan_names) != 1
+    ):
+        return _clarification_runtime_stop_v1(
+            resolution=resolution,
+            stop_stage="structured_plan_preflight",
+            reason_code="clarification_plan_not_unique",
+            message=(
+                "评价指标已经确认，但当前 Metric / 维度组合"
+                "还没有唯一可执行的查询计划。"
+            ),
+        )
+
+    plan_name = selection.plan_names[0]
+
+    primary_binding = build_day89_channel_tool_binding_v2()
+    registry = (
+        build_day89_business_question_tool_binding_registry_v2()
+    )
+
+    approved_binding = _select_approved_tool_binding_for_plan_v2(
+        actual_plan_name=plan_name,
+        primary_binding=primary_binding,
+        approved_tool_binding_registry=registry,
+    )
+
+    if approved_binding is None:
+        return _clarification_runtime_stop_v1(
+            resolution=resolution,
+            stop_stage="approved_tool_binding",
+            reason_code="clarification_plan_not_approved",
+            message=(
+                "这个指标与分析维度已经识别，但当前还没有"
+                "正式批准对应的受治理查询能力。"
+            ),
+        )
+
+    active_config = (
+        runtime_config
+        if runtime_config is not None
+        else load_governance_runtime_config()
+    )
+
+    request_id = (
+        "day93-business-clarification-"
+        f"{uuid4().hex}"
+    )
+
+    analysis_window = TimeWindowReferenceV2(
+        start_date=time_resolution.effective_start_date,
+        end_date=time_resolution.effective_end_date,
+    )
+
+    return invoke_governed_plan_delivery_v2(
+        context=build_day89_local_access_context_v2(
+            request_id=request_id,
+            allow_aggregated_business_metrics=True,
+        ),
+        plan_name=plan_name,
+        analysis_window=analysis_window,
+        question=resolution.resolved_question,
+        runtime_config=active_config,
+        approved_tool_binding=approved_binding,
+        requested_scope=(
+            resolution.preserved_requested_scope
         ),
         execution_policy=execution_policy,
         event_id=request_id,
@@ -723,6 +2024,7 @@ def run_day89_breakdown_summary_v2(
         ),
         runtime_config=active_config,
         approved_tool_binding=binding,
+        requested_scope=primary_result.requested_scope,
         execution_policy=execution_policy,
         event_id=request_id,
     )

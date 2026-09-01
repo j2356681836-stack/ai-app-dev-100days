@@ -9,14 +9,26 @@ from app.semantic_layer.brand_new_customer_query_plan_v2 import (
 from app.semantic_layer.cac_query_plan_v2 import (
     build_cac_channel_plan,
 )
+from app.semantic_layer.campaign_query_plan_v2_builder import (
+    build_gmv_campaign_plan_v2,
+)
 from app.semantic_layer.channel_new_customer_query_plan_v2 import (
     build_channel_paid_new_customer_count_channel_plan,
 )
 from app.semantic_layer.composite_query_plan_v2_builder import (
     build_gmv_channel_region_plan,
 )
+from app.semantic_layer.geography_query_plan_v2_builder import (
+    build_gmv_geography_hierarchy_plans_v2,
+)
 from app.semantic_layer.member_query_plan_v2 import (
     build_member_gmv_share_overall_plan,
+)
+from app.semantic_layer.membership_composition_query_plan_v2 import (
+    build_gmv_membership_level_plan,
+)
+from app.semantic_layer.order_count_customer_composition_query_plan_v2 import (
+    build_order_count_customer_lifecycle_membership_plan_v2,
 )
 from app.semantic_layer.query_plan_v2_models import (
     QueryLogic,
@@ -26,6 +38,9 @@ from app.semantic_layer.query_plan_v2_models import (
 )
 from app.semantic_layer.refund_query_plan_v2 import (
     build_refund_rate_overall_plan,
+)
+from app.semantic_layer.r12_cohort_query_plan_v2 import (
+    build_r12_cohort_metric_family_v2,
 )
 from app.semantic_layer.repeat_query_plan_v2_family import (
     build_repeat_metric_family,
@@ -89,12 +104,18 @@ def _normalize_for_yaml(value):
 
 def build_query_plan_v2_catalog() -> QueryPlanCatalogV2:
     """
-    Build the complete Day73 V2 static Query Plan catalog.
+    Build the complete Dataset V2 static Query Plan catalog.
 
     Families:
     - 39 Simple Query Plans
+    - 3 GMV Geography Hierarchy Query Plans
+      (Area / Province / City)
+    - 1 GMV Campaign Query Plan
     - 3 Repeat Staged Query Plans
+    - 5 R12 Cohort Staged Query Plans
     - 1 Member GMV Share Query Plan
+    - 1 Payment-time Membership Level GMV Query Plan
+    - 1 Order Count Customer Lifecycle × Membership Staged Query Plan
     - 1 Refund Rate Query Plan
     - 1 ROI Query Plan
     - 1 CAC Query Plan
@@ -103,26 +124,50 @@ def build_query_plan_v2_catalog() -> QueryPlanCatalogV2:
     - 1 GMV Channel × Region Composite Query Plan
 
     Total:
-    - 49 plans
-    - 19 metrics
-    - 41 QueryLogic
-    - 8 StagedQueryLogic
+    - 60 plans
+    - 24 metrics
+    - 46 QueryLogic
+    - 14 StagedQueryLogic
 
     Important:
     Catalog inclusion means the business/query contract is defined.
     It does NOT mean every plan is executable under every AccessContext.
     Governance remains responsible for fail-closed decisions.
+
+    The legacy gmv_region_v2 plan remains in the catalog for compatibility.
+    New investigation routing should use:
+    area -> province -> city.
     """
     simple_catalog = (
         build_simple_query_plan_catalog()
+    )
+
+    geography_gmv_plans = (
+        build_gmv_geography_hierarchy_plans_v2()
+    )
+
+    campaign_gmv_plan = (
+        build_gmv_campaign_plan_v2()
     )
 
     repeat_plans = (
         build_repeat_metric_family()
     )
 
+    r12_cohort_plans = (
+        build_r12_cohort_metric_family_v2()
+    )
+
     member_plan = (
         build_member_gmv_share_overall_plan()
+    )
+
+    membership_composition_plan = (
+        build_gmv_membership_level_plan()
+    )
+
+    order_customer_composition_plan = (
+        build_order_count_customer_lifecycle_membership_plan_v2()
     )
 
     refund_plan = (
@@ -151,9 +196,14 @@ def build_query_plan_v2_catalog() -> QueryPlanCatalogV2:
 
     all_plans = (
         tuple(simple_catalog.query_plans)
+        + tuple(geography_gmv_plans)
+        + (campaign_gmv_plan,)
         + tuple(repeat_plans)
+        + tuple(r12_cohort_plans)
         + (
             member_plan,
+            membership_composition_plan,
+            order_customer_composition_plan,
             refund_plan,
             roi_plan,
             cac_plan,

@@ -47,6 +47,10 @@ from app.delivery.runtime_delivery_bridge_v2 import (
     RuntimeDeliveryBridgeStatusV2,
 )
 
+from app.governance.governed_planning_envelope_v2 import (
+    GovernedPlanningEnvelopeV2,
+)
+
 
 INVESTIGATION_DELIVERY_ADAPTER_VERSION = (
     "day89_investigation_delivery_adapter_v2_0"
@@ -282,6 +286,51 @@ def _observation_reference_v2(
     )
 
 
+def _scope_summary_from_governed_envelope_v1(
+    envelope: GovernedPlanningEnvelopeV2,
+) -> str | None:
+    """
+    从本次实际 Governed Scope Binding 恢复安全范围摘要。
+
+    Investigation 的 seed AnalysisScope 可能比后续 Focus Scope 更宽；
+    Query Evidence Provenance 必须记录本次 SQL 真正绑定的范围，
+    不能继续沿用 seed 的全局 scope_summary。
+    """
+
+    scoped = envelope.scope_binding.scoped_query_contract
+    parameter_values = {
+        parameter.name: str(parameter.value)
+        for parameter in scoped.parameters
+    }
+
+    collected: dict[str, set[str]] = {}
+
+    for predicate in scoped.predicates:
+        dimension = predicate.dimension.value
+        values = collected.setdefault(dimension, set())
+
+        for name in predicate.parameter_names:
+            if name not in parameter_values:
+                raise ValueError(
+                    "Scope predicate references a missing parameter: "
+                    f"{name}"
+                )
+            values.add(parameter_values[name])
+
+    regions = tuple(sorted(collected.get("region", set())))
+    channels = tuple(sorted(collected.get("channel", set())))
+
+    parts: list[str] = []
+
+    if regions:
+        parts.append("地区代码：" + "、".join(regions))
+
+    if channels:
+        parts.append("渠道代码：" + "、".join(channels))
+
+    return "；".join(parts) if parts else None
+
+
 def _build_query_record(
     *,
     runtime_step: Day89InvestigationRuntimeStepResultV2,
@@ -331,8 +380,18 @@ def _build_query_record(
             "与 Tool Execution Result 不一致。",
         )
 
+    query_analysis_scope = insight.analysis_scope.model_copy(
+        update={
+            "scope_summary": (
+                _scope_summary_from_governed_envelope_v1(
+                    context.envelope
+                )
+            )
+        }
+    )
+
     build = build_governed_query_evidence_record_v2(
-        analysis_scope=insight.analysis_scope,
+        analysis_scope=query_analysis_scope,
         evidence_reference=execution.evidence_reference,
         tool_contract=context.tool_contract,
         envelope=context.envelope,
