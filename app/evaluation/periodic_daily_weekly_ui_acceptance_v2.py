@@ -34,10 +34,10 @@ def test_business_route_has_no_daily_weekly_placeholder() -> None:
         app._render_business_view
     )
 
-    assert "Daily / Weekly 尚未接入真实 Runtime" not in source
-    assert "_render_periodic_comparison_business(" in source
+    assert "Daily / Weekly" not in source or "Runtime" not in source
+    assert "_render_periodic_business_report_v2(" in source
+    assert "_render_periodic_channel_extension_v2(" in source
     assert "cadence=request.report_cadence" in source
-
 
 def test_business_renderer_accepts_ready_and_partial_ready() -> None:
     source = inspect.getsource(

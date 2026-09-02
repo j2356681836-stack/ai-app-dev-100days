@@ -198,10 +198,10 @@ def test_presenter_appends_trusted_summary_row() -> None:
     assert rows[-1]["构成占比"] == "100.00%"
 
 
-def test_catalog_expands_to_56_without_new_metric() -> None:
+def test_catalog_expands_to_60_without_new_metric() -> None:
     catalog = build_query_plan_v2_catalog()
 
-    assert len(catalog.query_plans) == 56
+    assert len(catalog.query_plans) == 60
     assert len(
         {
             plan.metric
@@ -227,7 +227,7 @@ TESTS = (
     test_customer_business_order_is_frozen,
     test_customer_projection_uses_fixed_order_and_no_top3,
     test_presenter_appends_trusted_summary_row,
-    test_catalog_expands_to_56_without_new_metric,
+    test_catalog_expands_to_60_without_new_metric,
 )
 
 

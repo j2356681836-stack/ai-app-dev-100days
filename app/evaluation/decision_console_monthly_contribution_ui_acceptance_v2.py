@@ -67,8 +67,9 @@ def test_current_breakdown_does_not_sum_visible_rows() -> None:
     assert "view.breakdown.rows" in source
     assert ".sum(" not in source
     assert "sum(" not in source
-    assert "页面不对明细自行求和" in source
-
+    assert "comparison.current_value" in source
+    assert "comparison.reference_value" in source
+    assert "build_display_rows_v2(" in source
 
 def test_anomaly_absence_is_not_rendered_as_anomaly() -> None:
     source = inspect.getsource(app._render_anomaly_boundary)

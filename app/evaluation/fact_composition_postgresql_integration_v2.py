@@ -38,19 +38,20 @@ def main() -> None:
 
     available = fact_composition_available_dimensions_v2(seed)
     assert available == (
+        FactCompositionDimensionV2.PEOPLE,
         FactCompositionDimensionV2.CHANNEL,
         FactCompositionDimensionV2.CATEGORY,
     )
 
-    results = [
-        run_day93_fact_composition_v2(
+    results = {
+        dimension: run_day93_fact_composition_v2(
             seed_result=seed,
             dimension=dimension,
         )
         for dimension in available
-    ]
+    }
 
-    for result in results:
+    for result in results.values():
         assert result.status == FactCompositionStatusV2.READY, result.message
         assert result.members
         assert result.released_row_count == len(result.members)
@@ -62,9 +63,16 @@ def main() -> None:
         assert abs(result.unexplained_remainder) <= Decimal("0.01")
         assert "SHANGHAI" in (result.scope_summary or "")
 
-    channel, category = results
+    people = results[FactCompositionDimensionV2.PEOPLE]
+    channel = results[FactCompositionDimensionV2.CHANNEL]
+    category = results[FactCompositionDimensionV2.CATEGORY]
 
-    assert channel.overall_value == category.overall_value
+    assert (
+        people.overall_value
+        == channel.overall_value
+        == category.overall_value
+    )
+    assert people.member_sum == people.overall_value
     assert channel.member_sum == channel.overall_value
     assert category.member_sum == category.overall_value
 

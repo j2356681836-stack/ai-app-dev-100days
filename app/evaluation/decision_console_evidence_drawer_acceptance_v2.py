@@ -37,7 +37,7 @@ from app.semantic_layer.time_comparison_contract_v2 import (
 )
 
 
-EXPECTED_VIEW_VERSION = "day89_decision_console_view_v2_7"
+EXPECTED_VIEW_VERSION = "day89_decision_console_view_v2_8"
 
 
 def _comparison() -> TimeComparisonContractV2:

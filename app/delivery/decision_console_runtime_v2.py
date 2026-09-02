@@ -65,6 +65,13 @@ from app.semantic_layer.analysis_mode_contract_v2 import (
 from app.semantic_layer.analysis_mode_resolution_v2 import (
     resolve_analysis_mode_v2,
 )
+from app.semantic_layer.comparison_intent_semantic_v2 import (
+    ComparisonIntentSemanticStatusV2,
+    resolve_gmv_adjacent_month_comparison_intent_v2,
+)
+from app.semantic_layer.question_semantic_parser_v2 import (
+    LLMCall,
+)
 from app.semantic_layer.dataset_availability_contract_v2 import (
     DatasetAvailabilityOutcomeV2,
     evaluate_dataset_availability_v2,
@@ -639,11 +646,155 @@ def _resolve_day93_gmv_comparison_seed_investigation_v2(
     )
 
 
+def _resolve_day94_gmv_comparison_seed_v2(
+    question: str,
+    *,
+    comparison_intent_llm_call: LLMCall | None = None,
+) -> tuple[
+    date,
+    date,
+    object,
+    AnalysisModeV2,
+    str,
+] | None:
+    """
+    Day94 Hybrid Comparison Intent Boundary。
+
+    Fast path：
+    - 保留 Day93 已验收的高置信度 deterministic Investigation；
+    - 不给已经稳定的表达增加额外 LLM latency。
+
+    Semantic fallback：
+    - 当原 deterministic contract 未命中时，
+      仅让 LLM 归一化 current/reference 月份语义角色与
+      COMPARISON / INVESTIGATION 深度；
+    - LLM 结果必须经过 comparison_intent_semantic_v2 的
+      deterministic validation；
+    - Requested Scope / Seed Grain 仍由既有 server-owned resolver
+      决定，LLM 不参与权限或 Query Plan 选择。
+
+    最终返回：
+      current_anchor
+      reference_anchor
+      requested_scope
+      requested_analysis_mode
+      route_source
+    """
+
+    text = str(question).strip()
+
+    if "gmv" not in text.casefold():
+        return None
+
+    deterministic = (
+        _resolve_day93_gmv_comparison_seed_investigation_v2(
+            text
+        )
+    )
+
+    if deterministic is not None:
+        (
+            current_anchor,
+            reference_anchor,
+            requested_scope,
+        ) = deterministic
+
+        return (
+            current_anchor,
+            reference_anchor,
+            requested_scope,
+            AnalysisModeV2.INVESTIGATION,
+            "day93_deterministic_fast_path",
+        )
+
+    raw_grain = resolve_result_grain_v2(
+        text
+    )
+
+    if (
+        raw_grain.status
+        != ResultGrainResolutionStatusV2.UNSPECIFIED
+        or raw_grain.dimensions
+        or raw_grain.evidence
+    ):
+        return None
+
+    requested_scope = resolve_requested_scope_v2(
+        text
+    )
+
+    if (
+        requested_scope.status
+        == RequestedScopeResolutionStatusV2
+        .UNRESOLVED_EXPLICIT_SCOPE
+    ):
+        return None
+
+    if comparison_intent_llm_call is None:
+        semantic = (
+            resolve_gmv_adjacent_month_comparison_intent_v2(
+                text
+            )
+        )
+    else:
+        semantic = (
+            resolve_gmv_adjacent_month_comparison_intent_v2(
+                text,
+                llm_call=comparison_intent_llm_call,
+            )
+        )
+
+    if (
+        semantic.status
+        != ComparisonIntentSemanticStatusV2.READY
+        or semantic.analysis_mode is None
+        or semantic.current_anchor_date is None
+        or semantic.reference_anchor_date is None
+    ):
+        deterministic_months = (
+            _extract_day93_f02_adjacent_months_v1(
+                text
+            )
+        )
+
+        deterministic_mode = resolve_analysis_mode_v2(
+            text
+        )
+
+        if (
+            deterministic_months is None
+            or deterministic_mode.analysis_mode
+            != AnalysisModeV2.COMPARISON
+        ):
+            return None
+
+        current_anchor, reference_anchor = (
+            deterministic_months
+        )
+
+        return (
+            current_anchor,
+            reference_anchor,
+            requested_scope,
+            AnalysisModeV2.COMPARISON,
+            "day94_deterministic_comparison_fallback",
+        )
+
+    return (
+        semantic.current_anchor_date,
+        semantic.reference_anchor_date,
+        requested_scope,
+        semantic.analysis_mode,
+        semantic.source,
+    )
+
+
 def _run_day93_gmv_comparison_seed_investigation_v2(
     *,
     question: str,
     runtime_config: GovernanceRuntimeConfig,
     execution_policy: GovernedExecutionPolicy | None,
+    comparison_intent_llm_call: LLMCall | None = None,
 ) -> RuntimeDeliveryBridgeResultV2 | None:
     """
     Generic Comparison Seed -> bounded Investigation.
@@ -662,8 +813,11 @@ def _run_day93_gmv_comparison_seed_investigation_v2(
     """
 
     resolved = (
-        _resolve_day93_gmv_comparison_seed_investigation_v2(
-            question
+        _resolve_day94_gmv_comparison_seed_v2(
+            question,
+            comparison_intent_llm_call=(
+                comparison_intent_llm_call
+            ),
         )
     )
 
@@ -674,6 +828,8 @@ def _run_day93_gmv_comparison_seed_investigation_v2(
         current_anchor,
         reference_anchor,
         requested_scope,
+        requested_analysis_mode,
+        semantic_route_source,
     ) = resolved
 
     comparison = build_monthly_mom_comparison_v2(
@@ -705,7 +861,7 @@ def _run_day93_gmv_comparison_seed_investigation_v2(
             },
             requested_scope=requested_scope,
             requested_analysis_mode=(
-                AnalysisModeV2.INVESTIGATION
+                requested_analysis_mode
             ),
         )
 
@@ -819,15 +975,20 @@ def _run_day93_gmv_comparison_seed_investigation_v2(
             },
             requested_scope=requested_scope,
             requested_analysis_mode=(
-                AnalysisModeV2.INVESTIGATION
+                requested_analysis_mode
             ),
         )
 
     return RuntimeDeliveryBridgeResultV2(
         status=RuntimeDeliveryBridgeStatusV2.READY,
         message=(
-            "整体时间比较 Seed 已形成受治理交付；"
-            "后续调查方向尚未由 Seed Grain 预先指定。"
+            (
+                "整体时间比较 Seed 已形成受治理交付；"
+                "后续调查方向尚未由 Seed Grain 预先指定。"
+            )
+            if requested_analysis_mode
+            == AnalysisModeV2.INVESTIGATION
+            else "整体时间比较已形成受治理交付。"
         ),
         safe_runtime_result={
             "success": True,
@@ -839,6 +1000,10 @@ def _run_day93_gmv_comparison_seed_investigation_v2(
             "seed_metric": "gmv",
             "seed_grain": "overall",
             "investigation_target_grain": None,
+            "semantic_route_source": semantic_route_source,
+            "requested_analysis_mode": (
+                requested_analysis_mode.value
+            ),
             "current_window": {
                 "start_date": (
                     comparison.current_window
@@ -862,7 +1027,7 @@ def _run_day93_gmv_comparison_seed_investigation_v2(
         },
         requested_scope=requested_scope,
         requested_analysis_mode=(
-            AnalysisModeV2.INVESTIGATION
+            requested_analysis_mode
         ),
         delivery=comparison_delivery.delivery,
         console_view=(

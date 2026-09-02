@@ -50,13 +50,12 @@ def main() -> None:
         "参考期 GMV",
         "当前期 GMV",
         "变化额",
-        "对整体变化贡献率",
-        "方向",
+        "占整体GMV增量",
     )
     assert row["参考期 GMV"] == "320,000.00"
     assert row["当前期 GMV"] == "250,000.00"
     assert row["变化额"] == "-70,000.00"
-    assert row["对整体变化贡献率"] == "38.20%"
+    assert row["占整体GMV增量"] == "38.20%"
 
     print("PASS: Contribution 表显式释放参考期 / 当前期 / Delta / Contribution")
     print("PASS: Presenter 只格式化已有可信字段，不重新计算业务真值")

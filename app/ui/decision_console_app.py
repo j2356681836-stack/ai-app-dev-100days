@@ -154,6 +154,22 @@ from app.delivery.analysis_investigation_snapshot_v1 import (
     build_analysis_evidence_lineage_v1,
     empty_analysis_investigation_snapshot_v1,
 )
+from app.delivery.investigation_report_v2 import (
+    InvestigationReportV2,
+    build_investigation_report_v2,
+)
+from app.delivery.report_export_v2 import (
+    render_investigation_report_markdown_v2,
+    render_periodic_report_markdown_v2,
+)
+from app.delivery.business_document_export_v2 import (
+    render_investigation_business_docx_v2,
+    render_periodic_business_docx_v2,
+)
+from app.delivery.business_workbook_export_v2 import (
+    render_investigation_business_xlsx_v2,
+    render_periodic_business_xlsx_v2,
+)
 from app.delivery.business_clarification_continuation_v1 import (
     BusinessClarificationResolutionV1,
     PendingBusinessClarificationV1,
@@ -784,6 +800,282 @@ def _render_analysis_session_history_v1() -> None:
                     st.divider()
 
 
+def _active_investigation_report_payload_v2(
+) -> InvestigationReportV2 | None:
+    """
+    当前 Business Console 的 Final Investigation Report Payload。
+
+    只从 active READY Analysis History + safe Investigation Snapshot
+    构造，不重新查询、不调用 LLM、不重新计算业务结论。
+    """
+    history_item = _active_analysis_history_item_v1()
+
+    if history_item is None:
+        return None
+
+    snapshot = (
+        _analysis_investigation_snapshot_for_history_v1(
+            history_item.history_id
+        )
+    )
+
+    return build_investigation_report_v2(
+        history_item=history_item,
+        investigation_snapshot=snapshot,
+    )
+
+
+def _render_investigation_report_export_v2() -> None:
+    """
+    Mode-aware Business Artifact Export。
+
+    Word / Excel / Markdown 继续消费同一个结构化 Report Payload；
+    这里只根据已冻结 analysis_mode 选择业务展示名称与文件名，
+    不重新查询、不调用 LLM、不重新计算业务结论。
+    """
+
+    report_payload = (
+        _active_investigation_report_payload_v2()
+    )
+
+    if report_payload is None:
+        st.info(
+            "当前 READY 分析尚未形成可导出的 Final Report Payload。"
+        )
+        return
+
+    docx_artifact = (
+        render_investigation_business_docx_v2(
+            report_payload
+        )
+    )
+    xlsx_artifact = (
+        render_investigation_business_xlsx_v2(
+            report_payload
+        )
+    )
+    markdown_artifact = (
+        render_investigation_report_markdown_v2(
+            report_payload
+        )
+    )
+
+    if report_payload.analysis_mode in {
+        AnalysisModeV2.FACT,
+        AnalysisModeV2.COMPOSITION,
+    }:
+        report_label = "事实分析"
+        base_prefix = "fact_analysis_report"
+    elif (
+        report_payload.analysis_mode
+        == AnalysisModeV2.COMPARISON
+    ):
+        report_label = "对比分析"
+        base_prefix = "comparison_report"
+    else:
+        report_label = "业务调查"
+        base_prefix = "investigation_report"
+
+    st.markdown("### 报告导出")
+    st.caption(
+        f"当前导出类型：{report_label}。"
+        "Word 与 Excel 共同消费同一个结构化 Report Payload；"
+        "导出层不会重新查询、调用 LLM 或重新计算业务结论。"
+    )
+
+    brief = report_payload.executive_brief
+
+    with st.expander(
+        "查看报告摘要",
+        expanded=False,
+    ):
+        st.write(
+            "业务问题：",
+            report_payload.original_question,
+        )
+        st.write(
+            "分析模式：",
+            _analysis_mode_label_v2(
+                report_payload.analysis_mode
+            ),
+        )
+        st.write(
+            "指标：",
+            report_payload.metric_definition.chinese_name,
+        )
+        st.write(
+            "分析窗口：",
+            (
+                f"{report_payload.analysis_window.start_date}"
+                " → "
+                f"{report_payload.analysis_window.end_date}"
+            ),
+        )
+        st.write(
+            "证据状态：",
+            format_evidence_sufficiency_v2(
+                brief.evidence_sufficiency
+            ),
+        )
+
+        if brief.key_findings:
+            st.markdown("**关键发现**")
+            for item in brief.key_findings:
+                st.write(
+                    f"- {format_statement_v2(item.summary)}"
+                )
+
+        if brief.limitations:
+            st.markdown("**必要限制**")
+            for item in brief.limitations:
+                st.write(
+                    f"- {format_statement_v2(item.detail)}"
+                )
+
+    base_name = (
+        f"{base_prefix}_{report_payload.history_id}"
+    )
+
+    left, right = st.columns(2)
+
+    with left:
+        st.download_button(
+            "下载 Word 业务报告",
+            data=docx_artifact,
+            file_name=f"{base_name}.docx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "wordprocessingml.document"
+            ),
+            key=(
+                "download_investigation_docx::"
+                f"{report_payload.history_id}"
+            ),
+            width="stretch",
+        )
+
+    with right:
+        st.download_button(
+            "下载 Excel 数据附件",
+            data=xlsx_artifact,
+            file_name=f"{base_name}.xlsx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+            key=(
+                "download_investigation_xlsx::"
+                f"{report_payload.history_id}"
+            ),
+            width="stretch",
+        )
+
+    with st.expander(
+        "更多格式",
+        expanded=False,
+    ):
+        st.download_button(
+            "下载 Markdown（技术 / Portfolio）",
+            data=markdown_artifact,
+            file_name=f"{base_name}.md",
+            mime="text/markdown; charset=utf-8",
+            key=(
+                "download_investigation_markdown::"
+                f"{report_payload.history_id}"
+            ),
+            width="stretch",
+        )
+
+
+
+def _render_periodic_report_export_v2(
+    report: PeriodicBusinessReportV2,
+) -> None:
+    # Day94 Periodic Business Artifact Export:
+    # 页面主报表、DOCX、XLSX、Markdown 都消费
+    # 同一个 PeriodicBusinessReportV2。
+    docx_artifact = (
+        render_periodic_business_docx_v2(
+            report
+        )
+    )
+    xlsx_artifact = (
+        render_periodic_business_xlsx_v2(
+            report
+        )
+    )
+    markdown_artifact = (
+        render_periodic_report_markdown_v2(
+            report
+        )
+    )
+
+    st.markdown("### 报表导出")
+    st.caption(
+        "Word 经营报告与 Excel 数据附件共同消费同一个 "
+        "PeriodicBusinessReportV2；导出层不重新计算 KPI、"
+        "Ratio、Delta 或 Reconciliation。"
+    )
+
+    base_name = (
+        f"{report.cadence.value}_business_report_"
+        f"{report.anchor_date.isoformat()}"
+    )
+
+    left, right = st.columns(2)
+
+    with left:
+        st.download_button(
+            "下载 Word 经营报告",
+            data=docx_artifact,
+            file_name=f"{base_name}.docx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "wordprocessingml.document"
+            ),
+            key=(
+                "download_periodic_docx::"
+                f"{report.cadence.value}::"
+                f"{report.anchor_date.isoformat()}"
+            ),
+            width="stretch",
+        )
+
+    with right:
+        st.download_button(
+            "下载 Excel 数据附件",
+            data=xlsx_artifact,
+            file_name=f"{base_name}.xlsx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+            key=(
+                "download_periodic_xlsx::"
+                f"{report.cadence.value}::"
+                f"{report.anchor_date.isoformat()}"
+            ),
+            width="stretch",
+        )
+
+    with st.expander(
+        "更多格式",
+        expanded=False,
+    ):
+        st.download_button(
+            "下载 Markdown（技术 / Portfolio）",
+            data=markdown_artifact,
+            file_name=f"{base_name}.md",
+            mime="text/markdown; charset=utf-8",
+            key=(
+                "download_periodic_markdown::"
+                f"{report.cadence.value}::"
+                f"{report.anchor_date.isoformat()}"
+            ),
+            width="stretch",
+        )
+
+
 def _periodic_business_report_result_v2(
 ) -> PeriodicBusinessReportV2 | None:
     value = st.session_state.get(
@@ -898,14 +1190,18 @@ def _periodic_runtime_failure() -> dict[str, str] | None:
 
 def _periodic_anchor_state_key_v2(cadence: str) -> str:
     """
-    为每一种报表周期建立独立的 Streamlit widget state。
+    Daily / Weekly / Monthly 共享同一个用户选择的 anchor date。
 
-    Daily / Weekly / Monthly 分开保存，避免切换 cadence 或 rerun 时
-    把用户已经确认的历史 anchor 静默重置为默认 completed period。
+    业务用户通常会用同一个历史日期横向查看日报 / 周报 / 月报，
+    因此 cadence 切换不应让日期静默回到各自默认值。
+
+    现有 main() 仍保留每个 cadence 的 max_anchor 保护：
+    如果共享日期超过所选周期允许的完整周期上限，
+    才会安全截断到该 cadence 的 max_anchor。
     """
 
-    return f"periodic_anchor_date::{cadence}"
-
+    _ = cadence
+    return "periodic_anchor_date::shared"
 
 def _update_periodic_runtime_trace_v2(
     **fields: object,
@@ -1741,9 +2037,8 @@ def _render_priority_assessment_v1(
         )
 
     st.caption(
-        "Evidence Sufficiency：PARTIAL｜"
-        f"Policy：{priority.policy_version}｜"
-        f"Evidence ID：{priority.evidence_id}"
+        "证据状态：部分充分。调查优先候选来自已注册的"
+        "确定性筛查规则；工程级标识保留在工程视图。"
     )
 
 
@@ -1901,80 +2196,40 @@ def _render_fact_verification_v2(
     result: RuntimeDeliveryBridgeResultV2,
 ) -> None:
     """
-    Fact 默认页面只回答事实。
+    FACT / Comparison Seed 的业务验证入口统一使用 Dialog。
 
-    完整 Effective Scope / Evidence / Provenance 集中放入
-    “验证这个数字”折叠区，避免在业务正文重复披露。
+    Business View 不直接展示 Evidence ID / Query Plan / Audit Event；
+    工程级 Provenance 保留在工程视图。
     """
 
     view = result.console_view
     if view is None:
         return
 
-    with st.expander(
-        "验证这个数字",
-        expanded=False,
+    if view.comparison is not None:
+        target = "comparison"
+        label = (
+            "验证整体比较基线"
+            if result.requested_analysis_mode
+            == AnalysisModeV2.INVESTIGATION
+            else "验证这次比较"
+        )
+    else:
+        target = "fact"
+        label = "验证这个数字"
+
+    if st.button(
+        label,
+        key=(
+            "open_primary_business_verification::"
+            f"{result.requested_analysis_mode.value}"
+        ),
+        type="secondary",
     ):
-        if view.fact_metric is not None:
-            st.write(
-                "分析窗口：",
-                (
-                    f"{view.fact_metric.analysis_window.start_date}"
-                    " → "
-                    f"{view.fact_metric.analysis_window.end_date}"
-                ),
-            )
-
-        _, full_scope = normalize_scope_summary_v2(
-            view.scope_summary
+        _render_business_verification_dialog_v2(
+            target
         )
 
-        if full_scope is not None:
-            st.write(
-                "完整 Effective Scope：",
-                full_scope,
-            )
-
-        st.write(
-            "证据状态：",
-            format_evidence_sufficiency_v2(
-                view.evidence_sufficiency
-            ),
-        )
-
-        records = tuple(
-            view.evidence_drawer.records
-        )
-
-        if records:
-            st.markdown("**Governed Evidence**")
-
-            for record in records:
-                st.write(
-                    "Evidence ID：",
-                    record.evidence_id,
-                )
-                st.write(
-                    "Query Plan：",
-                    record.plan_name or "-",
-                )
-                st.write(
-                    "Audit Event：",
-                    record.audit_event_id or "-",
-                )
-                st.write(
-                    "已释放字段：",
-                    list(record.released_field_names),
-                )
-                st.write(
-                    "已释放行数：",
-                    record.released_row_count,
-                )
-
-        st.caption(
-            "这里仅展示安全 Evidence / Provenance 投影；"
-            "不展示 raw SQL、SQL parameters 或未受保护数据。"
-        )
 
 
 def _render_fact_delivery_business(
@@ -2139,11 +2394,20 @@ def _render_comparison_seed_business_v2(
             relative if relative is not None else "未定义",
         )
 
-    st.info(
-        "以上是本次深入调查的可信整体比较基线。"
-        "后续渠道、品类、地区或活动调查必须继承"
-        "这组参考期 / 当前期，不能用单期拆分替代原问题答案。"
-    )
+    if (
+        result.requested_analysis_mode
+        == AnalysisModeV2.INVESTIGATION
+    ):
+        st.info(
+            "以上是本次深入调查的可信整体比较基线。"
+            "后续调查必须继承这组参考期 / 当前期，"
+            "不能用单期拆分替代原问题答案。"
+        )
+    else:
+        st.info(
+            "以上是本次比较分析的可信整体结果。"
+            "当前请求不会被静默升级为深入调查。"
+        )
 
     _render_fact_verification_v2(result)
 
@@ -2790,111 +3054,22 @@ def _render_periodic_business_report_v2(
                 "或占位数字补齐。"
             )
 
-        with st.expander(
+        if st.button(
             "验证 R12 客户指标",
-            expanded=False,
+            key="open_periodic_r12_verification",
+            type="secondary",
         ):
-            st.markdown("**R12 Base / Readiness**")
-
-            readiness_rows = (
-                build_periodic_r12_readiness_rows_v2(
-                    report
-                )
+            _render_business_verification_dialog_v2(
+                "periodic_r12"
             )
 
-            if readiness_rows:
-                st.dataframe(
-                    readiness_rows,
-                    width="stretch",
-                    hide_index=True,
-                )
-
-            st.write(
-                "Current Readiness：",
-                format_periodic_r12_readiness_status_v2(
-                    r12_trust.current_readiness.status.value
-                ),
-            )
-            st.write(
-                "Reference Readiness：",
-                format_periodic_r12_readiness_status_v2(
-                    r12_trust.reference_readiness.status.value
-                ),
-            )
-
-            reconciliation_rows = (
-                build_periodic_r12_reconciliation_rows_v2(
-                    report
-                )
-            )
-
-            st.markdown("**确定性关系验证**")
-
-            if reconciliation_rows:
-                st.dataframe(
-                    reconciliation_rows,
-                    width="stretch",
-                    hide_index=True,
-                )
-            else:
-                st.info(
-                    "当前没有可释放的 R12 Reconciliation。"
-                )
-
-            failed_r12 = [
-                item
-                for item in report.metrics
-                if (
-                    item.spec.metric_name
-                    in R12_PERIODIC_METRIC_NAMES_V2
-                    and item.status
-                    != PeriodicMetricStatusV2.READY
-                )
-            ]
-
-            if failed_r12:
-                st.markdown("**当前不可交付的 R12 指标**")
-
-                for item in failed_r12:
-                    st.write(
-                        f"{item.spec.chinese_name}："
-                        f"{item.message}"
-                    )
-
-            st.caption(
-                "R12 Base Window、Readiness、Evidence 和 "
-                "Reconciliation 均来自 Runtime/Delivery Contract；"
-                "Streamlit 不重新推导 Cohort、退款观察或业务真值。"
-            )
-
-    with st.expander(
+    if st.button(
         "验证这份周期报表",
-        expanded=False,
+        key="open_periodic_report_verification",
+        type="secondary",
     ):
-        rows = build_periodic_metric_comparison_rows_v2(
-            report.metrics
-        )
-        st.dataframe(
-            rows,
-            width="stretch",
-            hide_index=True,
-        )
-
-        st.markdown("**Governed Evidence IDs**")
-
-        for item in report.metrics:
-            if item.status != PeriodicMetricStatusV2.READY:
-                continue
-
-            st.write(
-                f"{item.spec.chinese_name}："
-                f"Reference={item.reference_evidence_id} ｜ "
-                f"Current={item.current_evidence_id}"
-            )
-
-        st.caption(
-            "这里展示的是 Report Runtime 已释放的 Evidence identity；"
-            "页面不展示 raw SQL、parameters 或未受保护数据。"
+        _render_business_verification_dialog_v2(
+            "periodic"
         )
 
 
@@ -3053,40 +3228,13 @@ def _render_periodic_comparison_business(
             )
 
     if view.verification is not None:
-        with st.expander("验证这次比较｜查看当前期 / 参考期 Overall Evidence"):
-            verification = view.verification
-            metric = verification.metric_definition
-
-            st.write("指标定义：", metric.chinese_name)
-            st.write("定义：", metric.definition)
-            st.write("公式：", metric.formula)
-
-            st.markdown("**当前期 Evidence**")
-            st.write(
-                "时间窗口：",
-                (
-                    f"{verification.current_evidence.analysis_window.start_date}"
-                    " → "
-                    f"{verification.current_evidence.analysis_window.end_date}"
-                ),
-            )
-            st.write(
-                "Audit Event：",
-                verification.current_evidence.audit_event_id,
-            )
-
-            st.markdown("**参考期 Evidence**")
-            st.write(
-                "时间窗口：",
-                (
-                    f"{verification.reference_evidence.analysis_window.start_date}"
-                    " → "
-                    f"{verification.reference_evidence.analysis_window.end_date}"
-                ),
-            )
-            st.write(
-                "Audit Event：",
-                verification.reference_evidence.audit_event_id,
+        if st.button(
+            "验证这次周期比较",
+            key="open_periodic_contribution_verification",
+            type="secondary",
+        ):
+            _render_business_verification_dialog_v2(
+                "periodic_contribution"
             )
 
 
@@ -3095,18 +3243,21 @@ def _composition_dimension_label_v2(
     *,
     metric_name: str | None = None,
 ) -> str:
-    if (
-        dimension == FactCompositionDimensionV2.PEOPLE
-        and metric_name == "order_count"
-    ):
-        return "人｜客户构成"
+    """
+    Business-facing Composition labels.
+
+    “人 / 货 / 场”只属于架构讨论；正式产品统一使用业务名称。
+    PEOPLE 当前不在 Business View 公开释放，但保留稳定标签，
+    避免历史技术快照被误读。
+    """
 
     return {
-        FactCompositionDimensionV2.PEOPLE: "人｜会员构成",
-        FactCompositionDimensionV2.CATEGORY: "货｜品类构成",
-        FactCompositionDimensionV2.CHANNEL: "场｜渠道构成",
-        FactCompositionDimensionV2.REGION: "地区｜城市构成",
+        FactCompositionDimensionV2.PEOPLE: "人群构成",
+        FactCompositionDimensionV2.CATEGORY: "品类构成",
+        FactCompositionDimensionV2.CHANNEL: "渠道构成",
+        FactCompositionDimensionV2.REGION: "地区构成",
     }[dimension]
+
 
 
 def _render_fact_composition_result_v2(
@@ -3213,10 +3364,22 @@ def _render_fact_composition_result_v2(
 def _render_fact_composition_cross_check_v2(
     results: dict[str, FactCompositionResultV2],
 ) -> None:
+    """
+    Business cross-dimensional verification。
+
+    PEOPLE 的正式业务语义仍在校准，因此不进入公开业务核对。
+    技术快照可以继续保留在内部合同中。
+    """
+
     ready = [
         result
         for result in results.values()
-        if result.status == FactCompositionStatusV2.READY
+        if (
+            result.status
+            == FactCompositionStatusV2.READY
+            and result.dimension
+            != FactCompositionDimensionV2.PEOPLE
+        )
     ]
 
     if len(ready) < 2:
@@ -3269,11 +3432,29 @@ def _render_fact_composition_cross_check_v2(
         )
 
 
+
 def _render_fact_composition_section_v2(
     seed: RuntimeDeliveryBridgeResultV2,
 ) -> None:
-    available = fact_composition_available_dimensions_v2(
-        seed
+    """
+    Business-facing Composition capability surface.
+
+    底层 registry 可以保留 legacy PEOPLE capability，
+    但在 Customer Lifecycle × Pre-window Membership Snapshot
+    业务合同完成前，PEOPLE 不进入公开产品。
+    """
+
+    available = tuple(
+        dimension
+        for dimension in (
+            fact_composition_available_dimensions_v2(
+                seed
+            )
+        )
+        if (
+            dimension
+            != FactCompositionDimensionV2.PEOPLE
+        )
     )
 
     if not available:
@@ -3291,10 +3472,9 @@ def _render_fact_composition_section_v2(
     )
 
     st.caption(
-        "构成分析不会自动发生。这里只展示当前指标已正式注册、"
-        "且数学上可以加总回 Overall 的受治理维度。"
-        "订单数当前支持客户、渠道、地区三条互斥可加构成；"
-        "跨品类订单数仍属于 Breakdown，不会伪装成可加构成。"
+        "这里只展示已经通过业务语义验收、"
+        "且可以加总回可信 Overall 的构成维度。"
+        "人群构成仍在口径校准中，当前暂不提供。"
     )
 
     columns = st.columns(len(available))
@@ -3306,7 +3486,10 @@ def _render_fact_composition_section_v2(
     ):
         with column:
             if st.button(
-                f"查看{_composition_dimension_label_v2(dimension, metric_name=seed_metric_name)}",
+                (
+                    "查看"
+                    f"{_composition_dimension_label_v2(dimension, metric_name=seed_metric_name)}"
+                ),
                 key=f"fact_composition::{dimension.value}",
                 type="secondary",
                 width="stretch",
@@ -3319,11 +3502,18 @@ def _render_fact_composition_section_v2(
     results = _fact_composition_results_v2()
 
     for dimension in available:
-        result = results.get(dimension.value)
+        result = results.get(
+            dimension.value
+        )
         if result is not None:
-            _render_fact_composition_result_v2(result)
+            _render_fact_composition_result_v2(
+                result
+            )
 
-    _render_fact_composition_cross_check_v2(results)
+    _render_fact_composition_cross_check_v2(
+        results
+    )
+
 
 
 def _render_business_view() -> None:
@@ -3331,7 +3521,7 @@ def _render_business_view() -> None:
 
     request = st.session_state.get("entry_request")
     if request is None:
-        st.info("请先从上方入口提交一个 Investigation 或 Periodic Report 请求。")
+        st.info("请先从上方入口提交一个业务问题或周期报表请求。")
         return
 
     _render_entry_summary(request)
@@ -3378,6 +3568,7 @@ def _render_business_view() -> None:
                 "本次渠道 Contribution 扩展没有可释放结果。"
             )
 
+        _render_periodic_report_export_v2(report)
         return
 
     result = _runtime_result()
@@ -3412,6 +3603,7 @@ def _render_business_view() -> None:
         ):
             _render_agentic_business_section()
 
+        _render_investigation_report_export_v2()
         return
 
     if (
@@ -3428,6 +3620,7 @@ def _render_business_view() -> None:
         ):
             _render_agentic_business_section()
 
+        _render_investigation_report_export_v2()
         return
 
     _render_fact_delivery_business(result)
@@ -3446,6 +3639,7 @@ def _render_business_view() -> None:
             "当前请求不会被静默升级为 Agentic Investigation。"
         )
 
+    _render_investigation_report_export_v2()
 
 
 
@@ -4934,11 +5128,136 @@ def _render_business_verification_dialog_v2(
     target: str,
 ) -> None:
     """
-    Business Verification 独立 Dialog。
+    统一 Business Verification Dialog。
 
-    最近分析继续独占 sidebar；
-    验证信息不再与历史记录共享同一侧栏。
+    业务用户只看时间 / Scope / Metric Definition /
+    Evidence Sufficiency / Reconciliation 等可解释结果。
+    Evidence identity / Query Plan / Audit Event 等工程级 Provenance
+    留在工程视图。
     """
+
+    if target == "fact":
+        seed = _runtime_result()
+
+        if seed is None or seed.console_view is None:
+            st.info("当前没有可验证的事实结果。")
+            return
+
+        view = seed.console_view
+        fact_metric = view.fact_metric
+
+        st.markdown("#### 本次事实结果")
+
+        if fact_metric is not None:
+            st.metric(
+                format_metric_name_v2(
+                    fact_metric.metric_name
+                ),
+                format_business_metric_value_v2(
+                    fact_metric.metric_name,
+                    fact_metric.value,
+                ),
+            )
+            st.write(
+                "分析窗口：",
+                (
+                    f"{fact_metric.analysis_window.start_date}"
+                    " → "
+                    f"{fact_metric.analysis_window.end_date}"
+                ),
+            )
+
+        metric = (
+            seed.delivery.metric_definition
+            if seed.delivery is not None
+            else None
+        )
+
+        if metric is not None:
+            st.markdown("#### 指标口径")
+            st.write("指标：", metric.chinese_name)
+            st.write("定义：", metric.definition)
+            st.write("公式：", metric.formula)
+
+        scope = build_business_scope_projection_v2(
+            view.scope_summary
+        )
+
+        st.markdown("#### 分析范围")
+        st.write("渠道：", scope.channel_summary)
+        if scope.channel_member_labels:
+            st.caption(
+                "、".join(scope.channel_member_labels)
+            )
+
+        st.write("地区：", scope.geography_summary)
+        if scope.geography_member_labels:
+            st.caption(
+                "、".join(scope.geography_member_labels)
+            )
+
+        st.write(
+            "证据状态：",
+            format_evidence_sufficiency_v2(
+                view.evidence_sufficiency
+            ),
+        )
+
+        compositions = tuple(
+            item
+            for item in (
+                _fact_composition_results_v2().values()
+            )
+            if (
+                item.dimension
+                != FactCompositionDimensionV2.PEOPLE
+            )
+        )
+
+        if compositions:
+            st.markdown("#### 构成核对")
+
+            rows = [
+                {
+                    "验证路径": _composition_dimension_label_v2(
+                        item.dimension,
+                        metric_name=item.metric_name,
+                    ),
+                    "构成合计": format_fact_metric_value_v2(
+                        item.metric_name,
+                        item.member_sum,
+                    ),
+                    "可信 Overall": format_fact_metric_value_v2(
+                        item.metric_name,
+                        item.overall_value,
+                    ),
+                    "未解释差额": format_fact_metric_value_v2(
+                        item.metric_name,
+                        item.unexplained_remainder,
+                    ),
+                    "状态": (
+                        "已对账"
+                        if (
+                            item.reconciliation_status
+                            == FactCompositionReconciliationStatusV2.RECONCILED
+                        )
+                        else "未完全对账"
+                    ),
+                }
+                for item in compositions
+            ]
+
+            st.dataframe(
+                rows,
+                width="stretch",
+                hide_index=True,
+            )
+
+        st.caption(
+            "工程级 Provenance 标识保留在工程视图；"
+            "业务验证窗口不展示内部标识或 raw data。"
+        )
+        return
 
     if target == "comparison":
         seed = _runtime_result()
@@ -4960,16 +5279,70 @@ def _render_business_verification_dialog_v2(
         st.write(
             f"比较周期：{reference_label} → {current_label}"
         )
-        st.write("指标：销售额（GMV）")
+
+        metric = (
+            seed.delivery.metric_definition
+            if seed.delivery is not None
+            else None
+        )
+
+        if metric is not None:
+            st.write("指标：", metric.chinese_name)
+            st.write("定义：", metric.definition)
+            st.write("公式：", metric.formula)
+        else:
+            st.write(
+                "指标：",
+                format_metric_name_v2(
+                    comparison.metric_name
+                ),
+            )
+
+        left, right = st.columns(2)
+
+        with left:
+            st.metric(
+                reference_label,
+                format_number_v2(
+                    comparison.reference_value
+                ),
+            )
+            st.metric(
+                "变化额",
+                format_number_v2(
+                    comparison.absolute_change
+                ),
+            )
+
+        with right:
+            st.metric(
+                current_label,
+                format_number_v2(
+                    comparison.current_value
+                ),
+            )
+            st.metric(
+                "变化率",
+                (
+                    format_percentage_v2(
+                        comparison.relative_change
+                    )
+                    or "未定义"
+                ),
+            )
 
         if view.contribution is not None:
             contribution = view.contribution
 
+            st.markdown("#### 数值核对")
             left, right = st.columns(2)
+
             with left:
                 st.metric(
-                    "整体 GMV 变化额",
-                    format_number_v2(contribution.overall_delta),
+                    "整体变化额",
+                    format_number_v2(
+                        contribution.overall_delta
+                    ),
                 )
                 st.metric(
                     "未解释差额",
@@ -4980,8 +5353,10 @@ def _render_business_verification_dialog_v2(
 
             with right:
                 st.metric(
-                    "渠道变化额合计",
-                    format_number_v2(contribution.sum_member_delta),
+                    "成员变化额合计",
+                    format_number_v2(
+                        contribution.sum_member_delta
+                    ),
                 )
                 st.metric(
                     "核对状态",
@@ -5009,9 +5384,255 @@ def _render_business_verification_dialog_v2(
                 "、".join(scope.geography_member_labels)
             )
 
+        st.write(
+            "证据状态：",
+            format_evidence_sufficiency_v2(
+                view.evidence_sufficiency
+            ),
+        )
+
         st.caption(
-            "Evidence ID、Audit Event、Query Plan 等工程信息"
-            "保留在“分析视图 / 工程视图”，不在业务验证窗口展示。"
+            "工程级 Provenance 标识保留在工程视图；"
+            "业务验证窗口只展示可解释的业务核对结果。"
+        )
+        return
+
+    if target == "periodic":
+        report = _periodic_business_report_result_v2()
+
+        if report is None:
+            st.info("当前没有可验证的周期经营报表。")
+            return
+
+        st.markdown("#### 本次周期报表")
+        st.write(
+            "周期：",
+            _periodic_cadence_label_v2(
+                report.cadence
+            ),
+        )
+        st.write(
+            "参考期：",
+            (
+                f"{report.comparison.reference_window.start_date}"
+                " → "
+                f"{report.comparison.reference_window.end_date}"
+            ),
+        )
+        st.write(
+            "当前期：",
+            (
+                f"{report.comparison.current_window.start_date}"
+                " → "
+                f"{report.comparison.current_window.end_date}"
+            ),
+        )
+
+        rows = build_periodic_metric_comparison_rows_v2(
+            report.metrics
+        )
+        st.dataframe(
+            rows,
+            width="stretch",
+            hide_index=True,
+        )
+
+        if report.driver_reconciliations:
+            st.markdown("#### 驱动关系核对")
+
+            verification_rows = [
+                {
+                    "关系": item.relationship,
+                    "状态": (
+                        "已对账"
+                        if (
+                            item.status
+                            == PeriodicDriverReconciliationStatusV2.RECONCILED
+                        )
+                        else (
+                            "未完全对账"
+                            if (
+                                item.status
+                                == PeriodicDriverReconciliationStatusV2.NOT_RECONCILED
+                            )
+                            else "当前不可验证"
+                        )
+                    ),
+                    "未解释差额": (
+                        str(item.remainder)
+                        if item.remainder is not None
+                        else "—"
+                    ),
+                }
+                for item in report.driver_reconciliations
+            ]
+
+            st.dataframe(
+                verification_rows,
+                width="stretch",
+                hide_index=True,
+            )
+
+        st.caption(
+            "周期报表验证只展示业务指标与确定性核对；"
+            "工程级 Provenance 标识保留在工程视图。"
+        )
+        return
+
+    if target == "periodic_r12":
+        report = _periodic_business_report_result_v2()
+
+        if (
+            report is None
+            or report.r12_customer_health is None
+        ):
+            st.info("当前没有可验证的 R12 客户指标。")
+            return
+
+        r12_trust = report.r12_customer_health
+
+        st.markdown("#### R12 Base / Readiness")
+
+        readiness_rows = (
+            build_periodic_r12_readiness_rows_v2(
+                report
+            )
+        )
+
+        if readiness_rows:
+            st.dataframe(
+                readiness_rows,
+                width="stretch",
+                hide_index=True,
+            )
+
+        st.write(
+            "Current Readiness：",
+            format_periodic_r12_readiness_status_v2(
+                r12_trust.current_readiness.status.value
+            ),
+        )
+        st.write(
+            "Reference Readiness：",
+            format_periodic_r12_readiness_status_v2(
+                r12_trust.reference_readiness.status.value
+            ),
+        )
+
+        reconciliation_rows = (
+            build_periodic_r12_reconciliation_rows_v2(
+                report
+            )
+        )
+
+        st.markdown("#### 确定性关系验证")
+
+        if reconciliation_rows:
+            st.dataframe(
+                reconciliation_rows,
+                width="stretch",
+                hide_index=True,
+            )
+        else:
+            st.info(
+                "当前没有可释放的 R12 Reconciliation。"
+            )
+
+        failed_r12 = [
+            item
+            for item in report.metrics
+            if (
+                item.spec.metric_name
+                in R12_PERIODIC_METRIC_NAMES_V2
+                and item.status
+                != PeriodicMetricStatusV2.READY
+            )
+        ]
+
+        if failed_r12:
+            st.markdown("#### 当前不可交付的 R12 指标")
+            for item in failed_r12:
+                st.write(
+                    f"{item.spec.chinese_name}："
+                    f"{item.message}"
+                )
+
+        st.caption(
+            "R12 Base、Readiness 与 Reconciliation "
+            "直接来自 Runtime / Delivery Contract；"
+            "页面不重新推导 Cohort。"
+        )
+        return
+
+    if target == "periodic_contribution":
+        periodic = _periodic_result()
+
+        if (
+            periodic is None
+            or periodic.console_view is None
+            or periodic.console_view.comparison is None
+        ):
+            st.info("当前没有可验证的周期渠道比较。")
+            return
+
+        view = periodic.console_view
+        comparison = view.comparison
+
+        st.markdown("#### 周期渠道比较")
+        st.write(
+            "参考期：",
+            (
+                f"{comparison.reference_window.start_date}"
+                " → "
+                f"{comparison.reference_window.end_date}"
+            ),
+        )
+        st.write(
+            "当前期：",
+            (
+                f"{comparison.current_window.start_date}"
+                " → "
+                f"{comparison.current_window.end_date}"
+            ),
+        )
+
+        if view.contribution is not None:
+            contribution = view.contribution
+
+            left, right = st.columns(2)
+            with left:
+                st.metric(
+                    "整体变化额",
+                    format_number_v2(
+                        contribution.overall_delta
+                    ),
+                )
+                st.metric(
+                    "未解释差额",
+                    format_number_v2(
+                        contribution.unexplained_remainder
+                    ),
+                )
+
+            with right:
+                st.metric(
+                    "渠道变化额合计",
+                    format_number_v2(
+                        contribution.sum_member_delta
+                    ),
+                )
+                st.metric(
+                    "核对状态",
+                    (
+                        "已对账"
+                        if contribution.reconciliation_status.value
+                        == "reconciled"
+                        else "未完全对账"
+                    ),
+                )
+
+        st.caption(
+            "工程级 Provenance 标识保留在工程视图。"
         )
         return
 
@@ -5110,6 +5731,11 @@ def _render_business_verification_dialog_v2(
                         hide_index=True,
                     )
                 break
+
+        return
+
+    st.info("当前没有匹配的业务验证目标。")
+
 
 
 def _render_agentic_business_section() -> None:
@@ -5226,7 +5852,9 @@ def _render_agentic_business_section() -> None:
     )
 
     _render_agentic_business_results(view)
-    _render_active_analysis_evidence_lineage_v1()
+    st.caption(
+        "完整技术证据链可在工程视图中查看。"
+    )
 
     control = view.runtime_control
     assessment = _latest_step_assessment_v2()
@@ -5581,7 +6209,14 @@ def _render_engineering_view() -> None:
 
     request = st.session_state.get("entry_request")
     if request is not None:
-        with st.expander("查看入口合同 Payload"):
+        entry_label = (
+            "周期报表"
+            if request.entry_mode
+            == DecisionConsoleEntryModeV2.PERIODIC_REPORT
+            else "业务问题"
+        )
+        st.caption(f"入口类型：{entry_label}")
+        with st.expander("查看内部入口合同 Payload"):
             st.json(request.model_dump(mode="json"))
 
     if (
@@ -5808,6 +6443,8 @@ def _render_engineering_view() -> None:
 
     with st.expander("查看 Safe Runtime Result"):
         st.json(result.safe_runtime_result)
+
+    _render_active_analysis_evidence_lineage_v1()
 
     st.caption(
         "工程视图只显示 Governed Graph 的 safe public summary；"
