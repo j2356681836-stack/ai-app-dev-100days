@@ -161,13 +161,27 @@ _CHINESE_NUMBERS = {
     "十二": 12,
 }
 
+# Calendar expressions are whitespace-tolerant inside their numeric tokens.
+# This keeps the original question unchanged, so evidence matched_text/start/end
+# still refer to the user's original input.
+_TIME_DIGITS_RE = r"\d(?:\s*\d)*"
+
 _DATE_RANGE_RE = re.compile(
-    r"(?P<y1>\d{4})[年/-](?P<m1>\d{1,2})[月/-](?P<d1>\d{1,2})日?"
+    rf"(?<!\d)(?P<y1>{_TIME_DIGITS_RE})\s*[年/-]\s*"
+    rf"(?P<m1>{_TIME_DIGITS_RE})\s*[月/-]\s*"
+    rf"(?P<d1>{_TIME_DIGITS_RE})\s*日?"
     r"\s*(?:至|到|~|～)\s*"
-    r"(?P<y2>\d{4})[年/-](?P<m2>\d{1,2})[月/-](?P<d2>\d{1,2})日?"
+    rf"(?P<y2>{_TIME_DIGITS_RE})\s*[年/-]\s*"
+    rf"(?P<m2>{_TIME_DIGITS_RE})\s*[月/-]\s*"
+    rf"(?P<d2>{_TIME_DIGITS_RE})\s*日?"
 )
-_MONTH_RE = re.compile(r"(?<!\d)(?P<year>\d{4})年(?P<month>\d{1,2})月(?!\d)")
-_YEAR_RE = re.compile(r"(?<!\d)(?P<year>\d{4})年(?!\d)")
+_MONTH_RE = re.compile(
+    rf"(?<!\d)(?P<year>{_TIME_DIGITS_RE})\s*年\s*"
+    rf"(?P<month>{_TIME_DIGITS_RE})\s*月(?!\d)"
+)
+_YEAR_RE = re.compile(
+    rf"(?<!\d)(?P<year>{_TIME_DIGITS_RE})\s*年(?!\d)"
+)
 _ROLLING_RE = re.compile(
     r"(?:近|最近|过去)\s*"
     r"(?P<number>\d+|十一|十二|十|[一二两三四五六七八九])\s*"
@@ -175,10 +189,17 @@ _ROLLING_RE = re.compile(
 )
 _UNSUPPORTED_RE = re.compile(
     r"近期|最近一段时间|前段时间|年初|月初|至今|以来|截至|"
-    r"\d{4}年\d{1,2}月至\d{1,2}月|\d{1,2}月至\d{1,2}月"
+    rf"{_TIME_DIGITS_RE}\s*年\s*"
+    rf"{_TIME_DIGITS_RE}\s*月\s*至\s*"
+    rf"{_TIME_DIGITS_RE}\s*月|"
+    rf"{_TIME_DIGITS_RE}\s*月\s*至\s*"
+    rf"{_TIME_DIGITS_RE}\s*月"
 )
 _GENERIC_HINT_RE = re.compile(
-    r"\d{4}年|\d{1,2}月|\d{1,2}日|本月|上月|本周|上周|"
+    rf"{_TIME_DIGITS_RE}\s*年|"
+    rf"{_TIME_DIGITS_RE}\s*月|"
+    rf"{_TIME_DIGITS_RE}\s*日|"
+    r"本月|上月|本周|上周|"
     r"本季度|上季度|今年|去年|本年|上年|今天|今日|昨天|昨日|"
     r"近|最近|过去|季度|半年|日期|时间范围|期间|周期"
 )
@@ -214,6 +235,23 @@ def _shift_months_clamped(value: date, months: int) -> date:
 
 def _quarter_start(value: date) -> date:
     return date(value.year, ((value.month - 1) // 3) * 3 + 1, 1)
+
+
+def _parse_time_digits(
+    raw: str,
+    *,
+    min_digits: int,
+    max_digits: int,
+) -> int | None:
+    compact = re.sub(r"\s+", "", raw)
+
+    if not compact.isdigit():
+        return None
+
+    if not min_digits <= len(compact) <= max_digits:
+        return None
+
+    return int(compact)
 
 
 def _parse_positive_integer(raw: str) -> int | None:
@@ -280,15 +318,30 @@ def _collect_candidates(text: str, reference_date: date) -> tuple[_Candidate, ..
     candidates: list[_Candidate] = []
 
     for match in _DATE_RANGE_RE.finditer(text):
+        y1 = _parse_time_digits(match.group("y1"), min_digits=4, max_digits=4)
+        m1 = _parse_time_digits(match.group("m1"), min_digits=1, max_digits=2)
+        d1 = _parse_time_digits(match.group("d1"), min_digits=1, max_digits=2)
+        y2 = _parse_time_digits(match.group("y2"), min_digits=4, max_digits=4)
+        m2 = _parse_time_digits(match.group("m2"), min_digits=1, max_digits=2)
+        d2 = _parse_time_digits(match.group("d2"), min_digits=1, max_digits=2)
+
+        if None in (y1, m1, d1, y2, m2, d2):
+            continue
+
         try:
-            start_date = date(int(match.group("y1")), int(match.group("m1")), int(match.group("d1")))
-            end_date = date(int(match.group("y2")), int(match.group("m2")), int(match.group("d2")))
+            start_date = date(y1, m1, d1)
+            end_date = date(y2, m2, d2)
         except ValueError:
             continue
         candidates.append(_Candidate(match.start(), match.end(), match.group(0), "explicit_date_range", TimeExpressionTypeV2.EXPLICIT_DATE_RANGE, start_date, end_date))
 
     for match in _MONTH_RE.finditer(text):
-        year, month = int(match.group("year")), int(match.group("month"))
+        year = _parse_time_digits(match.group("year"), min_digits=4, max_digits=4)
+        month = _parse_time_digits(match.group("month"), min_digits=1, max_digits=2)
+
+        if year is None or month is None:
+            continue
+
         try:
             start_date = date(year, month, 1)
             end_date = date(year, month, _last_day(year, month))
@@ -297,8 +350,27 @@ def _collect_candidates(text: str, reference_date: date) -> tuple[_Candidate, ..
         candidates.append(_Candidate(match.start(), match.end(), match.group(0), "explicit_calendar_month", TimeExpressionTypeV2.EXPLICIT_MONTH, start_date, end_date))
 
     for match in _YEAR_RE.finditer(text):
-        year = int(match.group("year"))
-        candidates.append(_Candidate(match.start(), match.end(), match.group(0), "explicit_calendar_year", TimeExpressionTypeV2.EXPLICIT_YEAR, date(year, 1, 1), date(year, 12, 31)))
+        year = _parse_time_digits(match.group("year"), min_digits=4, max_digits=4)
+        if year is None:
+            continue
+
+        try:
+            start_date = date(year, 1, 1)
+            end_date = date(year, 12, 31)
+        except ValueError:
+            continue
+
+        candidates.append(
+            _Candidate(
+                match.start(),
+                match.end(),
+                match.group(0),
+                "explicit_calendar_year",
+                TimeExpressionTypeV2.EXPLICIT_YEAR,
+                start_date,
+                end_date,
+            )
+        )
 
     for match in _ROLLING_RE.finditer(text):
         amount = _parse_positive_integer(match.group("number"))

@@ -36,8 +36,12 @@ def test_business_route_has_no_daily_weekly_placeholder() -> None:
 
     assert "Daily / Weekly" not in source or "Runtime" not in source
     assert "_render_periodic_business_report_v2(" in source
-    assert "_render_periodic_channel_extension_v2(" in source
+    # Day94 Public Delivery Presentation Freeze:
+    # Periodic Business View 不再展示单一 Channel Contribution Extension；
+    # 底层 Runtime / Analyst / Engineering 能力仍由其他 Acceptance 覆盖。
+    assert "_render_periodic_channel_extension_v2(" not in source
     assert "cadence=request.report_cadence" in source
+
 
 def test_business_renderer_accepts_ready_and_partial_ready() -> None:
     source = inspect.getsource(

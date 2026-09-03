@@ -3554,19 +3554,6 @@ def _render_business_view() -> None:
             cadence=request.report_cadence,
         )
 
-        contribution = _periodic_result()
-
-        if contribution is not None:
-            _render_periodic_channel_extension_v2(
-                contribution,
-                cadence=request.report_cadence,
-            )
-        else:
-            st.markdown("### 渠道变化贡献")
-            st.info(
-                "Multi-KPI 报表已形成；"
-                "本次渠道 Contribution 扩展没有可释放结果。"
-            )
 
         _render_periodic_report_export_v2(report)
         return
