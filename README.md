@@ -1,1017 +1,126 @@
-# AI-Architect-100Days
+# Beauty BI Agent
 
-一个面向企业 BI 场景的可信 AI Data Analyst / AI BI Agent 项目。
+**一个能说清“这个数是怎么来的”的数据分析 Agent。**
 
-它不是单纯的 Text-to-SQL Demo，而是尝试解决一个更难的问题：
+用自然语言问经营数据，它给出数字，同时给出口径、时间窗口和数据范围，并检查“各部分加起来是不是等于总数”。需要深入时，它会沿着渠道、地区、活动一层层往下查，并且明确写出哪些能确认、哪些不能确认。
 
-> 如何让 AI 在企业业务语义、权限、数据安全和证据边界内，完成可验证的经营分析与受控调查。
+> 在线 Demo 已下线（Render 免费额度到期）。本地可通过 Docker 一条命令完整复现，见文末运行说明。
 
-当前系统围绕 Beauty BI Dataset V2，形成了：
-
-```text
-Natural Language / Periodic Report Request
-↓
-Business Semantic Decision
-↓
-Deterministic Trust Plane
-↓
-Governed PostgreSQL
-↓
-Protected Evidence
-↓
-Bounded Agentic Investigation
-↓
-FACT / COMPARISON / INVESTIGATION / PERIODIC
-↓
-Decision Console / Word / Excel / Markdown
-```
+数据是我自己生成的模拟美妆电商数据（16 张表），不是真实企业数据。生成时植入了 9 条业务规律，用来验收系统能不能把它们找出来。
 
 ---
 
-## 1. Why This Project
+## 它能回答什么
 
-传统 BI 的难点并不只是“不会写 SQL”。
+| 类型 | 示例问题 | 返回内容 |
+| :--- | :--- | :--- |
+| 事实查询 | 2025年上海地区GMV是多少？ | 1,015,873.29；按渠道、按品类拆开后都能对上总数 |
+| 对比分析 | 2025年10月GMV和9月相比如何？ | 9月 847,765.20，10月 1,231,371.04，增加 383,605.84（+45.25%） |
+| 受控调查 | 同上，再问“如果发生变化，应该查看什么方面？” | 沿渠道、地区、活动逐层拆解，每层都对账，最后列出“能确认什么、不能确认什么” |
+| 周期报表 | 日报、周报、月报 | 经营摘要、KPI、驱动因素拆解、客户健康，可导出 Word、Excel、Markdown |
 
-真实企业分析通常还包含：
-
-- 指标定义并不透明；
-- 同一个词可能对应多个业务口径；
-- 用户有权限看到什么，与指标适用于什么并不是一回事；
-- SQL 能执行，不代表业务答案正确；
-- 维度拆解能对上，不代表已经证明业务原因；
-- AI 可以提出调查方向，但不能自由修改 Metric、权限或 SQL 可信边界；
-- 业务用户需要能验证一个数字从哪里来，而不是只能“相信模型”。
-
-因此本项目最终采用：
-
-```text
-Deterministic Trust Plane
-+
-Bounded Agentic Investigation Plane
-```
-
-核心原则是：
-
-```text
-Model proposes
-Contract constrains
-Governed Executor performs
-Evidence supports
-Business user verifies
-```
+对比和调查是两种不同的请求：只问“相比如何”，系统不会自己悄悄升级成一次深入调查。
 
 ---
 
-## 2. Current Product
+## 为什么做成这样
 
-### 2.1 FACT — 事实查询
+我先做了第一版：让大模型直接把问题翻译成 SQL。它能跑，但有两个问题：模型会写错，同一个问题两次生成的 SQL 也可能不一样。而经营分析需要的是**唯一确定的数**，口径一变，结论就变。
 
-示例：
+所以第二版把分工改了：
 
-```text
-2025年上海地区GMV是多少？
-```
+- **模型负责理解问题、提出下一步调查方向。**
+- **程序负责计算和放行**：SQL 由审核过的查询计划确定性地生成，经过校验后，在只读账号下执行。
 
-系统可以交付：
-
-- trusted Overall KPI；
-- Metric Definition；
-- Time Window；
-- Effective Scope；
-- 已发布的 Composition；
-- Evidence / Provenance；
-- Reconciliation。
-
-代表性本地验收：
-
-```text
-上海地区 2025 GMV
-= 1,015,873.29
-
-渠道构成
-→ reconciled
-
-品类构成
-→ reconciled
-
-Cross-dimensional trusted Overall
-→ same Overall = 1,015,873.29
-→ unexplained remainder = 0.00
-```
-
-当前公开 Composition：
-
-```text
-Channel Composition   RELEASED
-Category Composition  RELEASED
-People Composition    DEFERRED
-```
-
-People Composition 暂不公开的原因见「Known Boundaries」。
+模型可以建议“下一步看渠道”，但不能提交 SQL、不能改指标公式、不能改权限。
 
 ---
 
-### 2.2 COMPARISON — 对比分析
-
-示例：
-
-```text
-2025年10月GMV和9月相比如何？
-```
-
-代表性结果：
-
-```text
-2025-09 GMV = 847,765.20
-2025-10 GMV = 1,231,371.04
-Delta         = +383,605.84
-Delta Rate    = +45.25%
-```
-
-COMPARISON 有独立分析模式：
-
-```text
-comparison
-≠
-investigation
-```
-
-纯比较请求不会被静默升级为深入调查。
-
----
-
-### 2.3 INVESTIGATION — 受控业务调查
-
-示例：
-
-```text
-2025年10月GMV和9月相比如何？
-如果发生变化，应该查看什么方面？
-```
-
-系统将同一 Comparison 作为调查 Seed，并在合法 Tool Boundary 内继续调查：
-
-```text
-Overall Comparison
-↓
-Channel Change
-↓
-Geography Change
-↓
-Campaign Change
-↓
-Evidence / Reconciliation
-↓
-Can Confirm
-↓
-Cannot Confirm / Causal Boundary
-↓
-Recommended Next Step
-```
-
-代表性 2025-09 → 2025-10 Investigation：
-
-```text
-Overall Delta
-+383,605.84
-
-Channel Change
-→ reconciled
-
-Geography Change
-→ reconciled
-
-Campaign Change
-→ reconciled
-```
-
-Campaign 可能出现大于 100% 的 contribution rate，因为：
-
-```text
-positive contribution
-+
-negative offset
-=
-net overall delta
-```
-
-例如活动归因订单增加，同时非活动订单下降。
-
-系统允许说：
-
-```text
-“GMV 数值变化主要集中在某些活动归因订单”
-```
-
-但不会自动升级成：
-
-```text
-“该活动造成了增量”
-“该活动 uplift = ...”
-“已经找到最终业务根因”
-```
-
-因为当前没有反事实 / 实验对照。
-
----
-
-### 2.4 PERIODIC — 周期经营报表
-
-支持手动生成：
-
-```text
-Daily   → DOD
-Weekly  → natural-week WOW
-Monthly → MOM
-```
-
-当前交付包括：
-
-- 本期经营摘要；
-- 经营概览；
-- 销售驱动；
-- 客户健康；
-- R12 Customer Metrics；
-- deterministic driver reconciliation；
-- 本期限制；
-- Word / Excel / Markdown 导出。
-
-示例 Driver Relationship：
-
-```text
-GMV = Buyer Count × Spending
-→ reconciled
-
-Spending = AUS × FREQ
-→ reconciled
-```
-
-对于 ratio / derived metric，系统不会错误地把各维度 ratio 相加来做 reconciliation，而是验证其 constituent / arithmetic relationship。
-
----
-
-## 3. Architecture
-
-### 3.1 End-to-End
+## 一次提问是怎么走完的
 
 ```mermaid
-flowchart TD
-    A[Business Question / Periodic Report]
-    B[Analysis Mode / Entry Contract]
-    C[Business Semantic Decision]
-    D[Metric / Time / Comparison / Requested Scope]
-    E[Query Plan / Controlled Tool]
-    F[Authorization + Effective Scope]
-    G[Governed Planning Envelope]
-    H[Deterministic SQL Compiler]
-    I[PostgreSQL AST Enforcement]
-    J[Read-only PostgreSQL]
-    K[Result Protection]
-    L[Audit + Governed Finalization]
-    M[Protected Evidence]
-    N[FACT / COMPARISON / INVESTIGATION / PERIODIC]
-    O[Evidence / Reconciliation / Sufficiency]
-    P[Structured Report Payload]
-    Q1[Business View]
-    Q2[Analyst View]
-    Q3[Engineering / Audit View]
-    R1[Word]
-    R2[Excel]
-    R3[Markdown]
-
-    A --> B --> C --> D --> E --> F --> G --> H --> I --> J --> K --> L --> M
-    M --> N --> O --> P
-    P --> Q1
-    P --> Q2
-    P --> Q3
-    P --> R1
-    P --> R2
-    P --> R3
+flowchart LR
+    A[用户问题] --> B[识别指标 / 时间 / 范围]
+    B --> C[选择查询计划]
+    C --> D[权限与范围检查]
+    D --> E[确定性生成 SQL]
+    E --> F[SQL 语法树校验]
+    F --> G[只读库执行]
+    G --> H[结果保护与审计]
+    H --> I[证据与对账]
+    I --> J[展示 / 导出]
 ```
+
+调查类问题在最后多一个循环：
+
+```text
+证据 + 当前状态 → 模型在“合法动作”里选下一步 → 程序校验 → 执行 → 观察结果 → 继续 / 重试 / 换路径 / 停止
+```
+
+每一轮有步数和重试预算，用完就停；要继续，必须由用户明确同意。
 
 ---
 
-### 3.2 Deterministic Trust Plane
+## 三个关键设计
 
-```text
-Business Semantic Layer
-+
-Authorization / Effective Scope
-+
-Query Plan Contract
-+
-Deterministic SQL Compilation
-+
-PostgreSQL AST Enforcement
-+
-Execution Policy / Budget
-+
-Result Protection
-+
-Audit / Governed Finalization
-```
+**1. SQL 不让模型写。** 指标定义、时间语义、查询计划都放在元数据里（目前 24 个指标、60 个查询计划）。SQL 由程序按计划生成，再用 SQLGlot 在语法树层面校验，确认表、字段、范围条件都没有被改动。
 
-这个 Plane 决定：
+**2. 权限、范围和结果保护。** 查询使用独立的只读数据库账号，设有超时和最大行数。“用户有权限看的范围”和“这个指标适用的范围”是两回事，系统取它们的交集再叠加用户请求的范围。结果释放前还要经过最小分组保护和审计写入，审计失败就不返回结果。
 
-```text
-能查什么
-怎么算
-哪些 Scope 必须保留
-SQL 是否仍符合原合同
-结果是否允许释放
-Audit 是否成功持久化
-```
-
-LLM 不能绕过它。
+**3. 有边界的调查，以及“贡献不等于因果”。** 系统能说“GMV 的增长主要集中在某几个活动归因的订单”，但不会说“这个活动带来了增量”，因为没有对照实验。活动的贡献率有时会大于 100%，是因为有的订单增加、有的订单减少，互相抵消后才是净变化。
 
 ---
 
-### 3.3 Bounded Agentic Investigation
+## 踩过的坑
 
-```text
-Protected Evidence
-+
-Investigation State
-+
-Authorization-filtered Available Actions
-↓
-LLM Planner Proposal
-↓
-Deterministic Validation
-↓
-Trusted Tool Binding
-↓
-Governed Execute
-↓
-Observation
-↓
-State Update
-↓
-RETRY / REPLAN / RECOVER / STOP / CLARIFY
-```
-
-LLM 可以：
-
-- 在合法动作集合中选择下一步；
-- 基于 Evidence 给出 rationale；
-- 在信息不足时请求 clarification；
-- 根据新 Observation 改变调查方向。
-
-LLM 不能：
-
-- 提交 raw SQL；
-- 重新定义 metric formula；
-- 修改 permission；
-- 覆盖 requested scope；
-- 绕过 Query Plan / AST / Result Protection；
-- 把 Contribution 自动升级为因果解释。
+| 问题 | 原因 | 处理 |
+| :--- | :--- | :--- |
+| 代表性查询要 19 到 20 秒 | 批量造数后 PostgreSQL 没有统计信息 | 造数后执行 `ANALYZE`，降到约 22 到 65 毫秒；并把它写进启动流程 |
+| 评测“通过”但其实被我看过 | 修复时用过的用例不能再当“未见过”的测试 | 区分回归集、保留集、全新泛化集；第一次失败的用例降级为回归，修复后再用全新的用例验证 |
+| 模型判“最大渠道最值得优先调查” | 业务规模最大不等于最该优先查 | 人工校准发现分歧，评分标准升级一版：优先级要和用户目标、对比证据相关 |
+| 想知道慢在哪 | 不确定是模型还是数据库 | 接入链路追踪后，一次真实调查里模型生成约 6.8 秒，SQL 执行约 0.06 秒（单次观察，不代表性能指标） |
 
 ---
 
-## 4. Business Semantic Layer
+## 怎么验证它没出错
 
-系统不要求 LLM 自己“猜企业指标”。
-
-Business Semantic Layer 管理：
-
-```text
-Metric Definition
-Result Grain
-Query Plan
-Time Semantics
-Scope Semantics
-Table / Column Contract
-Result Shape
-Sensitivity Policy
-```
-
-当前 Dataset V2：
-
-```text
-Schema：16 tables
-Metadata V2：24 metrics
-Query Plans V2：60
-Dataset Status：candidate
-```
-
-复杂指标可以通过 staged / deterministic Query Plan 处理，而不是全部交给 Prompt 自由生成 SQL。
+- 确定性回归测试和 PostgreSQL 集成测试，通过 GitHub Actions 在每次提交时自动运行。
+- 评测分层：确定性检查、业务决策质量评估（有评分维度）、人工校准。
+- 全新用例 FG02 在修复冻结后首次运行并通过；之前用于修复问题的用例降级为回归测试，不再冒充“全新”。
 
 ---
 
-## 5. Governance & Security
+## 已知的局限
 
-当前 Governance Chain：
-
-```text
-Trusted AccessContext
-↓
-Metric / Table / Column Authorization
-↓
-Region / Channel Row Scope
-↓
-Governed Planning Envelope
-↓
-Compiled SQL Contract
-↓
-PostgreSQL AST Enforcement
-↓
-Dedicated Read-only Query Role
-↓
-statement_timeout / max_rows
-↓
-Result Protection
-↓
-Structured Audit Event
-↓
-Hash-chain Audit Sink
-↓
-Governed Finalization
-```
-
-关键边界：
-
-```text
-Authorized Scope
-≠
-Metric Applicable Scope
-≠
-Requested Scope
-≠
-Investigation Focus
-```
-
-最终 Effective Scope：
-
-```text
-Authorized
-∩ Metric Applicable
-∩ Requested
-∩ Investigation Focus
-```
-
-当前 Agent 仍然是：
-
-```text
-Observe / Advise
-```
-
-不是写库 Agent。
+- 数据是模拟的，没有真实用户，也没有在真实业务里运行过。
+- 周期报表里“客户构成”（新老客拆分）没有公开：当前实现用的是支付时的会员状态，而业务定义需要分析窗口之前的会员快照。语义不对，所以宁可不展示。
+- 没有因果推断，也没有调度和订阅推送。
+- 调查状态不跨请求保存；一个会话里同时做多个调查还不支持。
+- 模型调用的自动 SQL 修复是关闭的。
+- 语义解析器用的是在线模型，同一个问题多次运行的稳定性还没有完全量化。
+- 异常检测的阈值还没有经过业务校准，所以默认不启用。
 
 ---
 
-## 6. Trust & Verification
+## 本地运行
 
-项目的一个核心目标是：
-
-> 用户不只得到一个数字，还能验证这个数字。
-
-### 6.1 KPI → Composition
-
-对于 additive metric：
-
-```text
-trusted Overall
-↓
-dimension members
-↓
-member sum
-↓
-unexplained remainder
-↓
-reconciliation status
+```bash
+git clone [https://github.com/j2356681836-stack/ai-app-dev-100days.git](https://github.com/j2356681836-stack/ai-app-dev-100days.git)
+cd ai-app-dev-100days
+cp .env.example .env     # 填入 DeepSeek API Key 和数据库口令
+docker compose up
 ```
 
-UI / Word / Excel 不会通过重新求和可见表格去制造新的“Overall Truth”。
-
-### 6.2 Evidence / Provenance
-
-Evidence 可以绑定：
-
-- Metric Definition；
-- Time Window；
-- Effective Scope；
-- Query Plan；
-- Compiler / Contract Fingerprint；
-- protected result；
-- Audit reference；
-- parent evidence lineage。
-
-### 6.3 Epistemic Boundary
-
-系统区分：
-
-```text
-Confirmed Fact
-Detected Anomaly
-Dimension Contribution
-Candidate Hypothesis
-Unknown
-Recommended Check
-```
-
-并明确：
-
-```text
-Contribution
-≠
-Causality
-```
+首次启动会依次完成：建表、生成模拟数据、验收、`ANALYZE`、创建只读账号，然后打开页面。端口以 `docker-compose.yml` 为准。
 
 ---
 
-## 7. Business Delivery
+## 技术栈
 
-当前 Decision Console 提供三层视图：
-
-```text
-Business Decision View
-Analyst Investigation View
-Engineering / Audit View
-```
-
-它们不是三套独立结论，而是同一份受治理结果的不同 projection。
-
-### Business Artifact
-
-正式业务交付：
-
-```text
-Word
-Excel
-```
-
-技术 / Portfolio：
-
-```text
-Markdown
-```
-
-HTML renderer 可以保留，但不作为当前 Business UI 主交付格式。
-
-Artifact 层遵守：
-
-```text
-No re-query
-No new LLM conclusion
-No independent KPI recalculation
-No bypass of protected result
-```
+Python 3.10 · Streamlit · LangGraph · Pydantic · PostgreSQL（pgvector）· SQLAlchemy · SQLGlot · DeepSeek API · Langfuse · Docker Compose · GitHub Actions
 
 ---
 
-## 8. Evaluation
+## 更多文档
 
-当前评估体系不是单一测试脚本，而是多层 Gate：
-
-```text
-Deterministic Regression
-+
-PostgreSQL Integration
-+
-Security / Governance
-+
-Performance
-+
-Fresh / Post-failure Generalization
-+
-Business Decision Quality
-+
-Human Calibration
-+
-Manual UX / Public Delivery Acceptance
-```
-
-### Day94 Local Final Regression
-
-```text
-Gate A
-Deterministic / Presentation / Export
-PASS
-
-Gate B1
-Composition Contract / PostgreSQL
-PASS
-
-Gate B2
-Periodic / R12 / Evidence / Trust
-PASS
-```
-
-最终本地冻结：
-
-```text
-Final Regression                 PASS
-Trust & Verification Acceptance PASS
-Reproducibility Integration Gate PASS
-```
-
-### Generalization Discipline
-
-项目明确区分：
-
-```text
-Regression
-Holdout
-Fresh Generalization
-```
-
-Day93：
-
-```text
-FG01
-→ first run exposed issues
-→ no longer Fresh
-→ Post-Failure Regression PASS
-
-FG02
-→ first run after fix freeze
-→ Fresh Generalization PASS
-```
-
-不会把“看过并用于修复的 Case”继续冒充 Fresh。
-
----
-
-## 9. Business Decision Quality
-
-系统不会把“SQL 正确”直接等价成“业务分析质量高”。
-
-Business Decision Evaluation 至少评估：
-
-- factual correctness；
-- diagnostic relevance；
-- prioritization；
-- actionability；
-- epistemic discipline；
-- evidence sufficiency。
-
-Human Calibration 曾暴露：
-
-```text
-“业务规模最大”
-≠
-“最值得优先调查”
-```
-
-因此 investigation prioritization 必须与当前 business objective 和比较性 Evidence 相关，而不是机械选择 Top1。
-
----
-
-## 10. Performance & Reproducibility
-
-Dataset V2 曾出现代表性查询约：
-
-```text
-19–20s
-```
-
-根因不是 SQL 业务逻辑本身，而是 Bulk Seed 后 PostgreSQL Planner Statistics 缺失。
-
-执行：
-
-```text
-ANALYZE beauty_bi_v2
-```
-
-后代表性查询恢复到：
-
-```text
-~22–65 ms DB query range
-Deterministic V2 E2E ≈ 0.8s
-```
-
-这形成了明确的 Dataset Lifecycle：
-
-```text
-Create / Rebuild
-→ Seed
-→ Formal Acceptance
-→ ANALYZE
-→ Query / Performance Readiness
-```
-
----
-
-### Docker Reproducibility
-
-Fresh isolated volume 已验证：
-
-```text
-empty volume
-→ initialize schema
-→ deterministic seed
-→ formal acceptance
-→ ANALYZE
-→ provision read-only query role
-→ READY
-→ Decision Console
-→ real business query PASS
-```
-
-这证明 infrastructure / data semantics / business result 可重复启动，但不声称 byte-for-byte reproducibility。
-
----
-
-## 11. Observability & CI
-
-Observability 采用 allowlist metadata boundary。
-
-允许：
-
-- stage；
-- request / round；
-- action；
-- status；
-- retryable；
-- latency；
-- row count；
-- evidence count；
-- token usage。
-
-默认不上传：
-
-- raw question；
-- prompt / completion text；
-- raw SQL；
-- SQL parameters；
-- raw / blocked rows；
-- AccessContext；
-- Governed Envelope；
-- secrets。
-
-真实 Investigation Trace 曾观察到：
-
-```text
-planner / LLM generation
-≈ main latency source
-
-SQL execution
-≈ much smaller share
-```
-
-当前只作为 observed evidence，不外推为 P95 / P99 / SLA。
-
-Minimal CI：
-
-```text
-GitHub Actions
-→ Python 3.10
-→ locked dependencies
-→ pip check
-→ deterministic unified regression
-```
-
----
-
-## 12. Deployment
-
-当前 Public Demo：
-
-https://beauty-bi-agent-demo.onrender.com
-
-Cloud Runtime：
-
-```text
-Render Web Service
-→ Internal PostgreSQL
-→ dedicated beauty_bi_query read-only role
-→ Governed Query
-→ Result Protection
-→ Audit / Finalization
-→ Decision Console
-```
-
-Day92 已完成公网业务 Smoke。
-
-Day94 最终状态：
-
-```text
-Local Final Regression        PASS
-Business Artifact Freeze      PASS
-Trust / Verification          PASS
-Latest-main Render Redeploy   PASS
-Public Delivery Hard Gate     PASS
-Phase4                        CLOSED
-```
-
-Day94 最新 `main` 已完成 Render 公网复验。显式时间语义修复与 Periodic Business Presentation 最终冻结均通过 public re-validation，因此 Phase4 正式关闭。
-
----
-
-## 13. Representative Demo Flow
-
-推荐 5-minute Demo 路径：
-
-```text
-1. FACT
-2025年上海地区GMV是多少？
-→ trusted Overall
-→ Channel / Category Composition
-→ Verification / Reconciliation
-
-2. COMPARISON
-2025年10月GMV和9月相比如何？
-→ reference / current / delta / delta rate
-→ no silent investigation upgrade
-
-3. INVESTIGATION
-2025年10月GMV和9月相比如何？
-如果发生变化，应该查看什么方面？
-→ Decision Summary
-→ Channel / Geography / Campaign
-→ reconciliation
-→ causal boundary
-
-4. PERIODIC
-Monthly / 2025-10-31
-→ Operating Summary
-→ KPI
-→ Driver Reconciliation
-→ Customer Health
-→ Word / Excel
-```
-
----
-
-## 14. Known Boundaries
-
-当前明确不冒充已完成的能力：
-
-### People Composition
-
-状态：
-
-```text
-DEFERRED / NOT PUBLICLY RELEASED
-```
-
-原因：
-
-legacy path 使用 payment-time membership，而最终业务定义要求：
-
-```text
-Old Customer
-→ latest membership snapshot immediately before analysis window
-
-New Customer
-→ first purchase within requested channel scope during analysis window
-```
-
-正确实现需要 lifecycle history + temporal snapshot + stage-aware scope contract。
-
-Day94 Closing 选择：
-
-```text
-semantics not correct
-→ do not release
-```
-
-而不是展示一个“能算出数、但回答错问题”的结果。
-
----
-
-### 其他 Deferred
-
-- Evidence-aware adaptive routing；
-- Campaign × Channel / Campaign × Category / Channel × Category；
-- causal uplift / counterfactual；
-- Scheduler / Subscription / Automatic Distribution；
-- durable multi-investigation state；
-- Multi-plan execution；
-- V2 automatic SQL Repair Runtime；
-- Production Active Anomaly Policy calibration；
-- Dataset V2 Stable Promotion。
-
----
-
-## 15. Release Boundary
-
-```text
-Phase1：CLOSED
-Phase2：CLOSED
-Phase3：CLOSED
-Phase4：CLOSED
-Public Delivery Hard Gate：PASS
-
-Dataset V2：candidate
-
-Latest Stable：
-Day60
-beauty_bi_v1
-commit 6701323
-
-Stable Promotion：
-deferred
-
-Production Active Anomaly Policy：
-0
-```
-
-Candidate 不等于失败。
-
-它表示：
-
-```text
-当前能力已经具备明确工程证据
-+
-已知边界显式记录并 fail-safe
-+
-但尚未满足更高 Stable Promotion 门槛
-```
-
----
-
-## 16. Tech Stack
-
-### Application
-
-- Python 3.10
-- Streamlit
-- Pydantic V2
-- LangGraph
-- Tenacity
-
-### Database
-
-- PostgreSQL
-- pgvector
-- SQLAlchemy 2.0
-- SQLGlot
-
-### AI
-
-- DeepSeek API
-- Embedding Search
-- Structured Outputs
-- LLM-as-Judge / Human Calibration
-
-### Engineering
-
-- Docker / Docker Compose
-- GitHub Actions
-- Langfuse
-- Render
-- deterministic regression / PostgreSQL integration tests
-
----
-
-## 17. Project Structure
-
-```text
-app/
-├─ governance/
-├─ semantic_layer/
-├─ delivery/
-├─ evaluation/
-├─ observability/
-├─ db/
-│  └─ beauty_bi_v2/
-├─ ui/
-│  └─ decision_console_app.py
-└─ ...
-
-metadata/
-├─ business_metrics.yaml
-├─ query_plans.yaml
-├─ table_dictionary.yaml
-└─ table_relationships.yaml
-
-docs/
-└─ evaluation/
-
-.github/
-└─ workflows/
-   └─ ci.yml
-
-Dockerfile
-docker-compose.yml
-requirements-lock.txt
-.env.example
-```
-
----
-
-## 18. Project Positioning
-
-这个项目最终希望证明的不是：
-
-```text
-“我会调用一个 LLM”
-```
-
-而是：
-
-```text
-我能把 LLM 放进一个
-有业务语义
-有权限边界
-有确定性计算合同
-有受控 Agent Loop
-有 Evidence / Reconciliation
-有 Evaluation
-有可复现部署
-有清晰失败边界
-的工程系统里。
-```
-
-这也是当前项目面向 AI Data Analyst / AI Engineer / GenAI Engineer / AI Agent Engineer 岗位的核心作品集价值。
+评测记录与性能验证证据见 `docs/evaluation/`。
